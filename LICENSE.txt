@@ -1,0 +1,24 @@
+SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-Palimpsest-0.5
+
+This software is dual-licensed under:
+  1. GNU Affero General Public License v3.0 or later
+  2. Palimpsest License v0.5
+
+See https://spdx.org/licenses/ for license details.
+================================================================================
+
+JanusKey Licensing Policy: Mutually Assured Accountability (MAA)
+
+The JanusKey project operates under a mandatory dual-licensing structure to maintain the high assurance claims derived from the Maximal Principle Reduction (MPR) axiom. This policy ensures that contributions are maximized while the integrity and provable claims of the project are protected.
+1. Code Licensing (Default License)
+
+Unless otherwise noted, all source code and accompanying documentation are licensed under the MIT License.
+
+This license is chosen to maximize the project's accessibility, interoperability, and adoption across the FOSS ecosystem (including Deno, Bun, and major Rust/WASM toolchains).
+2. Assurance and Integrity Licensing (Palimpsest v0.4)
+
+All formal verification artifacts, proof scripts, and derived security assertions (located primarily in the verification/formal/ directory) are additionally licensed under the Palimpsest v0.4 License.
+
+This dual licensing ensures that while the code is open for use and contribution (MIT), the core intellectual property—the proofs, assurance claims, and the formal structure of the MPR axiom—remain protected under a specialized license (Palimpsest v0.4) that mandates strict compliance or verification protocols for commercial deployment.
+
+Note: Contributors submitting new formal verification proofs or changes to the core RMR/RMO logic must agree to this dual licensing structure.

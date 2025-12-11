@@ -1,0 +1,122 @@
+Internet Engineering Task Force (IETF)                               Jonathan D.A. Jewell
+Internet-Draft                                                         The Open University
+Intended status: Informational                                   [October 13, 2025]
+Expires: April 13, 2026
+
+                                   Mutually Assured Accountability (MAA) Framework
+                                                            Abstract
+
+The widespread reliance on unverifiable, best-effort transactional
+integrity and data deletion mechanisms in decentralized systems
+constitutes a systemic trust deficit. This deficit leads to chronic
+compliance failures (e.g., GDPR Article 17) and unrecoverable state
+corruption in Edge and IoT deployments. This document introduces the
+Mutually Assured Accountability (MAA) Framework, a novel ethical
+and engineering paradigm. MAA operationalises the **Maximal
+Principle Reduction (MPR)** axiom by defining a set of formally
+verifiable, dual primitives (RMR and RMO) that structurally enforce
+a balance between auditability and user autonomy. The MAA Framework
+proposes achieving system dependability through mathematically
+certain state reversibility and data obliteration, thereby replacing
+operational logging reliance with structural, formal assurance.
+
+                                   1. Introduction
+
+The principles governing data management in high-assurance,
+decentralized systems remain fundamentally reliant on operational
+accountability methods (logging, monitoring, eventual consistency).
+These methods fail to provide **epistemological certainty**—the
+mathematical guarantee that a system state is correct, or that a
+deleted record no longer exists. This gap leads to structural trust
+deficits.
+
+The MAA Framework addresses this by establishing two symmetrical,
+formally verifiable primitives derived from the MPR axiom. These
+primitives are structurally guaranteed by the **Oblíbený** language's
+constraint-driven compilation model:
+
+* **RMR (Reversible Transaction):** A primitive for state transitions
+  that guarantees instant, mathematically certain rollback to a
+  prior safe state via Algorithmic Reversibility. This maximizes
+  system auditability and dependability.
+
+* **RMO (Obliterative Wipe):** A primitive for data erasure that
+  achieves Formal Obliteration, proving the non-existence of
+  specified data traces, thereby providing verifiable individual
+  autonomy.
+
+The MAA dynamic dictates that the deployment of RMR (Accountability)
+must be coupled with RMO (Control), stabilizing the system through
+a mutually enforced set of formal constraints.
+
+                                   2. Terminology
+
+The key terms defined within this document are:
+
+* **MAA (Mutually Assured Accountability):** The ethical and
+  engineering paradigm that structurally balances adversarial
+  system requirements using formal verification.
+
+* **MPR (Maximal Principle Reduction):** The core axiom used to
+  constrain system complexity to a minimal, verifiable subset.
+
+* **Oblíbený:** The specialized language and compiler toolchain that
+  enforces the MPR axiom via a Turing-Incomplete Deployment Subset.
+
+* **RMR (Reversible Transaction):** A data primitive, implemented
+  via the **Oblíbený** toolchain (targeting Rust/WASM), that guarantees
+  the existence of a mathematically sound inverse function for every
+  state change.
+
+* **RMO (Obliterative Wipe):** A data primitive that guarantees,
+  via formal proof, the non-existence (unrecoverability) of specific
+  data after invocation, satisfying the Right to Erasure.
+
+                                3. MAA and Formal Integrity
+  
+Current distributed transaction models (e.g., Two-Phase Commit, Saga)
+are complex and can enter blocking or inconsistent states. RMR
+proposes replacement with a simple, formally verified mechanism
+where the guarantee of integrity is based on the proven symmetry of
+the underlying function: $F^{-1}(\text{F}(\text{State})) = \text{State}$. The
+formal proof scripts for RMR demonstrate that the primitive is
+structurally incapable of leaving the state corrupted.
+
+                                   4. MAA and User Autonomy
+
+RMO addresses the chronic failure of data persistence to honour user
+deletion requests. The primitive ensures that the integrity of the
+data record is broken and its digital reminiscence is eliminated. This
+capability is crucial for compliance with privacy frameworks,
+providing a verifiable technical mechanism for the individual's
+right to control their digital history.
+
+                                   5. Security Considerations
+
+The MAA framework shifts the security focus from patch management
+to structural design. Security is assured by forcing the smallest
+possible Trusted Computing Base (TCB) at the protocol/primitive
+layer. The integrity of the MAA framework itself relies on the rigor
+of the formal verification proofs (e.g., using Isabelle/HOL and Z3)
+which must be auditable and maintained openly (e.g., as FOSS).
+
+                                   6. IANA Considerations
+
+This document has no IANA considerations.
+
+                                   7. Acknowledgements
+
+The principles of the MAA framework are grounded in the work on
+Algorithmic Reversibility (Bennett) and the thermodynamic limits of
+information erasure (Landauer). The axiomatic foundation was further
+sharpened by the philosophical challenge of resolving
+epistemological dilemmas (Wittgenstein and Russell) and by the
+critical necessity to clearly articulate verifiable security concepts
+in response to challenges raised by Joshua Jewell.
+
+                                   Author's Address
+
+Jonathan D.A. Jewell
+The Open University
+E-mail: [Your OU Email]
+GitLab: hyperpolymath/januskey

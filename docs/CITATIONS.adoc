@@ -1,0 +1,36 @@
+= januskey - Citation Guide
+:toc:
+
+== BibTeX
+
+[source,bibtex]
+----
+@software{januskey_2025,
+  author = {Polymath, Hyper},
+  title = {januskey},
+  year = {2025},
+  url = {https://github.com/hyperpolymath/januskey},
+  license = {AGPL-3.0-or-later}
+}
+----
+
+== Harvard Style
+
+Polymath, H. (2025) _januskey_ [Computer software]. Available at: https://github.com/hyperpolymath/januskey
+
+== OSCOLA
+
+Hyper Polymath, 'januskey' (2025) <https://github.com/hyperpolymath/januskey>
+
+== MLA
+
+Polymath, Hyper. "januskey." 2025, github.com/hyperpolymath/januskey.
+
+== APA 7
+
+Polymath, H. (2025). _januskey_ [Computer software]. GitHub. https://github.com/hyperpolymath/januskey
+
+== See Also
+
+* link:../CITATION.cff[CITATION.cff]
+* link:../codemeta.json[codemeta.json]
