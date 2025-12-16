@@ -23,13 +23,6 @@ pub enum OperationType {
     Chmod,
     Chown,
     Create,
-    // Extended operations
-    Mkdir,
-    Rmdir,
-    Symlink,
-    Append,
-    Truncate,
-    Touch,
 }
 
 impl std::fmt::Display for OperationType {
@@ -42,12 +35,6 @@ impl std::fmt::Display for OperationType {
             Self::Chmod => write!(f, "CHMOD"),
             Self::Chown => write!(f, "CHOWN"),
             Self::Create => write!(f, "CREATE"),
-            Self::Mkdir => write!(f, "MKDIR"),
-            Self::Rmdir => write!(f, "RMDIR"),
-            Self::Symlink => write!(f, "SYMLINK"),
-            Self::Append => write!(f, "APPEND"),
-            Self::Truncate => write!(f, "TRUNCATE"),
-            Self::Touch => write!(f, "TOUCH"),
         }
     }
 }
