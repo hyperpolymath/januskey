@@ -25,6 +25,7 @@ Thumbs.db
 
 # Rust
 # Cargo.lock  # Keep for binaries
+**/target/
 
 # Elixir
 /cover/
