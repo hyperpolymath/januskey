@@ -8,6 +8,7 @@ pub mod backend;
 pub mod content_store;
 pub mod delta;
 pub mod error;
+pub mod ffi;
 pub mod metadata;
 pub mod obliteration;
 pub mod operations;

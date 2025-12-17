@@ -41,6 +41,15 @@ impl ContentHash {
         let computed = Self::from_bytes(content);
         self.0 == computed.0
     }
+
+    /// Create hash from hex string (with or without sha256: prefix)
+    pub fn from_hex(hex_str: &str) -> Self {
+        if hex_str.starts_with("sha256:") {
+            Self(hex_str.to_string())
+        } else {
+            Self(format!("sha256:{}", hex_str))
+        }
+    }
 }
 
 impl std::fmt::Display for ContentHash {
