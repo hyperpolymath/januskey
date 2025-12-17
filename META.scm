@@ -97,3 +97,39 @@
       Each language is chosen for its strengths in its domain.")))
 
 ;;; End of META.scm
+;; ============================================================================
+;; CROSS-PLATFORM STATUS (Added 2025-12-17)
+;; ============================================================================
+;; ATTENTION: Both GitHub and GitLab were active on the same day.
+;; Manual review required before syncing.
+
+(cross-platform-status
+  (generated "2025-12-17")
+  (primary-platform "github")
+  (gitlab-mirror
+    (path "hyperpolymath/januskey")
+    (url "https://gitlab.com/hyperpolymath/januskey")
+    (last-gitlab-activity "2025-12-17")
+    (sync-status "needs-review")
+    (notes "Both platforms active same day. Compare before sync."))
+  
+  (reconciliation-instructions
+    ";; STEP 1: Add GitLab remote and fetch"
+    ";; git remote add gitlab https://gitlab.com/hyperpolymath/januskey.git"
+    ";; git fetch gitlab"
+    ";;"
+    ";; STEP 2: Compare the two versions"
+    ";; git log --oneline main          # GitHub history"
+    ";; git log --oneline gitlab/main   # GitLab history"  
+    ";; git diff main gitlab/main       # See differences"
+    ";;"
+    ";; STEP 3: Decide and merge if needed"
+    ";; git merge gitlab/main --allow-unrelated-histories"
+    ";; OR cherry-pick specific: git cherry-pick <sha>"
+    ";;"
+    ";; STEP 4: After reconciliation, update this section:"
+    ";;   (sync-status \"resolved\")"
+    ";;   (resolved-date \"YYYY-MM-DD\")")
+  
+  (action-required "needs-review"))
+
