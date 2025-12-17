@@ -1,0 +1,546 @@
+= CLI Commands Guide
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+The `jk` command-line interface provides access to all JanusKey operations. This guide covers every command with examples.
+
+== Getting Started
+
+=== Installation
+
+[source,bash]
+----
+# Build from source
+cd src/januskey
+cargo build --release
+
+# Install to PATH
+cargo install --path .
+
+# Verify installation
+jk --version
+----
+
+=== Initialize a Directory
+
+Before using JanusKey in a directory, initialize it:
+
+[source,bash]
+----
+cd /your/project
+jk init
+----
+
+This creates `.januskey/` with:
+----
+.januskey/
+├── config.json      # Configuration
+├── content/         # Content store
+├── metadata.json    # Operation log
+└── transactions     # Transaction log
+----
+
+== Core Commands
+
+=== init
+
+Initialize JanusKey in the current directory.
+
+[source,bash]
+----
+jk init
+----
+
+Options:
+|===
+| Flag | Description
+
+| `--force`
+| Reinitialize existing .januskey directory
+|===
+
+=== delete
+
+Delete files (reversible).
+
+[source,bash]
+----
+jk delete file.txt
+jk delete *.log
+jk delete -f important.txt  # No confirmation
+jk delete --dry-run test/*  # Preview only
+----
+
+Options:
+|===
+| Flag | Description
+
+| `-f, --force`
+| Skip confirmation
+
+| `--dry-run`
+| Preview without executing
+
+| `-r, --recursive`
+| Delete directories recursively
+|===
+
+=== modify
+
+Modify file content.
+
+[source,bash]
+----
+jk modify file.txt --content "new content"
+jk modify file.txt --file replacement.txt
+jk modify config.yaml --sed "s/DEBUG/INFO/g"
+----
+
+Options:
+|===
+| Flag | Description
+
+| `--content <TEXT>`
+| New content as string
+
+| `--file <PATH>`
+| Read new content from file
+
+| `--sed <PATTERN>`
+| Apply sed-like substitution
+|===
+
+=== move
+
+Move or rename files.
+
+[source,bash]
+----
+jk move old.txt new.txt
+jk mv src/file.txt dst/file.txt
+----
+
+=== copy
+
+Copy files.
+
+[source,bash]
+----
+jk copy source.txt destination.txt
+jk cp original.txt backup.txt
+----
+
+=== mkdir
+
+Create directories.
+
+[source,bash]
+----
+jk mkdir new_directory
+jk mkdir -p path/to/nested/directory
+----
+
+Options:
+|===
+| Flag | Description
+
+| `-p, --parents`
+| Create parent directories as needed
+|===
+
+=== rmdir
+
+Remove directories.
+
+[source,bash]
+----
+jk rmdir empty_dir
+jk rmdir -r directory_with_contents
+----
+
+Options:
+|===
+| Flag | Description
+
+| `-r, --recursive`
+| Remove directory and all contents
+|===
+
+=== symlink
+
+Create symbolic links (Unix only).
+
+[source,bash]
+----
+jk symlink /path/to/target link_name
+jk ln -s target link
+----
+
+=== append
+
+Append content to files.
+
+[source,bash]
+----
+jk append log.txt --content "New log entry"
+jk append data.csv --file new_rows.csv
+----
+
+=== truncate
+
+Truncate files to specified size.
+
+[source,bash]
+----
+jk truncate large_file.txt --size 1000
+jk truncate file.txt -s 0  # Empty the file
+----
+
+=== touch
+
+Update timestamps or create empty files.
+
+[source,bash]
+----
+jk touch file.txt           # Update mtime or create
+jk touch --no-create file   # Only update, don't create
+----
+
+=== chmod
+
+Change file permissions (Unix only).
+
+[source,bash]
+----
+jk chmod 644 file.txt
+jk chmod +x script.sh
+jk chmod 755 directory/
+----
+
+== Undo Commands
+
+=== undo
+
+Undo the last operation(s).
+
+[source,bash]
+----
+jk undo              # Undo last operation
+jk undo --count 3    # Undo last 3 operations
+jk undo -n 5         # Undo last 5 operations
+jk undo --id abc123  # Undo specific operation by ID
+----
+
+Options:
+|===
+| Flag | Description
+
+| `-n, --count <N>`
+| Number of operations to undo
+
+| `--id <ID>`
+| Undo specific operation by ID
+
+| `--dry-run`
+| Preview undo without executing
+|===
+
+Example session:
+[source,bash]
+----
+$ jk delete important.txt
+Deleted: important.txt (sha256:abc123...)
+
+$ ls important.txt
+ls: cannot access 'important.txt': No such file or directory
+
+$ jk undo
+Restored: important.txt
+
+$ ls important.txt
+important.txt
+----
+
+== Transaction Commands
+
+=== begin
+
+Start a new transaction.
+
+[source,bash]
+----
+jk begin
+jk begin "cleanup operation"
+jk begin --name "refactor"
+----
+
+=== commit
+
+Commit the current transaction.
+
+[source,bash]
+----
+jk commit
+----
+
+=== rollback
+
+Rollback all operations in the current transaction.
+
+[source,bash]
+----
+jk rollback
+----
+
+=== preview
+
+Preview operations in the current transaction.
+
+[source,bash]
+----
+jk preview
+----
+
+Example output:
+----
+Transaction: cleanup operation
+Started: 2025-12-17T10:30:00Z
+Operations pending:
+  1. DELETE /tmp/old_logs/app.log
+  2. DELETE /tmp/old_logs/error.log
+  3. MOVE /config/old.yaml → /archive/old.yaml
+Total files affected: 4
+----
+
+== Information Commands
+
+=== status
+
+Show current JanusKey status.
+
+[source,bash]
+----
+jk status
+----
+
+Example output:
+----
+JanusKey Status
+===============
+Directory: /home/user/project
+Initialized: Yes
+Operations: 156
+Content store: 12 MB (89 blobs)
+Active transaction: cleanup (3 operations)
+----
+
+=== history
+
+Show operation history.
+
+[source,bash]
+----
+jk history
+jk history --count 20
+jk history --type DELETE
+jk history --path "*.log"
+jk history --since "2025-12-01"
+----
+
+Options:
+|===
+| Flag | Description
+
+| `-n, --count <N>`
+| Show last N operations
+
+| `--type <TYPE>`
+| Filter by operation type
+
+| `--path <PATTERN>`
+| Filter by path pattern
+
+| `--since <DATE>`
+| Show operations since date
+
+| `--json`
+| Output as JSON
+|===
+
+Example output:
+----
+Operation History (last 10)
+===========================
+ID        Type     Path                    Time
+--------  -------  ----------------------  -------------------
+abc123    DELETE   /tmp/test.txt           2025-12-17 10:30
+def456    MODIFY   /config/app.yaml        2025-12-17 10:25
+ghi789    MOVE     /old/path → /new/path   2025-12-17 10:20
+...
+----
+
+=== info
+
+Show details about a specific operation.
+
+[source,bash]
+----
+jk info abc123
+jk info --id abc123
+----
+
+Example output:
+----
+Operation: abc123
+Type: DELETE
+Time: 2025-12-17T10:30:00Z
+User: jonathan
+Path: /tmp/test.txt
+Content Hash: sha256:abc123...
+Original Size: 1234 bytes
+Original Permissions: 644
+Undone: No
+----
+
+== Maintenance Commands
+
+=== gc
+
+Run garbage collection to reclaim space.
+
+[source,bash]
+----
+jk gc
+jk gc --dry-run
+jk gc --older-than 30d
+----
+
+Options:
+|===
+| Flag | Description
+
+| `--dry-run`
+| Show what would be deleted
+
+| `--older-than <DURATION>`
+| Only GC content older than duration
+|===
+
+=== verify
+
+Verify content store integrity.
+
+[source,bash]
+----
+jk verify
+jk verify --fix
+----
+
+=== config
+
+View or modify configuration.
+
+[source,bash]
+----
+jk config                           # Show all config
+jk config compression              # Get specific value
+jk config compression false        # Set value
+jk config --reset                  # Reset to defaults
+----
+
+== Global Options
+
+These options work with all commands:
+
+|===
+| Flag | Description
+
+| `-v, --verbose`
+| Verbose output
+
+| `-q, --quiet`
+| Suppress non-error output
+
+| `--dry-run`
+| Preview without executing
+
+| `--json`
+| Output as JSON
+
+| `-C, --directory <DIR>`
+| Run in specified directory
+
+| `--help`
+| Show help for command
+
+| `--version`
+| Show version
+|===
+
+== Exit Codes
+
+|===
+| Code | Meaning
+
+| 0
+| Success
+
+| 1
+| General error
+
+| 2
+| Invalid arguments
+
+| 3
+| File not found
+
+| 4
+| Permission denied
+
+| 5
+| Not initialized
+
+| 6
+| Transaction error
+|===
+
+== Shell Completion
+
+Generate shell completions:
+
+[source,bash]
+----
+# Bash
+jk completions bash > /etc/bash_completion.d/jk
+
+# Zsh
+jk completions zsh > ~/.zsh/completions/_jk
+
+# Fish
+jk completions fish > ~/.config/fish/completions/jk.fish
+----
+
+== Aliases
+
+You can create shell aliases for common operations:
+
+[source,bash]
+----
+# ~/.bashrc or ~/.zshrc
+alias jkd='jk delete'
+alias jkm='jk move'
+alias jkc='jk copy'
+alias jku='jk undo'
+alias jks='jk status'
+alias jkh='jk history'
+----
+
+== Further Reading
+
+* link:transactions.adoc[Transaction Guide]
+* link:../operations/index.adoc[Operations Reference]
+* link:../examples/index.adoc[Examples]

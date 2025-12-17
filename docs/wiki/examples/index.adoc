@@ -1,0 +1,546 @@
+= Examples and Use Cases
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+This section provides practical examples of JanusKey usage for common scenarios.
+
+== Basic Operations
+
+=== Safe File Deletion
+
+[source,bash]
+----
+# Initialize JanusKey
+jk init
+
+# Delete files safely
+jk delete logs/*.log
+echo "Deleted 47 log files"
+
+# Oops! Needed one of those logs
+jk history --type DELETE --count 50
+# Find the operation ID for the needed file
+
+jk undo --id abc123
+# File restored
+----
+
+=== Modifying Configuration Files
+
+[source,bash]
+----
+# Modify a config file
+jk modify config.yaml --sed 's/debug: true/debug: false/'
+
+# Something broke? Undo instantly
+jk undo
+
+# Try a different change
+jk modify config.yaml --sed 's/log_level: INFO/log_level: DEBUG/'
+
+# Works! Keep it
+----
+
+=== Reorganizing Directory Structure
+
+[source,bash]
+----
+jk begin "reorganize project"
+
+# Move files to new structure
+jk mkdir -p src/components
+jk mkdir -p src/utils
+jk mkdir -p src/services
+
+jk move components/* src/components/
+jk move utils/* src/utils/
+jk move services/* src/services/
+
+# Preview the changes
+jk preview
+
+# Tests pass?
+npm test
+if [ $? -eq 0 ]; then
+    jk commit
+    echo "Reorganization complete"
+else
+    jk rollback
+    echo "Tests failed, reverted changes"
+fi
+----
+
+== Advanced Patterns
+
+=== Batch Processing with Rollback
+
+[source,bash]
+----
+#!/bin/bash
+# batch_process.sh - Process files with automatic rollback on error
+
+jk begin "batch processing"
+
+for file in data/*.json; do
+    # Process each file
+    jk modify "$file" --file <(process_json "$file")
+
+    # Validate result
+    if ! validate_json "$file"; then
+        echo "Error processing $file"
+        jk rollback
+        exit 1
+    fi
+done
+
+jk commit
+echo "All files processed successfully"
+----
+
+=== Safe Deployment Preparation
+
+[source,bash]
+----
+#!/bin/bash
+# prepare_deploy.sh
+
+jk begin "deployment prep v1.2.0"
+
+# Remove development artifacts
+jk delete -r .dev/
+jk delete -r __pycache__/
+jk delete -r node_modules/.cache/
+jk delete "*.pyc"
+jk delete ".env.local"
+
+# Update version strings
+jk modify package.json --sed 's/"version": "1.1.0"/"version": "1.2.0"/'
+jk modify setup.py --sed "s/version='1.1.0'/version='1.2.0'/"
+
+# Build and test
+npm run build
+npm test
+
+if [ $? -eq 0 ]; then
+    jk commit
+    echo "Ready for deployment"
+else
+    jk rollback
+    echo "Build/test failed, changes reverted"
+    exit 1
+fi
+----
+
+=== Configuration Migration
+
+[source,bash]
+----
+#!/bin/bash
+# migrate_config.sh - Migrate config format with safety
+
+jk begin "config migration v2"
+
+# Backup and transform configs
+for config in config/*.yaml; do
+    # Transform YAML to new format
+    new_content=$(yaml_transform "$config")
+
+    if [ -n "$new_content" ]; then
+        jk modify "$config" --content "$new_content"
+    else
+        echo "Transform failed for $config"
+        jk rollback
+        exit 1
+    fi
+done
+
+# Validate all configs
+if validate_all_configs; then
+    jk commit
+    echo "Migration complete"
+else
+    jk rollback
+    echo "Validation failed, reverted"
+    exit 1
+fi
+----
+
+== Integration Examples
+
+=== Git Pre-Commit Hook
+
+[source,bash]
+----
+#!/bin/bash
+# .git/hooks/pre-commit
+
+# Ensure JanusKey is initialized
+if ! jk status > /dev/null 2>&1; then
+    echo "JanusKey not initialized"
+    exit 0
+fi
+
+# Create checkpoint before commit
+jk begin "pre-commit checkpoint"
+
+# Run linters with auto-fix
+npm run lint:fix
+
+# If files changed, add them
+if ! git diff --quiet; then
+    git add -A
+    jk commit
+    echo "Auto-fixed lint issues"
+else
+    jk rollback  # No changes needed
+fi
+----
+
+=== CI/CD Pipeline Integration
+
+[source,yaml]
+----
+# .github/workflows/test.yml
+name: Test with JanusKey Protection
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install JanusKey
+        run: |
+          cd src/januskey
+          cargo install --path .
+
+      - name: Initialize JanusKey
+        run: jk init
+
+      - name: Run tests with protection
+        run: |
+          jk begin "test run"
+          npm test
+          TEST_RESULT=$?
+          if [ $TEST_RESULT -eq 0 ]; then
+            jk commit
+          else
+            jk rollback
+            echo "Tests modified files unexpectedly"
+          fi
+          exit $TEST_RESULT
+----
+
+=== Makefile Integration
+
+[source,makefile]
+----
+# Makefile with JanusKey support
+
+.PHONY: clean build test deploy
+
+init:
+	jk init
+
+clean:
+	jk begin "clean"
+	jk delete -r build/
+	jk delete -r dist/
+	jk delete "*.pyc"
+	jk commit
+
+build: clean
+	jk begin "build"
+	python setup.py build
+	npm run build
+	jk commit
+
+test:
+	jk begin "test"
+	pytest tests/
+	npm test
+	@if [ $$? -eq 0 ]; then \
+		jk commit; \
+	else \
+		jk rollback; \
+		exit 1; \
+	fi
+
+deploy: build test
+	jk begin "deploy prep"
+	jk delete .env.local
+	jk delete -r __pycache__/
+	# ... deployment steps
+	jk commit
+----
+
+== Rust Library Examples
+
+=== Basic Library Usage
+
+[source,rust]
+----
+use januskey::{JanusKey, FileOperation, OperationExecutor};
+use std::path::PathBuf;
+
+fn main() -> januskey::Result<()> {
+    // Initialize or open
+    let mut jk = if JanusKey::is_initialized(".".as_ref()) {
+        JanusKey::open(".".as_ref())?
+    } else {
+        JanusKey::init(".".as_ref())?
+    };
+
+    // Delete a file (reversible)
+    let mut executor = OperationExecutor::new(
+        &jk.content_store,
+        &mut jk.metadata_store,
+    );
+
+    let metadata = executor.execute(FileOperation::Delete {
+        path: PathBuf::from("old_file.txt"),
+    })?;
+
+    println!("Deleted file, operation ID: {}", metadata.id);
+
+    // Later: undo if needed
+    // executor.undo(&metadata.id)?;
+
+    Ok(())
+}
+----
+
+=== Transaction Example
+
+[source,rust]
+----
+use januskey::{JanusKey, FileOperation, TransactionExecutor};
+
+fn batch_cleanup(jk: &mut JanusKey) -> januskey::Result<()> {
+    // Start transaction
+    jk.transaction_manager.begin(Some("cleanup".to_string()))?;
+
+    // Execute multiple operations
+    {
+        let mut executor = TransactionExecutor::new(
+            &jk.content_store,
+            &mut jk.metadata_store,
+            &mut jk.transaction_manager,
+        );
+
+        // Delete temp files
+        for entry in std::fs::read_dir("./temp")? {
+            let path = entry?.path();
+            if path.is_file() {
+                executor.execute(FileOperation::Delete { path })?;
+            }
+        }
+    }
+
+    // Verify and commit/rollback
+    if verify_cleanup() {
+        jk.transaction_manager.commit()?;
+        println!("Cleanup committed");
+    } else {
+        jk.transaction_manager.rollback(
+            &jk.content_store,
+            &mut jk.metadata_store,
+        )?;
+        println!("Cleanup rolled back");
+    }
+
+    Ok(())
+}
+----
+
+=== Custom Operation Wrapper
+
+[source,rust]
+----
+use januskey::{JanusKey, FileOperation, OperationExecutor, OperationMetadata};
+use std::path::Path;
+
+/// Wrapper for safe file operations with automatic JanusKey tracking
+pub struct SafeFileOps {
+    jk: JanusKey,
+}
+
+impl SafeFileOps {
+    pub fn new(path: &Path) -> januskey::Result<Self> {
+        let jk = if JanusKey::is_initialized(path) {
+            JanusKey::open(path)?
+        } else {
+            JanusKey::init(path)?
+        };
+        Ok(Self { jk })
+    }
+
+    pub fn delete(&mut self, path: &Path) -> januskey::Result<OperationMetadata> {
+        let mut executor = OperationExecutor::new(
+            &self.jk.content_store,
+            &mut self.jk.metadata_store,
+        );
+        executor.execute(FileOperation::Delete {
+            path: path.to_path_buf(),
+        })
+    }
+
+    pub fn write(&mut self, path: &Path, content: &[u8]) -> januskey::Result<OperationMetadata> {
+        let mut executor = OperationExecutor::new(
+            &self.jk.content_store,
+            &mut self.jk.metadata_store,
+        );
+
+        if path.exists() {
+            executor.execute(FileOperation::Modify {
+                path: path.to_path_buf(),
+                new_content: content.to_vec(),
+            })
+        } else {
+            executor.execute(FileOperation::Create {
+                path: path.to_path_buf(),
+                content: content.to_vec(),
+            })
+        }
+    }
+
+    pub fn undo_last(&mut self) -> januskey::Result<OperationMetadata> {
+        let last = self.jk.metadata_store
+            .last_undoable()
+            .ok_or(januskey::JanusError::OperationFailed(
+                "No operations to undo".to_string()
+            ))?;
+        let id = last.id.clone();
+
+        let mut executor = OperationExecutor::new(
+            &self.jk.content_store,
+            &mut self.jk.metadata_store,
+        );
+        executor.undo(&id)
+    }
+}
+----
+
+== Real-World Scenarios
+
+=== Log Rotation with Recovery
+
+[source,bash]
+----
+#!/bin/bash
+# rotate_logs.sh - Rotate logs with ability to recover
+
+LOG_DIR="/var/log/myapp"
+ARCHIVE_DIR="/var/log/myapp/archive"
+
+cd "$LOG_DIR"
+jk init 2>/dev/null || true
+
+jk begin "log rotation $(date +%Y%m%d)"
+
+# Rotate current logs
+for log in *.log; do
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    jk move "$log" "$ARCHIVE_DIR/${log%.log}_${timestamp}.log"
+done
+
+# Compress old archives
+find "$ARCHIVE_DIR" -name "*.log" -mtime +7 -exec gzip {} \;
+
+# Clean very old archives
+jk delete "$ARCHIVE_DIR"/*.log.gz -mtime +30
+
+jk commit
+echo "Log rotation complete"
+
+# If something went wrong with the app after rotation:
+# jk rollback
+# This restores all logs to their original locations
+----
+
+=== Database Migration Companion
+
+[source,bash]
+----
+#!/bin/bash
+# migrate_with_files.sh - Database migration with file changes
+
+jk begin "migration v1.2.0"
+
+# Update configuration for new schema
+jk modify config/database.yaml --sed 's/schema_version: 1.1/schema_version: 1.2/'
+
+# Add new migration files
+jk create migrations/v1.2.0_add_indexes.sql --file ./new_migration.sql
+
+# Run database migration
+if python manage.py migrate; then
+    jk commit
+    echo "Migration successful"
+else
+    jk rollback
+    echo "Migration failed, config reverted"
+    echo "Note: Database changes may need manual rollback"
+    exit 1
+fi
+----
+
+== Troubleshooting Examples
+
+=== Recovering from Mistakes
+
+[source,bash]
+----
+# Accidentally deleted important files
+$ rm -rf src/  # Oops! Wrong directory
+
+# If JanusKey was used:
+$ jk history --path "src/*" --count 100
+# Find the delete operations
+
+$ jk undo --count 47  # Undo all src/ deletions
+# Files restored!
+----
+
+=== Viewing What Changed
+
+[source,bash]
+----
+# What did I change in the last hour?
+$ jk history --since "1 hour ago"
+
+# What operations affected config files?
+$ jk history --path "config/*"
+
+# Details on a specific operation
+$ jk info abc123
+----
+
+=== Cleaning Up History
+
+[source,bash]
+----
+# Check current storage usage
+$ jk status
+Content store: 156 MB (2341 blobs)
+Operations: 15,234
+
+# Run garbage collection
+$ jk gc --older-than 30d --dry-run
+Would remove: 89 MB (1205 blobs)
+
+$ jk gc --older-than 30d
+Removed: 89 MB
+----
+
+== Further Reading
+
+* link:../guides/cli.adoc[CLI Reference]
+* link:../guides/transactions.adoc[Transaction Guide]
+* link:../api/index.adoc[API Reference]

@@ -1,0 +1,114 @@
+= JanusKey Wiki
+Jonathan D.A. Jewell <jonathan.jewell@gmail.com>
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+:experimental:
+
+== Welcome to JanusKey
+
+JanusKey is a provably reversible file operations utility that achieves complete reversibility through architectural design rather than logging or backups. Unlike traditional backup systems that restore from external state, JanusKey operations carry sufficient information for perfect inversion—making data loss architecturally impossible.
+
+=== Core Philosophy
+
+JanusKey implements *Maximal Principle Reduction (MPR)*, a security methodology where vulnerability elimination occurs by construction rather than verification. This represents a fundamental shift from:
+
+[cols="1,1"]
+|===
+| Traditional Approach | JanusKey Approach
+
+| Data protection through backups
+| Data loss impossible by construction
+
+| Logging for accountability
+| Structural reversibility guarantee
+
+| Trust in operational processes
+| Formal mathematical proofs
+
+| Recovery from external state
+| Recovery from operation metadata
+|===
+
+=== Quick Navigation
+
+[cols="1,3"]
+|===
+| Section | Description
+
+| link:theory/index.adoc[Theory]
+| Formal foundations: MPR, MAA Framework, RMR/RMO primitives
+
+| link:architecture/index.adoc[Architecture]
+| System design, component overview, data flow
+
+| link:operations/index.adoc[Operations Reference]
+| Complete guide to all reversible operations
+
+| link:guides/cli.adoc[CLI Guide]
+| Command-line interface documentation
+
+| link:guides/transactions.adoc[Transactions]
+| Grouping operations with commit/rollback
+
+| link:api/index.adoc[API Reference]
+| Rust library API documentation
+
+| link:formal-proofs/index.adoc[Formal Proofs]
+| Mathematical proofs of reversibility
+
+| link:examples/index.adoc[Examples]
+| Practical usage examples and patterns
+|===
+
+=== Key Guarantees
+
+1. **100% Reversibility**: Every operation can be undone, always
+2. **Instant Rollback**: Undo changes in milliseconds, not hours
+3. **Data Loss Impossible**: Not "unlikely"—architecturally impossible
+4. **Complete Audit Trail**: Every change tracked automatically
+5. **Transaction Support**: Group operations, commit/rollback together
+6. **Content-Addressed Storage**: SHA256 hashing with deduplication
+
+=== The Janus Symbol
+
+The name "JanusKey" derives from Janus, the Roman god of beginnings, endings, doorways, and transitions. Janus is typically depicted with two faces—one looking to the past, one to the future. This perfectly captures the essence of JanusKey:
+
+* **Forward Operations**: Execute changes moving from present state to future state
+* **Reverse Operations**: Perfect restoration from any point back to the past
+
+The "Key" represents the cryptographic foundation (SHA256 content addressing) that ensures integrity and enables the formal guarantees of the system.
+
+=== Quick Start
+
+[source,bash]
+----
+# Build from source
+cd src/januskey
+cargo build --release
+
+# Initialize in a directory
+jk init
+
+# Delete files (reversible)
+jk delete *.log
+
+# Instantly undo
+jk undo
+
+# Group operations
+jk begin "cleanup"
+jk delete temp*.txt
+jk move old/ archive/
+jk preview    # Review changes
+jk commit     # Or: jk rollback
+----
+
+=== License
+
+JanusKey is dual-licensed under MIT OR AGPL-3.0-or-later.
+
+=== Contributing
+
+See link:../CONTRIBUTING.adoc[CONTRIBUTING.adoc] for guidelines.

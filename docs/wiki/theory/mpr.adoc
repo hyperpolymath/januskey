@@ -1,0 +1,273 @@
+= Maximal Principle Reduction (MPR)
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+:stem: latexmath
+
+== Definition
+
+**Maximal Principle Reduction (MPR)** is a design philosophy and engineering methodology that achieves security and correctness guarantees through structural constraints rather than runtime verification.
+
+[quote, Core MPR Axiom]
+If a vulnerability cannot exist in the design space, it cannot exist in the implementation. Reduce the design space to exclude vulnerabilities entirely.
+
+== Principles
+
+=== Principle 1: Construction Over Verification
+
+[cols="1,1"]
+|===
+| Verification Approach | Construction Approach
+
+| Write code, then test for bugs
+| Design types that make bugs unrepresentable
+
+| Add validation at boundaries
+| Make invalid states impossible
+
+| Log errors for detection
+| Prevent error conditions structurally
+|===
+
+.Example: Null Safety
+[source,rust]
+----
+// Verification approach: check at runtime
+fn process_file(path: String) -> Result<(), Error> {
+    if path.is_empty() {
+        return Err(Error::InvalidPath);
+    }
+    // ... process
+}
+
+// MPR approach: make empty paths unrepresentable
+struct NonEmptyPath(String);
+
+impl NonEmptyPath {
+    fn new(s: String) -> Option<NonEmptyPath> {
+        if s.is_empty() { None } else { Some(NonEmptyPath(s)) }
+    }
+}
+
+fn process_file(path: NonEmptyPath) {
+    // No runtime check needed - empty paths cannot exist
+}
+----
+
+=== Principle 2: Minimal Trusted Computing Base
+
+The **Trusted Computing Base (TCB)** is the set of components that must be correct for the system to be secure. MPR mandates:
+
+1. Minimize the TCB to the smallest possible set
+2. Formally verify the TCB where possible
+3. Use simple, auditable code for TCB components
+
+.JanusKey TCB
+----
++------------------------------------------+
+|           Application Code               |  <- Not in TCB
++------------------------------------------+
+|        Operation Executor                |  <- Not in TCB
++------------------------------------------+
+|    Content Store  |  Metadata Store      |  <- Minimal TCB
++------------------------------------------+
+|         SHA256    |    File System       |  <- External TCB
++------------------------------------------+
+----
+
+=== Principle 3: Structural Invariants
+
+Invariants should be enforced by the type system and data structures, not runtime checks.
+
+.JanusKey Structural Invariants
+|===
+| Invariant | Enforcement Mechanism
+
+| Content integrity
+| SHA256 content-addressed storage (verified on retrieval)
+
+| Operation completeness
+| Metadata stored atomically with operation
+
+| Transaction atomicity
+| All-or-nothing commit/rollback by design
+
+| Reversal possibility
+| Inverse metadata captured before execution
+|===
+
+=== Principle 4: Fail-Safe Defaults
+
+When in doubt, the system should fail safely:
+
+* Operations fail if metadata cannot be stored
+* Retrieval fails if content hash doesn't match
+* Transactions roll back if any operation fails
+
+== Application to File Operations
+
+=== The Data Loss Problem
+
+Traditional file operations are inherently destructive:
+
+[source,bash]
+----
+rm important_file.txt   # Data gone forever
+mv file.txt /dev/null   # Data gone forever
+----
+
+Recovery requires external systems (backups, snapshots) that:
+
+* May not exist
+* May be out of date
+* May be corrupted
+* Require manual intervention
+
+=== MPR Solution: Reversibility by Construction
+
+JanusKey applies MPR by making irreversible operations structurally impossible:
+
+[source,rust]
+----
+// Before any destructive operation:
+// 1. Capture complete content
+// 2. Capture complete metadata
+// 3. Store in content-addressed storage
+// 4. Log operation with inverse information
+// 5. Only then execute
+
+pub fn execute_delete(&mut self, path: &Path) -> Result<OperationMetadata> {
+    // Capture everything needed for reversal FIRST
+    let content = fs::read(path)?;                    // Full content
+    let file_metadata = FileMetadata::from_path(path)?; // All metadata
+    let content_hash = self.content_store.store(&content)?; // Store safely
+
+    // Create metadata with all information for reversal
+    let metadata = OperationMetadata::new(OperationType::Delete, path)
+        .with_content_hash(content_hash)
+        .with_original_metadata(file_metadata);
+
+    // NOW safe to delete - reversal is guaranteed possible
+    fs::remove_file(path)?;
+
+    self.metadata_store.append(metadata)?;
+    Ok(metadata)
+}
+----
+
+== Comparison with Other Approaches
+
+=== Version Control (Git)
+
+[cols="1,1,1"]
+|===
+| Aspect | Git | JanusKey
+
+| Scope
+| Tracked files only
+| Any file operation
+
+| Granularity
+| Commit-level
+| Operation-level
+
+| Explicit action required
+| Yes (git add, commit)
+| No (automatic)
+
+| Working directory changes
+| Lost until committed
+| Always reversible
+|===
+
+=== File System Snapshots (ZFS, Btrfs)
+
+[cols="1,1,1"]
+|===
+| Aspect | Snapshots | JanusKey
+
+| Recovery granularity
+| Snapshot-level
+| Operation-level
+
+| Space efficiency
+| Copy-on-write
+| Content-addressed deduplication
+
+| Cross-filesystem
+| No
+| Yes
+
+| Operation awareness
+| None
+| Full semantic awareness
+|===
+
+=== Traditional Backups
+
+[cols="1,1,1"]
+|===
+| Aspect | Backups | JanusKey
+
+| Recovery time
+| Minutes to hours
+| Milliseconds
+
+| Recovery point
+| Last backup time
+| Any operation
+
+| Storage overhead
+| Full copies
+| Deduplicated content
+
+| Requires external system
+| Yes
+| No (self-contained)
+|===
+
+== Formal Statement
+
+Let stem:[D] be the design space of all possible system states and behaviors.
+
+Let stem:[V \subset D] be the set of vulnerable or incorrect states.
+
+**Traditional approach**: Implement stem:[D], then try to detect/prevent stem:[V] at runtime.
+
+**MPR approach**: Design a restricted space stem:[D' \subset D] such that stem:[D' \cap V = \emptyset].
+
+For JanusKey:
+[stem]
+++++
+D' = \{ s \in D : \forall o \in \text{ops}(s), \exists o^{-1} \in \text{metadata}(s) \}
+++++
+
+This ensures that any reachable state has complete reversal information by construction.
+
+== Limitations and Trade-offs
+
+=== Storage Overhead
+
+Content must be stored before deletion. This trades:
+* Storage space (more) for reversibility (guaranteed)
+* Mitigated by: compression, deduplication, garbage collection
+
+=== Performance Overhead
+
+Additional I/O for metadata capture. This trades:
+* Latency (higher) for safety (guaranteed)
+* Mitigated by: async operations, batching, transactions
+
+=== Complexity Shift
+
+Complexity moves from recovery procedures to operation design:
+* Simpler recovery (just undo)
+* More complex operation implementation
+* Net reduction in total system complexity
+
+== Further Reading
+
+* link:maa-framework.adoc[MAA Framework - Balancing Auditability and Autonomy]
+* link:formal-model.adoc[Formal Model - Mathematical Definitions]
+* link:../formal-proofs/index.adoc[Formal Proofs of Reversibility]

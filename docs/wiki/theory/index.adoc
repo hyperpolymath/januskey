@@ -1,0 +1,131 @@
+= Theoretical Foundations
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+:stem: latexmath
+
+== Overview
+
+JanusKey's design is grounded in rigorous theoretical foundations that provide mathematical guarantees for reversibility. This section covers the core concepts that make JanusKey's guarantees possible.
+
+=== Contents
+
+1. link:mpr.adoc[Maximal Principle Reduction (MPR)]
+2. link:maa-framework.adoc[Mutually Assured Accountability (MAA) Framework]
+3. link:rmr-primitive.adoc[RMR: Reversible Transaction Primitive]
+4. link:rmo-primitive.adoc[RMO: Obliterative Wipe Primitive]
+5. link:formal-model.adoc[Formal Model of File System State]
+6. link:reversibility-theory.adoc[Reversibility Theory]
+
+== Core Axiom: Maximal Principle Reduction
+
+The foundational principle underlying JanusKey is **Maximal Principle Reduction (MPR)**:
+
+[quote]
+Security and correctness should be achieved by construction, not verification. The system should be designed such that vulnerabilities are structurally impossible, not merely unlikely or detectable.
+
+=== Traditional vs MPR Approach
+
+[cols="1,1,1"]
+|===
+| Aspect | Traditional | MPR
+
+| Data safety
+| Achieved through backups
+| Impossible to lose by design
+
+| Verification
+| Post-hoc testing
+| Compile-time guarantees
+
+| Trust model
+| Trust operational processes
+| Trust mathematical proofs
+
+| Failure mode
+| Graceful degradation
+| No degradation possible
+|===
+
+== The MAA Framework
+
+The **Mutually Assured Accountability (MAA) Framework** balances two opposing requirements:
+
+1. **Auditability**: The ability to track, verify, and replay all state changes
+2. **User Autonomy**: The right to permanently erase data (GDPR Article 17)
+
+These are implemented through dual primitives:
+
+* **RMR (Reversible Transaction)**: Guarantees perfect state reversal
+* **RMO (Obliterative Wipe)**: Guarantees permanent, verifiable data erasure
+
+[ditaa]
+....
+                    +----------------+
+                    |  MAA Framework |
+                    +-------+--------+
+                            |
+            +---------------+---------------+
+            |                               |
+    +-------v-------+               +-------v-------+
+    |     RMR       |               |     RMO       |
+    | Reversibility |               | Obliteration  |
+    +-------+-------+               +-------+-------+
+            |                               |
+    +-------v-------+               +-------v-------+
+    | Auditability  |               |   Autonomy    |
+    | Accountability|               |   Privacy     |
+    +---------------+               +---------------+
+....
+
+== Mathematical Foundation
+
+=== File System State
+
+A file system state stem:[S] is defined as a total function:
+
+[stem]
+++++
+S: \text{Path} \to \text{FileState}
+++++
+
+where:
+
+[stem]
+++++
+\text{FileState} = \text{Content} \times \text{Metadata} \cup \{\bot\}
+++++
+
+The symbol stem:[\bot] represents a non-existent file.
+
+=== Operations as Functions
+
+Each operation stem:[O] is a function:
+
+[stem]
+++++
+O: S \to S
+++++
+
+For JanusKey operations, we require the existence of an inverse:
+
+[stem]
+++++
+\forall O \in \text{Operations}: \exists O^{-1}: O^{-1}(O(S)) = S
+++++
+
+== Historical Context
+
+JanusKey builds on foundational work in:
+
+* **Algorithmic Reversibility** (Bennett, 1973): Theoretical foundation for reversible computing
+* **Landauer's Principle**: Thermodynamic limits of information erasure
+* **ACID Properties**: Transaction guarantees in database systems
+* **Content-Addressable Storage**: Git's object model for integrity
+
+== Next Steps
+
+* link:mpr.adoc[Deep dive into Maximal Principle Reduction]
+* link:formal-model.adoc[Formal model definitions and proofs]
+* link:../architecture/index.adoc[See how theory maps to implementation]
