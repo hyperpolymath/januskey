@@ -1,0 +1,284 @@
+= Mutually Assured Accountability (MAA) Framework
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+:stem: latexmath
+
+== Abstract
+
+The MAA Framework is an ethical and engineering paradigm that structurally balances two opposing requirements in data management systems:
+
+1. **Accountability/Auditability**: Systems must track changes for compliance, debugging, and recovery
+2. **User Autonomy/Privacy**: Users must have verifiable control over their data, including deletion
+
+These requirements are often in tension. MAA resolves this through formal primitives that provide mathematical guarantees for both.
+
+== The Problem Statement
+
+=== The Accountability Requirement
+
+Modern systems require auditability for:
+
+* **Regulatory compliance** (SOX, HIPAA, financial regulations)
+* **Security forensics** (incident investigation)
+* **System reliability** (debugging, recovery)
+* **Business continuity** (disaster recovery)
+
+This pushes toward: _never delete anything, log everything, keep all history_.
+
+=== The Autonomy Requirement
+
+Users and regulations require data control:
+
+* **GDPR Article 17** (Right to Erasure)
+* **CCPA** (California Consumer Privacy Act)
+* **User trust** (promise of deletion must be kept)
+* **Security** (compromised data should be destroyable)
+
+This pushes toward: _complete, verifiable deletion capability_.
+
+=== The Tension
+
+[ditaa]
+....
+    Accountability <---------> Autonomy
+    "Keep everything"          "Delete completely"
+
+    Traditional solutions:
+    +------------------+  or  +------------------+
+    | Keep all data    |      | Allow deletion   |
+    | No real deletion |      | No audit trail   |
+    +------------------+      +------------------+
+
+    Result: Always compromise one goal
+....
+
+== The MAA Solution
+
+MAA introduces two formally verified primitives that satisfy both requirements:
+
+=== RMR (Reversible Transaction)
+
+[quote]
+A primitive for state transitions that guarantees instant, mathematically certain rollback to a prior safe state via Algorithmic Reversibility.
+
+RMR provides:
+
+* Complete state capture before changes
+* Guaranteed reversal capability
+* Full audit trail of all operations
+* Accountability without data loss risk
+
+See: link:rmr-primitive.adoc[RMR Primitive Specification]
+
+=== RMO (Obliterative Wipe)
+
+[quote]
+A primitive for data erasure that achieves Formal Obliteration, proving the non-existence of specified data traces.
+
+RMO provides:
+
+* Cryptographically verifiable deletion
+* Proof of non-existence
+* Compliance with right-to-erasure
+* User autonomy with mathematical guarantees
+
+See: link:rmo-primitive.adoc[RMO Primitive Specification]
+
+== The MAA Dynamic
+
+The key insight of MAA is that RMR and RMO are not alternatives—they are complementary:
+
+[ditaa]
+....
+                    +------------------+
+                    |   MAA Framework  |
+                    +--------+---------+
+                             |
+         +-------------------+-------------------+
+         |                                       |
+    +----v----+                             +----v----+
+    |   RMR   |                             |   RMO   |
+    +---------+                             +---------+
+    | Tracks  |                             | Removes |
+    | changes |     Must be balanced        | traces  |
+    | fully   |<--------------------------->| fully   |
+    +---------+                             +---------+
+         |                                       |
+    +----v----+                             +----v----+
+    |  Audit  |                             | Privacy |
+    |  Trail  |                             | Control |
+    +---------+                             +---------+
+....
+
+=== Balancing Rules
+
+1. **RMR-by-default**: All operations use RMR for reversibility
+2. **RMO-on-request**: Users can invoke RMO to permanently erase
+3. **Audit of RMO**: The _fact_ that RMO was invoked is logged (but not the erased content)
+4. **No silent deletion**: RMO requires explicit user action
+
+== Formal Properties
+
+=== Property 1: Complete Reversibility (RMR)
+
+For any sequence of operations stem:[O_1, O_2, \ldots, O_n]:
+
+[stem]
+++++
+O_n^{-1}(O_{n-1}^{-1}(\ldots O_1^{-1}(O_1(O_2(\ldots O_n(S)))))) = S
+++++
+
+The system can always return to any previous state.
+
+=== Property 2: Formal Obliteration (RMO)
+
+After stem:[\text{RMO}(d)] for data stem:[d]:
+
+[stem]
+++++
+\nexists \text{ algorithm } A: A(\text{system\_state}) \to d
+++++
+
+No algorithm can recover the obliterated data from system state.
+
+=== Property 3: Accountability Preservation
+
+[stem]
+++++
+\forall \text{RMO}(d): \text{log}(\text{timestamp}, \text{user}, \text{hash}(d))
+++++
+
+The fact of deletion is logged, maintaining accountability without content preservation.
+
+== Implementation in JanusKey
+
+JanusKey currently implements RMR fully. RMO support is planned.
+
+=== Current RMR Implementation
+
+[source,rust]
+----
+// Every operation stores complete reversal information
+pub struct OperationMetadata {
+    pub id: String,                           // Unique identifier
+    pub op_type: OperationType,               // What operation
+    pub timestamp: DateTime<Utc>,             // When
+    pub user: String,                         // Who
+    pub path: PathBuf,                        // What file
+    pub content_hash: Option<ContentHash>,    // Original content
+    pub original_metadata: Option<FileMetadata>, // Original metadata
+    // ... sufficient for complete reversal
+}
+----
+
+=== Planned RMO Implementation
+
+[source,rust]
+----
+// Future RMO primitive
+pub struct ObliterationRecord {
+    pub timestamp: DateTime<Utc>,
+    pub user: String,
+    pub content_hash: ContentHash,  // Hash of obliterated content
+    pub obliteration_proof: ObliterationProof,
+}
+
+// Secure deletion with overwrite
+pub fn obliterate(content_hash: &ContentHash) -> Result<ObliterationProof> {
+    // 1. Locate content in store
+    // 2. Overwrite with cryptographic randomness
+    // 3. Remove from content index
+    // 4. Generate non-existence proof
+    // 5. Log obliteration record (without content)
+}
+----
+
+== Compliance Mapping
+
+|===
+| Regulation | Requirement | MAA Component
+
+| GDPR Art. 17
+| Right to erasure
+| RMO primitive
+
+| GDPR Art. 5(1)(e)
+| Storage limitation
+| RMO with retention policies
+
+| GDPR Art. 30
+| Records of processing
+| RMR audit trail
+
+| SOX Section 802
+| Record retention
+| RMR full history
+
+| HIPAA
+| Audit controls
+| RMR operation logging
+
+| CCPA
+| Right to delete
+| RMO primitive
+|===
+
+== Security Considerations
+
+=== Threat Model
+
+|===
+| Threat | RMR Protection | RMO Protection
+
+| Accidental deletion
+| Full reversal capability
+| N/A (RMO is intentional)
+
+| Malicious modification
+| Detect via audit trail
+| N/A
+
+| Data breach (compromised data)
+| N/A
+| Obliterate compromised content
+
+| Compliance audit failure
+| Complete audit trail
+| Obliteration records
+|===
+
+=== Attack Surface
+
+The MAA framework's security relies on:
+
+1. **Content store integrity** (SHA256 verification)
+2. **Metadata store integrity** (append-only log)
+3. **RMO implementation correctness** (secure overwrite)
+
+== Theoretical Foundations
+
+MAA draws from:
+
+=== Bennett's Reversible Computing (1973)
+
+Charles Bennett proved that all computation can be made reversible without significant overhead. JanusKey applies this to file operations.
+
+=== Landauer's Principle (1961)
+
+Rolf Landauer established that erasing information has a minimum thermodynamic cost. RMO acknowledges that true erasure is an irreversible physical process.
+
+=== Epistemological Certainty
+
+Traditional logging provides _evidence_ of state changes. MAA provides _proof_:
+
+* RMR: Mathematical proof of reversibility
+* RMO: Mathematical proof of non-existence
+
+== Further Reading
+
+* link:rmr-primitive.adoc[RMR Primitive Specification]
+* link:rmo-primitive.adoc[RMO Primitive Specification]
+* link:../formal-proofs/reversibility.adoc[Formal Proofs of Reversibility]
+* link:mpr.adoc[Maximal Principle Reduction]

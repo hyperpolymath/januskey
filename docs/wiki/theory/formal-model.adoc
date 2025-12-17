@@ -1,0 +1,349 @@
+= Formal Model of File System State
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+:stem: latexmath
+
+== Introduction
+
+This document defines the formal model underlying JanusKey's reversibility guarantees. We establish mathematical definitions for file system state, operations, and the conditions for reversibility.
+
+== Definitions
+
+=== File System State
+
+A file system state stem:[S] is a partial function:
+
+[stem]
+++++
+S: \mathcal{P} \rightharpoonup \mathcal{F}
+++++
+
+where:
+
+* stem:[\mathcal{P}] is the set of all valid file paths
+* stem:[\mathcal{F}] is the set of all file states
+* stem:[\rightharpoonup] denotes a partial function (not all paths have files)
+
+=== File State
+
+A file state stem:[f \in \mathcal{F}] is a tuple:
+
+[stem]
+++++
+f = (c, m)
+++++
+
+where:
+
+* stem:[c \in \mathcal{C}] is the content (byte sequence)
+* stem:[m \in \mathcal{M}] is the metadata
+
+=== Metadata
+
+Metadata stem:[m \in \mathcal{M}] is a tuple:
+
+[stem]
+++++
+m = (\pi, o, g, s, t, \ell)
+++++
+
+where:
+
+* stem:[\pi \in \{0, \ldots, 0o7777\}] is the permission mode
+* stem:[o \in \mathbb{N}] is the owner uid
+* stem:[g \in \mathbb{N}] is the group gid
+* stem:[s \in \mathbb{N}] is the file size
+* stem:[t \in \mathbb{R}] is the modification timestamp
+* stem:[\ell \in \mathcal{P} \cup \{\bot\}] is the symlink target (or stem:[\bot] if not a symlink)
+
+=== Content Hash
+
+The content hash function stem:[H: \mathcal{C} \to \mathcal{H}] satisfies:
+
+[stem]
+++++
+\forall c_1, c_2 \in \mathcal{C}: H(c_1) = H(c_2) \Rightarrow c_1 = c_2 \text{ (with overwhelming probability)}
+++++
+
+JanusKey uses SHA256 for stem:[H].
+
+== Operations
+
+=== Operation Definition
+
+An operation stem:[O] is a function:
+
+[stem]
+++++
+O: \mathcal{S} \to \mathcal{S}
+++++
+
+that transforms one file system state to another.
+
+=== Reversible Operation
+
+An operation stem:[O] is **reversible** if there exists an inverse operation stem:[O^{-1}] such that:
+
+[stem]
+++++
+\forall S \in \mathcal{S}: O^{-1}(O(S)) = S
+++++
+
+=== Operation Catalog
+
+==== Delete
+
+[stem]
+++++
+\text{DELETE}_p: S \mapsto S' \text{ where } S'(q) = \begin{cases} \bot & \text{if } q = p \\ S(q) & \text{otherwise} \end{cases}
+++++
+
+**Precondition**: stem:[S(p) \neq \bot]
+
+**Inverse**: stem:[\text{CREATE}_p] with stored content and metadata
+
+==== Create
+
+[stem]
+++++
+\text{CREATE}_{p,c,m}: S \mapsto S' \text{ where } S'(q) = \begin{cases} (c, m) & \text{if } q = p \\ S(q) & \text{otherwise} \end{cases}
+++++
+
+**Precondition**: stem:[S(p) = \bot]
+
+**Inverse**: stem:[\text{DELETE}_p]
+
+==== Modify
+
+[stem]
+++++
+\text{MODIFY}_{p,c'}: S \mapsto S' \text{ where } S'(q) = \begin{cases} (c', m) & \text{if } q = p \land S(p) = (c, m) \\ S(q) & \text{otherwise} \end{cases}
+++++
+
+**Precondition**: stem:[S(p) \neq \bot]
+
+**Inverse**: stem:[\text{MODIFY}_{p,c}] with original content stem:[c]
+
+==== Move
+
+[stem]
+++++
+\text{MOVE}_{p,q}: S \mapsto S' \text{ where } S'(r) = \begin{cases} \bot & \text{if } r = p \\ S(p) & \text{if } r = q \\ S(r) & \text{otherwise} \end{cases}
+++++
+
+**Precondition**: stem:[S(p) \neq \bot \land S(q) = \bot]
+
+**Inverse**: stem:[\text{MOVE}_{q,p}]
+
+==== Copy
+
+[stem]
+++++
+\text{COPY}_{p,q}: S \mapsto S' \text{ where } S'(r) = \begin{cases} S(p) & \text{if } r = q \\ S(r) & \text{otherwise} \end{cases}
+++++
+
+**Precondition**: stem:[S(p) \neq \bot \land S(q) = \bot]
+
+**Inverse**: stem:[\text{DELETE}_q]
+
+==== Append
+
+[stem]
+++++
+\text{APPEND}_{p,c'}: S \mapsto S' \text{ where } S'(q) = \begin{cases} (c \cdot c', m') & \text{if } q = p \land S(p) = (c, m) \\ S(q) & \text{otherwise} \end{cases}
+++++
+
+where stem:[c \cdot c'] denotes concatenation and stem:[m'] updates size.
+
+**Precondition**: stem:[S(p) \neq \bot]
+
+**Inverse**: stem:[\text{TRUNCATE}_{p,|c|}] to original size
+
+==== Truncate
+
+[stem]
+++++
+\text{TRUNCATE}_{p,n}: S \mapsto S' \text{ where } S'(q) = \begin{cases} (c[0:n], m') & \text{if } q = p \land S(p) = (c, m) \\ S(q) & \text{otherwise} \end{cases}
+++++
+
+**Precondition**: stem:[S(p) \neq \bot]
+
+**Inverse**: stem:[\text{MODIFY}_{p,c}] with original content
+
+== Theorems
+
+=== Theorem 1: Individual Reversibility
+
+Every JanusKey operation is reversible.
+
+==== Proof
+
+We show for each operation type:
+
+|===
+| Operation | Inverse | Reversibility Condition
+
+| DELETE
+| CREATE with stored (c,m)
+| Content and metadata stored before delete
+
+| CREATE
+| DELETE
+| No information loss (creation is addition)
+
+| MODIFY
+| MODIFY with original c
+| Original content stored
+
+| MOVE
+| MOVE in reverse direction
+| Source and destination paths stored
+
+| COPY
+| DELETE of copy
+| Destination path stored
+
+| APPEND
+| TRUNCATE to original size
+| Original size stored in metadata
+
+| TRUNCATE
+| MODIFY with original content
+| Original content stored
+|===
+
+All inverse information is captured by `OperationMetadata`. ∎
+
+=== Theorem 2: Composition Reversibility
+
+If stem:[O_1, O_2] are reversible operations, then stem:[O_2 \circ O_1] is reversible with inverse stem:[O_1^{-1} \circ O_2^{-1}].
+
+==== Proof
+
+Let stem:[S] be the initial state.
+
+[stem]
+++++
+(O_1^{-1} \circ O_2^{-1})(O_2 \circ O_1)(S) = O_1^{-1}(O_2^{-1}(O_2(O_1(S))))
+++++
+
+By reversibility of stem:[O_2]:
+[stem]
+++++
+= O_1^{-1}(O_1(S))
+++++
+
+By reversibility of stem:[O_1]:
+[stem]
+++++
+= S
+++++
+
+∎
+
+=== Theorem 3: Sequential Reversibility (Theorem 3.4)
+
+For any sequence of reversible operations stem:[\langle O_1, O_2, \ldots, O_n \rangle]:
+
+[stem]
+++++
+\langle O_n^{-1}, O_{n-1}^{-1}, \ldots, O_1^{-1} \rangle \text{ reverses } \langle O_1, O_2, \ldots, O_n \rangle
+++++
+
+==== Proof
+
+By induction on stem:[n], using Theorem 2. ∎
+
+=== Theorem 4: Transaction Atomicity
+
+A transaction stem:[T = \langle O_1, \ldots, O_n \rangle] with rollback satisfies:
+
+Either:
+
+1. **Commit**: All operations applied, all reversible
+2. **Rollback**: State equals initial state
+
+==== Proof
+
+Rollback executes stem:[\langle O_n^{-1}, \ldots, O_1^{-1} \rangle]. By Theorem 3, this restores initial state. ∎
+
+== Content-Addressed Storage Properties
+
+=== Definition: Content Store
+
+A content store stem:[\Sigma] is a partial function:
+
+[stem]
+++++
+\Sigma: \mathcal{H} \rightharpoonup \mathcal{C}
+++++
+
+with operations:
+
+* stem:[\text{store}(c) = h] where stem:[h = H(c)] and stem:[\Sigma(h) := c]
+* stem:[\text{retrieve}(h) = \Sigma(h)]
+
+=== Theorem 5: Content Integrity
+
+[stem]
+++++
+\forall c: \text{retrieve}(\text{store}(c)) = c
+++++
+
+==== Proof
+
+By definition of store and retrieve, and the collision resistance of stem:[H]. ∎
+
+=== Theorem 6: Deduplication Correctness
+
+[stem]
+++++
+\forall c_1, c_2: H(c_1) = H(c_2) \Rightarrow \text{store}(c_1) = \text{store}(c_2)
+++++
+
+And both can be retrieved correctly.
+
+==== Proof
+
+If stem:[H(c_1) = H(c_2)], then by collision resistance, stem:[c_1 = c_2]. Storage of either produces the same stem:[h], and retrieval returns the identical content. ∎
+
+== Invariants
+
+=== Invariant 1: Metadata Completeness
+
+For every operation stem:[O] recorded in the metadata store:
+
+[stem]
+++++
+\text{sufficient}(\text{metadata}(O), O^{-1})
+++++
+
+The metadata contains all information needed to compute the inverse.
+
+=== Invariant 2: Content Availability
+
+For every content hash stem:[h] referenced in operation metadata:
+
+[stem]
+++++
+\Sigma(h) \neq \bot
+++++
+
+Referenced content is always available in the content store.
+
+=== Invariant 3: Operation Ordering
+
+The metadata store maintains temporal ordering:
+
+[stem]
+++++
+\forall O_i, O_j: i < j \Rightarrow \text{timestamp}(O_i) \leq \text{timestamp}(O_j)
+++++
+
+== Further Reading
+
+* link:reversibility-theory.adoc[Extended Reversibility Theory]
+* link:rmr-primitive.adoc[RMR Primitive Specification]
+* link:../formal-proofs/index.adoc[Complete Formal Proofs]

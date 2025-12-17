@@ -1,0 +1,620 @@
+= API Reference
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+JanusKey is implemented as a Rust library with a CLI frontend. This reference documents the public API for programmatic use.
+
+== Crate Structure
+
+[source]
+----
+januskey/
+├── lib.rs              # Main entry point
+├── content_store.rs    # Content-addressed storage
+├── metadata.rs         # Operation metadata and logging
+├── operations.rs       # File operations
+├── transaction.rs      # Transaction management
+└── error.rs            # Error types
+----
+
+== Core Types
+
+=== JanusKey
+
+The main entry point for JanusKey functionality.
+
+[source,rust]
+----
+pub struct JanusKey {
+    pub root: PathBuf,
+    pub config: Config,
+    pub content_store: ContentStore,
+    pub metadata_store: MetadataStore,
+    pub transaction_manager: TransactionManager,
+}
+
+impl JanusKey {
+    /// Initialize JanusKey for a directory
+    pub fn init(root: &Path) -> Result<Self>;
+
+    /// Open existing JanusKey directory
+    pub fn open(root: &Path) -> Result<Self>;
+
+    /// Check if directory is initialized
+    pub fn is_initialized(root: &Path) -> bool;
+}
+----
+
+==== Example
+
+[source,rust]
+----
+use januskey::JanusKey;
+use std::path::Path;
+
+fn main() -> januskey::Result<()> {
+    // Initialize in current directory
+    let jk = JanusKey::init(Path::new("."))?;
+
+    // Or open existing
+    let jk = JanusKey::open(Path::new("/path/to/project"))?;
+
+    Ok(())
+}
+----
+
+=== Config
+
+Configuration for JanusKey behavior.
+
+[source,rust]
+----
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub storage_path: PathBuf,
+    pub compression: bool,
+    pub max_history: usize,
+    pub auto_confirm: bool,
+    pub dry_run_default: bool,
+    pub audit_enabled: bool,
+}
+
+impl Config {
+    pub fn load(dir: &Path) -> Self;
+    pub fn save(&self, dir: &Path) -> Result<()>;
+}
+
+impl Default for Config {
+    fn default() -> Self;
+}
+----
+
+== Content Store
+
+=== ContentHash
+
+SHA256 content hash with verification.
+
+[source,rust]
+----
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ContentHash(pub String);
+
+impl ContentHash {
+    /// Create hash from content bytes
+    pub fn from_bytes(content: &[u8]) -> Self;
+
+    /// Create hash from string
+    pub fn from_str(s: &str) -> Self;
+
+    /// Get raw hash without prefix
+    pub fn raw_hash(&self) -> &str;
+
+    /// Verify content matches this hash
+    pub fn verify(&self, content: &[u8]) -> bool;
+}
+----
+
+=== ContentStore
+
+Content-addressed storage with optional compression.
+
+[source,rust]
+----
+pub struct ContentStore {
+    root: PathBuf,
+    compression: bool,
+}
+
+impl ContentStore {
+    /// Create or open a content store
+    pub fn new(root: PathBuf, compression: bool) -> Result<Self>;
+
+    /// Store content and return its hash
+    pub fn store(&self, content: &[u8]) -> Result<ContentHash>;
+
+    /// Store content from a file
+    pub fn store_file(&self, file_path: &Path) -> Result<ContentHash>;
+
+    /// Retrieve content by hash (verifies integrity)
+    pub fn retrieve(&self, hash: &ContentHash) -> Result<Vec<u8>>;
+
+    /// Check if content exists
+    pub fn exists(&self, hash: &ContentHash) -> bool;
+
+    /// Delete content (for garbage collection)
+    pub fn delete(&self, hash: &ContentHash) -> Result<()>;
+
+    /// Get total size of content store
+    pub fn total_size(&self) -> Result<u64>;
+
+    /// Count stored content blobs
+    pub fn count(&self) -> Result<usize>;
+}
+----
+
+==== Example
+
+[source,rust]
+----
+use januskey::ContentStore;
+
+fn example() -> januskey::Result<()> {
+    let store = ContentStore::new("./content".into(), true)?;
+
+    // Store content
+    let content = b"Hello, World!";
+    let hash = store.store(content)?;
+    println!("Stored with hash: {}", hash);
+
+    // Retrieve (with integrity verification)
+    let retrieved = store.retrieve(&hash)?;
+    assert_eq!(content.to_vec(), retrieved);
+
+    Ok(())
+}
+----
+
+== Metadata
+
+=== OperationType
+
+Enumeration of all operation types.
+
+[source,rust]
+----
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OperationType {
+    Delete,
+    Modify,
+    Move,
+    Copy,
+    Chmod,
+    Chown,
+    Create,
+    Mkdir,
+    Rmdir,
+    Symlink,
+    Append,
+    Truncate,
+    Touch,
+}
+----
+
+=== FileMetadata
+
+File metadata for preservation and restoration.
+
+[source,rust]
+----
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileMetadata {
+    pub permissions: u32,
+    pub owner: String,
+    pub group: String,
+    pub size: u64,
+    pub modified: DateTime<Utc>,
+    pub is_symlink: bool,
+    pub symlink_target: Option<String>,
+}
+
+impl FileMetadata {
+    /// Capture metadata from a file path
+    pub fn from_path(path: &Path) -> Result<Self>;
+
+    /// Apply metadata to a file
+    pub fn apply(&self, path: &Path) -> Result<()>;
+}
+----
+
+=== OperationMetadata
+
+Complete metadata for an operation (sufficient for reversal).
+
+[source,rust]
+----
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperationMetadata {
+    pub id: String,
+    pub op_type: OperationType,
+    pub timestamp: DateTime<Utc>,
+    pub user: String,
+    pub path: PathBuf,
+    pub path_secondary: Option<PathBuf>,
+    pub content_hash: Option<ContentHash>,
+    pub new_content_hash: Option<ContentHash>,
+    pub original_metadata: Option<FileMetadata>,
+    pub new_metadata: Option<FileMetadata>,
+    pub transaction_id: Option<String>,
+    pub undone: bool,
+    pub undo_operation_id: Option<String>,
+}
+
+impl OperationMetadata {
+    pub fn new(op_type: OperationType, path: PathBuf) -> Self;
+
+    // Builder methods
+    pub fn with_secondary_path(self, path: PathBuf) -> Self;
+    pub fn with_content_hash(self, hash: ContentHash) -> Self;
+    pub fn with_new_content_hash(self, hash: ContentHash) -> Self;
+    pub fn with_original_metadata(self, metadata: FileMetadata) -> Self;
+    pub fn with_transaction_id(self, id: String) -> Self;
+}
+----
+
+=== MetadataStore
+
+Append-only operation log.
+
+[source,rust]
+----
+pub struct MetadataStore {
+    path: PathBuf,
+    log: OperationLog,
+}
+
+impl MetadataStore {
+    pub fn new(path: PathBuf) -> Result<Self>;
+
+    /// Append an operation to the log
+    pub fn append(&mut self, metadata: OperationMetadata) -> Result<()>;
+
+    /// Get all operations
+    pub fn operations(&self) -> &[OperationMetadata];
+
+    /// Get operation by ID
+    pub fn get(&self, id: &str) -> Option<&OperationMetadata>;
+
+    /// Get last N undoable operations
+    pub fn last_n(&self, n: usize) -> Vec<&OperationMetadata>;
+
+    /// Get last undoable operation
+    pub fn last_undoable(&self) -> Option<&OperationMetadata>;
+
+    /// Get operations for a transaction
+    pub fn transaction_operations(&self, transaction_id: &str) -> Vec<&OperationMetadata>;
+
+    /// Mark operation as undone
+    pub fn mark_undone(&mut self, id: &str, undo_op_id: &str) -> Result<()>;
+
+    /// Filter operations by type
+    pub fn filter_by_type(&self, op_type: OperationType) -> Vec<&OperationMetadata>;
+
+    /// Filter operations by path pattern
+    pub fn filter_by_path(&self, pattern: &str) -> Result<Vec<&OperationMetadata>>;
+
+    /// Get operation count
+    pub fn count(&self) -> usize;
+
+    /// Prune old operations
+    pub fn prune(&mut self, keep: usize) -> Result<usize>;
+}
+----
+
+== Operations
+
+=== FileOperation
+
+Enumeration of all file operations.
+
+[source,rust]
+----
+#[derive(Debug, Clone)]
+pub enum FileOperation {
+    Delete { path: PathBuf },
+    Modify { path: PathBuf, new_content: Vec<u8> },
+    Move { source: PathBuf, destination: PathBuf },
+    Copy { source: PathBuf, destination: PathBuf },
+    Create { path: PathBuf, content: Vec<u8> },
+    #[cfg(unix)]
+    Chmod { path: PathBuf, new_mode: u32 },
+    Mkdir { path: PathBuf, parents: bool },
+    Rmdir { path: PathBuf },
+    RmdirRecursive { path: PathBuf },
+    #[cfg(unix)]
+    Symlink { target: PathBuf, link_path: PathBuf },
+    Append { path: PathBuf, content: Vec<u8> },
+    Truncate { path: PathBuf, new_size: u64 },
+    Touch { path: PathBuf, create: bool },
+}
+
+impl FileOperation {
+    /// Get operation type
+    pub fn op_type(&self) -> OperationType;
+
+    /// Get primary path
+    pub fn path(&self) -> &Path;
+}
+----
+
+=== OperationExecutor
+
+Executes operations with reversibility support.
+
+[source,rust]
+----
+pub struct OperationExecutor<'a> {
+    content_store: &'a ContentStore,
+    metadata_store: &'a mut MetadataStore,
+    transaction_id: Option<String>,
+}
+
+impl<'a> OperationExecutor<'a> {
+    pub fn new(
+        content_store: &'a ContentStore,
+        metadata_store: &'a mut MetadataStore,
+    ) -> Self;
+
+    pub fn with_transaction(self, transaction_id: String) -> Self;
+
+    /// Execute an operation and record metadata for reversal
+    pub fn execute(&mut self, operation: FileOperation) -> Result<OperationMetadata>;
+
+    /// Undo an operation using its metadata
+    pub fn undo(&mut self, operation_id: &str) -> Result<OperationMetadata>;
+}
+----
+
+==== Example
+
+[source,rust]
+----
+use januskey::{JanusKey, FileOperation, OperationExecutor};
+use std::path::PathBuf;
+
+fn example() -> januskey::Result<()> {
+    let mut jk = JanusKey::open(".")?;
+
+    // Execute a delete operation
+    let mut executor = OperationExecutor::new(
+        &jk.content_store,
+        &mut jk.metadata_store,
+    );
+
+    let metadata = executor.execute(FileOperation::Delete {
+        path: PathBuf::from("unwanted.txt"),
+    })?;
+
+    println!("Deleted with operation ID: {}", metadata.id);
+
+    // Undo it
+    let mut executor = OperationExecutor::new(
+        &jk.content_store,
+        &mut jk.metadata_store,
+    );
+    executor.undo(&metadata.id)?;
+
+    println!("File restored");
+    Ok(())
+}
+----
+
+== Transactions
+
+=== Transaction
+
+A transaction grouping multiple operations.
+
+[source,rust]
+----
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Transaction {
+    pub id: String,
+    pub name: Option<String>,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub state: TransactionState,
+    pub operation_ids: Vec<String>,
+    pub user: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TransactionState {
+    Active,
+    Committed,
+    RolledBack,
+}
+
+impl Transaction {
+    pub fn new(name: Option<String>) -> Self;
+    pub fn is_active(&self) -> bool;
+    pub fn add_operation(&mut self, operation_id: String);
+    pub fn commit(&mut self);
+    pub fn rollback(&mut self);
+}
+----
+
+=== TransactionManager
+
+Manages transaction lifecycle.
+
+[source,rust]
+----
+pub struct TransactionManager {
+    path: PathBuf,
+    log: TransactionLog,
+}
+
+impl TransactionManager {
+    pub fn new(path: PathBuf) -> Result<Self>;
+
+    /// Begin a new transaction
+    pub fn begin(&mut self, name: Option<String>) -> Result<&Transaction>;
+
+    /// Get current active transaction
+    pub fn active(&self) -> Option<&Transaction>;
+
+    /// Add operation to active transaction
+    pub fn add_operation(&mut self, operation_id: String) -> Result<()>;
+
+    /// Commit the active transaction
+    pub fn commit(&mut self) -> Result<Transaction>;
+
+    /// Rollback the active transaction
+    pub fn rollback(
+        &mut self,
+        content_store: &ContentStore,
+        metadata_store: &mut MetadataStore,
+    ) -> Result<Transaction>;
+
+    /// Get transaction by ID
+    pub fn get(&self, id: &str) -> Option<&Transaction>;
+
+    /// Get all transactions
+    pub fn all(&self) -> &[Transaction];
+
+    /// Check if there's an active transaction
+    pub fn has_active(&self) -> bool;
+
+    /// Get active transaction ID
+    pub fn active_id(&self) -> Option<&str>;
+}
+----
+
+=== TransactionExecutor
+
+Helper for executing operations within transactions.
+
+[source,rust]
+----
+pub struct TransactionExecutor<'a> {
+    content_store: &'a ContentStore,
+    metadata_store: &'a mut MetadataStore,
+    transaction_manager: &'a mut TransactionManager,
+}
+
+impl<'a> TransactionExecutor<'a> {
+    pub fn new(
+        content_store: &'a ContentStore,
+        metadata_store: &'a mut MetadataStore,
+        transaction_manager: &'a mut TransactionManager,
+    ) -> Self;
+
+    /// Execute an operation within the current transaction
+    pub fn execute(&mut self, operation: FileOperation) -> Result<OperationMetadata>;
+}
+----
+
+==== Example
+
+[source,rust]
+----
+use januskey::{JanusKey, FileOperation, TransactionExecutor};
+
+fn example() -> januskey::Result<()> {
+    let mut jk = JanusKey::open(".")?;
+
+    // Begin transaction
+    jk.transaction_manager.begin(Some("cleanup".to_string()))?;
+
+    // Execute operations
+    {
+        let mut executor = TransactionExecutor::new(
+            &jk.content_store,
+            &mut jk.metadata_store,
+            &mut jk.transaction_manager,
+        );
+
+        executor.execute(FileOperation::Delete {
+            path: "temp1.txt".into(),
+        })?;
+
+        executor.execute(FileOperation::Delete {
+            path: "temp2.txt".into(),
+        })?;
+    }
+
+    // Commit or rollback
+    if verify_changes() {
+        jk.transaction_manager.commit()?;
+    } else {
+        jk.transaction_manager.rollback(
+            &jk.content_store,
+            &mut jk.metadata_store,
+        )?;
+    }
+
+    Ok(())
+}
+----
+
+== Error Handling
+
+=== JanusError
+
+[source,rust]
+----
+#[derive(Debug, thiserror::Error)]
+pub enum JanusError {
+    #[error("File not found: {0}")]
+    FileNotFound(String),
+
+    #[error("Path already exists: {0}")]
+    PathExists(String),
+
+    #[error("Directory not found: {0}")]
+    DirectoryNotFound(String),
+
+    #[error("JanusKey not initialized in {0}")]
+    NotInitialized(String),
+
+    #[error("Content integrity error: expected {expected}, got {actual}")]
+    ContentIntegrityError { expected: String, actual: String },
+
+    #[error("Metadata corrupted: {0}")]
+    MetadataCorrupted(String),
+
+    #[error("Transaction already active: {0}")]
+    TransactionActive(String),
+
+    #[error("No active transaction")]
+    NoActiveTransaction,
+
+    #[error("Invalid operation ID: {0}")]
+    InvalidOperationId(String),
+
+    #[error("Operation failed: {0}")]
+    OperationFailed(String),
+
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Glob pattern error: {0}")]
+    Glob(#[from] glob::PatternError),
+}
+
+pub type Result<T> = std::result::Result<T, JanusError>;
+----
+
+== Further Reading
+
+* link:../guides/cli.adoc[CLI Guide]
+* link:../operations/index.adoc[Operations Reference]
+* link:../theory/formal-model.adoc[Formal Model]

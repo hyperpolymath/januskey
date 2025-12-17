@@ -1,0 +1,596 @@
+= Operations Reference
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+JanusKey provides a comprehensive set of reversible file operations. Each operation captures sufficient metadata before execution to guarantee perfect reversal.
+
+== Operation Categories
+
+=== Core Operations
+
+|===
+| Operation | Description | Reversal
+
+| Delete
+| Remove a file
+| Restore from content store
+
+| Modify
+| Change file content
+| Restore original content
+
+| Move
+| Rename/relocate file
+| Move back to original path
+
+| Copy
+| Duplicate a file
+| Delete the copy
+
+| Create
+| Create new file
+| Delete the created file
+|===
+
+=== Extended Operations
+
+|===
+| Operation | Description | Reversal
+
+| Mkdir
+| Create directory
+| Remove directory
+
+| Rmdir
+| Remove empty directory
+| Recreate directory
+
+| RmdirRecursive
+| Remove directory with contents
+| Restore all contents
+
+| Symlink
+| Create symbolic link
+| Remove link
+
+| Append
+| Add content to file
+| Truncate to original size
+
+| Truncate
+| Reduce file size
+| Restore original content
+
+| Touch
+| Update timestamps / create empty
+| Restore timestamps / delete
+
+| Chmod
+| Change permissions (Unix)
+| Restore original permissions
+|===
+
+== Detailed Operation Reference
+
+=== Delete
+
+Removes a file while preserving its complete content and metadata for reversal.
+
+==== Syntax
+
+[source,bash]
+----
+jk delete <file>...
+jk delete "*.log"           # Glob pattern
+jk delete -f important.txt  # Force (no confirmation)
+----
+
+==== Behavior
+
+1. Read file content
+2. Capture file metadata (permissions, timestamps, etc.)
+3. Store content in content store (SHA256 addressed)
+4. Record operation metadata
+5. Remove the file
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "id": "uuid-v4",
+  "op_type": "DELETE",
+  "timestamp": "2025-12-17T10:30:00Z",
+  "user": "username",
+  "path": "/path/to/file.txt",
+  "content_hash": "sha256:abc123...",
+  "original_metadata": {
+    "permissions": 420,
+    "owner": "1000",
+    "group": "1000",
+    "size": 1234,
+    "modified": "2025-12-17T09:00:00Z"
+  }
+}
+----
+
+==== Reversal
+
+[source,bash]
+----
+jk undo  # Restores the file with original content and metadata
+----
+
+=== Modify
+
+Changes the content of an existing file.
+
+==== Syntax
+
+[source,bash]
+----
+jk modify <file> --content "new content"
+jk modify <file> --file new_content.txt
+jk modify <file> --sed "s/old/new/g"
+----
+
+==== Behavior
+
+1. Read original content
+2. Store original content in content store
+3. Record operation with both content hashes
+4. Write new content to file
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "MODIFY",
+  "path": "/path/to/file.txt",
+  "content_hash": "sha256:original...",
+  "new_content_hash": "sha256:newcontent...",
+  "original_metadata": { ... }
+}
+----
+
+==== Reversal
+
+Restores original content:
+
+[source,bash]
+----
+jk undo
+----
+
+=== Move
+
+Relocates a file from one path to another.
+
+==== Syntax
+
+[source,bash]
+----
+jk move <source> <destination>
+jk mv <source> <destination>  # Alias
+----
+
+==== Behavior
+
+1. Verify source exists and destination doesn't
+2. Create destination parent directories if needed
+3. Capture source metadata
+4. Perform the rename/move
+5. Record operation
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "MOVE",
+  "path": "/original/path/file.txt",
+  "path_secondary": "/new/path/file.txt",
+  "original_metadata": { ... }
+}
+----
+
+==== Reversal
+
+Moves file back:
+
+[source,bash]
+----
+jk undo  # Moves /new/path/file.txt back to /original/path/file.txt
+----
+
+=== Copy
+
+Creates a duplicate of a file.
+
+==== Syntax
+
+[source,bash]
+----
+jk copy <source> <destination>
+jk cp <source> <destination>  # Alias
+----
+
+==== Behavior
+
+1. Verify source exists and destination doesn't
+2. Create destination parent directories if needed
+3. Copy the file
+4. Record operation
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "COPY",
+  "path": "/source/file.txt",
+  "path_secondary": "/destination/file.txt"
+}
+----
+
+==== Reversal
+
+Deletes the copy (source unchanged):
+
+[source,bash]
+----
+jk undo  # Deletes /destination/file.txt
+----
+
+=== Mkdir
+
+Creates a directory.
+
+==== Syntax
+
+[source,bash]
+----
+jk mkdir <directory>
+jk mkdir -p <path/to/nested/directory>  # Create parents
+----
+
+==== Behavior
+
+1. Verify path doesn't exist
+2. Create directory (and parents if `-p`)
+3. Record operation
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "MKDIR",
+  "path": "/path/to/directory"
+}
+----
+
+==== Reversal
+
+Removes the directory:
+
+[source,bash]
+----
+jk undo  # Removes directory (must be empty)
+----
+
+=== Rmdir
+
+Removes an empty directory.
+
+==== Syntax
+
+[source,bash]
+----
+jk rmdir <directory>
+----
+
+==== Behavior
+
+1. Verify directory exists and is empty
+2. Capture directory metadata
+3. Remove directory
+4. Record operation
+
+==== Reversal
+
+Recreates the directory:
+
+[source,bash]
+----
+jk undo
+----
+
+=== RmdirRecursive
+
+Removes a directory and all its contents.
+
+==== Syntax
+
+[source,bash]
+----
+jk rmdir -r <directory>
+jk rmdir --recursive <directory>
+----
+
+==== Behavior
+
+1. Walk directory tree
+2. Store all file contents in content store
+3. Create manifest of all files with their content hashes
+4. Store manifest
+5. Remove entire directory tree
+6. Record operation with manifest hash
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "RMDIR",
+  "path": "/path/to/directory",
+  "content_hash": "sha256:manifest...",  // Manifest of all files
+  "original_metadata": { ... }
+}
+----
+
+==== Reversal
+
+Recreates entire directory structure with all contents:
+
+[source,bash]
+----
+jk undo
+----
+
+=== Symlink
+
+Creates a symbolic link (Unix only).
+
+==== Syntax
+
+[source,bash]
+----
+jk symlink <target> <link_name>
+jk ln -s <target> <link_name>  # Alias
+----
+
+==== Behavior
+
+1. Verify link path doesn't exist
+2. Create symbolic link pointing to target
+3. Record operation
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "SYMLINK",
+  "path": "/path/to/link",
+  "path_secondary": "/path/to/target"
+}
+----
+
+==== Reversal
+
+Removes the symbolic link (target unchanged):
+
+[source,bash]
+----
+jk undo
+----
+
+=== Append
+
+Adds content to the end of a file.
+
+==== Syntax
+
+[source,bash]
+----
+jk append <file> --content "additional content"
+jk append <file> --file content_to_add.txt
+----
+
+==== Behavior
+
+1. Verify file exists
+2. Capture original file size
+3. Store appended content
+4. Append content to file
+5. Record operation
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "APPEND",
+  "path": "/path/to/file.txt",
+  "content_hash": "sha256:appended...",
+  "original_metadata": {
+    "size": 1000  // Original size for truncation on undo
+  }
+}
+----
+
+==== Reversal
+
+Truncates file to original size:
+
+[source,bash]
+----
+jk undo  # File returns to original size, appended content removed
+----
+
+=== Truncate
+
+Reduces a file to a specified size.
+
+==== Syntax
+
+[source,bash]
+----
+jk truncate <file> --size <bytes>
+jk truncate <file> -s 100
+----
+
+==== Behavior
+
+1. Verify file exists
+2. Store original content
+3. Truncate file to new size
+4. Record operation
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "TRUNCATE",
+  "path": "/path/to/file.txt",
+  "content_hash": "sha256:original...",
+  "original_metadata": {
+    "size": 5000  // Original size
+  }
+}
+----
+
+==== Reversal
+
+Restores original content:
+
+[source,bash]
+----
+jk undo  # File restored to original content
+----
+
+=== Touch
+
+Updates file timestamps or creates an empty file.
+
+==== Syntax
+
+[source,bash]
+----
+jk touch <file>              # Update timestamps (or create)
+jk touch --no-create <file>  # Update only, don't create
+----
+
+==== Behavior
+
+If file exists:
+1. Capture original timestamps
+2. Update modification time to now
+3. Record operation
+
+If file doesn't exist and creation allowed:
+1. Create empty file
+2. Record operation (no original metadata)
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "TOUCH",
+  "path": "/path/to/file.txt",
+  "original_metadata": {
+    "modified": "2025-12-17T09:00:00Z"  // Only if file existed
+  }
+}
+----
+
+==== Reversal
+
+* If file existed: restores original timestamps
+* If file was created: deletes the file
+
+=== Chmod (Unix)
+
+Changes file permissions.
+
+==== Syntax
+
+[source,bash]
+----
+jk chmod 644 <file>
+jk chmod +x <file>
+----
+
+==== Behavior
+
+1. Verify file exists
+2. Capture original permissions
+3. Apply new permissions
+4. Record operation
+
+==== Metadata Captured
+
+[source,json]
+----
+{
+  "op_type": "CHMOD",
+  "path": "/path/to/file.txt",
+  "original_metadata": {
+    "permissions": 420  // 0o644
+  },
+  "new_metadata": {
+    "permissions": 493  // 0o755
+  }
+}
+----
+
+==== Reversal
+
+Restores original permissions:
+
+[source,bash]
+----
+jk undo
+----
+
+== Error Handling
+
+All operations may return these errors:
+
+|===
+| Error | Cause | Resolution
+
+| FileNotFound
+| File doesn't exist
+| Check path spelling
+
+| PathExists
+| Destination already exists
+| Use different destination or delete first
+
+| DirectoryNotFound
+| Directory doesn't exist
+| Create parent directories
+
+| ContentIntegrityError
+| Stored content corrupted
+| Check disk health
+
+| OperationFailed
+| Generic operation failure
+| Check error message for details
+|===
+
+== Further Reading
+
+* link:../guides/cli.adoc[CLI Commands Guide]
+* link:../guides/transactions.adoc[Transactions Guide]
+* link:../theory/formal-model.adoc[Formal Model]
