@@ -10,6 +10,7 @@ use colored::Colorize;
 use dialoguer::Confirm;
 use indicatif::{ProgressBar, ProgressStyle};
 use januskey::{
+    content_store::ContentHash,
     operations::{FileOperation, OperationExecutor},
     transaction::TransactionPreview,
     JanusKey,
@@ -216,6 +217,42 @@ enum Commands {
         #[arg(short, long)]
         create: bool,
     },
+
+    // === RMO (Obliterative Wipe) Commands ===
+
+    /// Permanently obliterate content (GDPR Article 17 - Right to Erasure)
+    /// WARNING: This is IRREVERSIBLE - content cannot be recovered
+    #[command(alias = "erase")]
+    Obliterate {
+        /// Content hash to obliterate (from history)
+        #[arg(long)]
+        hash: Option<String>,
+
+        /// Obliterate content referenced by operation ID
+        #[arg(long)]
+        operation: Option<String>,
+
+        /// Reason for obliteration (for audit trail)
+        #[arg(long)]
+        reason: Option<String>,
+
+        /// Legal basis (e.g., "GDPR Article 17")
+        #[arg(long)]
+        legal_basis: Option<String>,
+    },
+
+    /// Show obliteration history
+    ObliterationHistory {
+        /// Number of entries to show
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// Verify an obliteration proof
+    VerifyObliteration {
+        /// Proof ID to verify
+        proof_id: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -259,6 +296,12 @@ fn main() -> Result<()> {
         }
         Commands::Truncate { path, size } => cmd_truncate(&working_dir, &path, size, cli.dry_run),
         Commands::Touch { paths, create } => cmd_touch(&working_dir, &paths, create, cli.dry_run),
+        // RMO commands
+        Commands::Obliterate { hash, operation, reason, legal_basis } => {
+            cmd_obliterate(&working_dir, hash, operation, reason, legal_basis, cli.yes)
+        }
+        Commands::ObliterationHistory { limit } => cmd_obliteration_history(&working_dir, limit),
+        Commands::VerifyObliteration { proof_id } => cmd_verify_obliteration(&working_dir, &proof_id),
     }
 }
 
@@ -1188,6 +1231,213 @@ fn cmd_touch(dir: &PathBuf, paths: &[PathBuf], create: bool, dry_run: bool) -> R
     }
 
     println!("  Use {} to restore original timestamps", "jk undo".cyan());
+
+    Ok(())
+}
+
+// === RMO (Obliterative Wipe) Command Handlers ===
+
+fn cmd_obliterate(
+    dir: &PathBuf,
+    hash: Option<String>,
+    operation_id: Option<String>,
+    reason: Option<String>,
+    legal_basis: Option<String>,
+    auto_yes: bool,
+) -> Result<()> {
+    let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
+
+    // Determine what to obliterate
+    let content_hash = if let Some(h) = hash {
+        ContentHash(h)
+    } else if let Some(op_id) = operation_id {
+        // Find the operation and get its content hash
+        let op = jk
+            .metadata_store
+            .get(&op_id)
+            .ok_or_else(|| anyhow::anyhow!("Operation not found: {}", op_id))?;
+
+        op.content_hash
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("Operation {} has no associated content", op_id))?
+    } else {
+        anyhow::bail!("Must provide either --hash or --operation");
+    };
+
+    // Check if content exists
+    if !jk.content_store.exists(&content_hash) {
+        println!(
+            "{} Content {} not found in store (may already be obliterated)",
+            "!".yellow(),
+            content_hash
+        );
+        return Ok(());
+    }
+
+    // Warn about irreversibility
+    println!();
+    println!("{}", "╔═══════════════════════════════════════════════════════════════╗".red());
+    println!("{}", "║  ⚠️  WARNING: OBLITERATION IS IRREVERSIBLE                     ║".red());
+    println!("{}", "║                                                               ║".red());
+    println!("{}", "║  This operation will:                                         ║".red());
+    println!("{}", "║  • Securely overwrite the content with random data           ║".red());
+    println!("{}", "║  • Permanently remove it from the content store              ║".red());
+    println!("{}", "║  • Generate a cryptographic proof of obliteration            ║".red());
+    println!("{}", "║                                                               ║".red());
+    println!("{}", "║  The content CANNOT be recovered after this operation.       ║".red());
+    println!("{}", "╚═══════════════════════════════════════════════════════════════╝".red());
+    println!();
+    println!("Content hash: {}", content_hash.to_string().cyan());
+    if let Some(ref r) = reason {
+        println!("Reason: {}", r);
+    }
+    if let Some(ref lb) = legal_basis {
+        println!("Legal basis: {}", lb);
+    }
+    println!();
+
+    if !auto_yes {
+        if !Confirm::new()
+            .with_prompt("Are you absolutely sure you want to obliterate this content?")
+            .default(false)
+            .interact()?
+        {
+            println!("{}", "Cancelled".green());
+            return Ok(());
+        }
+
+        // Double confirmation for safety
+        if !Confirm::new()
+            .with_prompt("Type 'yes' again to confirm permanent deletion")
+            .default(false)
+            .interact()?
+        {
+            println!("{}", "Cancelled".green());
+            return Ok(());
+        }
+    }
+
+    // Perform obliteration
+    let record = jk.obliteration_manager.obliterate(
+        &jk.content_store,
+        &content_hash,
+        reason,
+        legal_basis,
+    )?;
+
+    println!();
+    println!("{} Content obliterated", "✓".green());
+    println!("  Proof ID: {}", record.proof.id.cyan());
+    println!("  Commitment: {}", &record.proof.commitment[..16]);
+    println!("  Timestamp: {}", record.timestamp.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!();
+    println!("The obliteration is logged for audit purposes.");
+    println!("Use {} to verify the proof.", "jk verify-obliteration <proof-id>".cyan());
+
+    Ok(())
+}
+
+fn cmd_obliteration_history(dir: &PathBuf, limit: usize) -> Result<()> {
+    let jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
+
+    let records = jk.obliteration_manager.records();
+
+    if records.is_empty() {
+        println!("{} No obliteration records", "!".yellow());
+        return Ok(());
+    }
+
+    println!("{}", "Obliteration History (RMO Audit Trail)".bold());
+    println!("{}", "═".repeat(80));
+    println!();
+
+    for record in records.iter().rev().take(limit) {
+        let time = record.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
+        println!(
+            "{} | {} | {}",
+            time,
+            "OBLITERATED".red().bold(),
+            record.content_hash.to_string().dimmed()
+        );
+        println!(
+            "      Proof: {} | User: {}",
+            &record.proof.id[..8].cyan(),
+            record.user
+        );
+        if let Some(ref reason) = record.reason {
+            println!("      Reason: {}", reason);
+        }
+        if let Some(ref legal) = record.legal_basis {
+            println!("      Legal basis: {}", legal.yellow());
+        }
+        println!();
+    }
+
+    println!("{}", "═".repeat(80));
+    println!("Total obliterations: {}", records.len());
+
+    Ok(())
+}
+
+fn cmd_verify_obliteration(dir: &PathBuf, proof_id: &str) -> Result<()> {
+    let jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
+
+    // Find the proof
+    let record = jk
+        .obliteration_manager
+        .records()
+        .iter()
+        .find(|r| r.proof.id == proof_id || r.proof.id.starts_with(proof_id))
+        .ok_or_else(|| anyhow::anyhow!("Proof not found: {}", proof_id))?;
+
+    println!("{}", "Obliteration Proof Verification".bold());
+    println!("{}", "─".repeat(50));
+    println!();
+
+    // Verify cryptographic commitment
+    let commitment_valid = record.proof.verify_commitment();
+
+    println!("Proof ID:        {}", record.proof.id.cyan());
+    println!("Content Hash:    {}", record.content_hash);
+    println!("Timestamp:       {}", record.timestamp.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!("User:            {}", record.user);
+    println!("Overwrite Passes: {}", record.proof.overwrite_passes);
+    println!();
+    println!("Commitment:      {}", record.proof.commitment);
+    println!("Nonce:           {}...", &record.proof.nonce[..16]);
+    println!();
+
+    if commitment_valid {
+        println!(
+            "{} Cryptographic commitment VERIFIED",
+            "✓".green().bold()
+        );
+        println!("  The proof cryptographically confirms that:");
+        println!("  • Content with hash {} was obliterated", record.content_hash);
+        println!("  • Obliteration occurred at {}", record.timestamp);
+        println!("  • {} overwrite passes were performed", record.proof.overwrite_passes);
+    } else {
+        println!(
+            "{} Cryptographic commitment INVALID",
+            "✗".red().bold()
+        );
+        println!("  WARNING: The proof appears to have been tampered with!");
+    }
+
+    // Verify content no longer exists
+    let content_gone = !jk.content_store.exists(&record.content_hash);
+    println!();
+    if content_gone {
+        println!(
+            "{} Content confirmed absent from store",
+            "✓".green()
+        );
+    } else {
+        println!(
+            "{} WARNING: Content still exists in store!",
+            "✗".red()
+        );
+    }
 
     Ok(())
 }
