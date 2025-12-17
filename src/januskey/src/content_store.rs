@@ -41,15 +41,6 @@ impl ContentHash {
         let computed = Self::from_bytes(content);
         self.0 == computed.0
     }
-
-    /// Create hash from hex string (with or without sha256: prefix)
-    pub fn from_hex(hex_str: &str) -> Self {
-        if hex_str.starts_with("sha256:") {
-            Self(hex_str.to_string())
-        } else {
-            Self(format!("sha256:{}", hex_str))
-        }
-    }
 }
 
 impl std::fmt::Display for ContentHash {
@@ -74,8 +65,7 @@ impl ContentStore {
     }
 
     /// Get path for a content hash
-    /// Made public for use by ObliterationManager
-    pub fn content_path(&self, hash: &ContentHash) -> PathBuf {
+    fn content_path(&self, hash: &ContentHash) -> PathBuf {
         let raw = hash.raw_hash();
         // Use first 2 chars as directory for distribution
         let (dir, file) = raw.split_at(2.min(raw.len()));
