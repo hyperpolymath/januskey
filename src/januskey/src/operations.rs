@@ -5,6 +5,7 @@
 // Each operation stores sufficient metadata for perfect inversion
 
 use crate::content_store::{ContentHash, ContentStore};
+use crate::delta::Delta;
 use crate::error::{JanusError, Result};
 use crate::metadata::{FileMetadata, MetadataStore, OperationMetadata, OperationType};
 use std::fs;
@@ -206,7 +207,9 @@ impl<'a> OperationExecutor<'a> {
         Ok(metadata)
     }
 
-    /// Execute modify operation
+    /// Execute modify operation with optional delta storage for efficiency
+    /// Note: Delta storage is currently disabled pending refinement of the diff algorithm.
+    /// Set JANUSKEY_USE_DELTA=1 environment variable to enable experimental delta storage.
     fn execute_modify(&mut self, path: &Path, new_content: &[u8]) -> Result<OperationMetadata> {
         if !path.exists() {
             return Err(JanusError::FileNotFound(path.display().to_string()));
@@ -215,14 +218,38 @@ impl<'a> OperationExecutor<'a> {
         // Capture original content
         let original_content = fs::read(path)?;
         let file_metadata = FileMetadata::from_path(path)?;
-        let original_hash = self.content_store.store(&original_content)?;
         let new_hash = ContentHash::from_bytes(new_content);
+
+        // Delta storage is opt-in for now (pending algorithm refinement)
+        let use_experimental_delta = std::env::var("JANUSKEY_USE_DELTA").is_ok();
+
+        let (content_hash, is_delta) = if use_experimental_delta {
+            // Compute REVERSE delta (from new to original) for undo operations
+            // This allows us to reconstruct original from new content during undo
+            let reverse_delta = Delta::compute(new_content, &original_content);
+
+            if !reverse_delta.is_full() {
+                // Store the reverse delta (more efficient for large files with small changes)
+                let delta_bytes = reverse_delta.into_bytes();
+                let hash = self.content_store.store(&delta_bytes)?;
+                (hash, true)
+            } else {
+                // Store full original content (for small files or large changes)
+                let hash = self.content_store.store(&original_content)?;
+                (hash, false)
+            }
+        } else {
+            // Store full original content (default, most reliable)
+            let hash = self.content_store.store(&original_content)?;
+            (hash, false)
+        };
 
         // Create operation metadata
         let mut metadata = OperationMetadata::new(OperationType::Modify, path.to_path_buf())
-            .with_content_hash(original_hash)
+            .with_content_hash(content_hash)
             .with_new_content_hash(new_hash)
-            .with_original_metadata(file_metadata);
+            .with_original_metadata(file_metadata)
+            .with_delta(is_delta);
 
         if let Some(ref tid) = self.transaction_id {
             metadata = metadata.with_transaction_id(tid.clone());
@@ -689,23 +716,56 @@ impl<'a> OperationExecutor<'a> {
         Ok(metadata)
     }
 
-    /// Undo modify: restore original content
+    /// Undo modify: restore original content (handles both delta and full storage)
     fn undo_modify(&mut self, original: &OperationMetadata) -> Result<OperationMetadata> {
         let content_hash = original
             .content_hash
             .as_ref()
             .ok_or_else(|| JanusError::MetadataCorrupted("Missing content hash".to_string()))?;
 
-        // Retrieve original content
-        let content = self.content_store.retrieve(content_hash)?;
+        // Retrieve stored data (either delta or full content)
+        let stored_data = self.content_store.retrieve(content_hash)?;
 
-        // Modify back to original
-        let modify_op = FileOperation::Modify {
-            path: original.path.clone(),
-            new_content: content,
+        // Reconstruct original content
+        let original_content = if original.is_delta {
+            // Stored data is a reverse delta - apply it to current file content
+            let current_content = fs::read(&original.path)?;
+            let delta = Delta::from_bytes(&stored_data)
+                .ok_or_else(|| JanusError::MetadataCorrupted("Invalid delta format".to_string()))?;
+            delta
+                .apply(&current_content)
+                .ok_or_else(|| JanusError::MetadataCorrupted("Failed to apply delta".to_string()))?
+        } else {
+            // Stored data is full original content
+            stored_data
         };
 
-        self.execute(modify_op)
+        // Get current metadata before modification
+        let file_metadata = FileMetadata::from_path(&original.path)?;
+        let new_hash = ContentHash::from_bytes(&original_content);
+
+        // Store the current content (for potential re-undo)
+        // Since this is an undo, store full content, not delta
+        let current_content = fs::read(&original.path)?;
+        let current_hash = self.content_store.store(&current_content)?;
+
+        // Create operation metadata for the undo
+        let mut metadata = OperationMetadata::new(OperationType::Modify, original.path.clone())
+            .with_content_hash(current_hash)
+            .with_new_content_hash(new_hash)
+            .with_original_metadata(file_metadata)
+            .with_delta(false); // Undo operations store full content for reliability
+
+        if let Some(ref tid) = self.transaction_id {
+            metadata = metadata.with_transaction_id(tid.clone());
+        }
+
+        // Write the original content back
+        fs::write(&original.path, &original_content)?;
+
+        // Record and return
+        self.metadata_store.append(metadata.clone())?;
+        Ok(metadata)
     }
 
     /// Undo move: move back to original location
@@ -1194,5 +1254,68 @@ mod tests {
 
         assert!(!link.exists());
         assert!(target.exists()); // Target should still exist
+    }
+
+    #[test]
+    fn test_modify_large_file_and_undo() {
+        let (tmp, content_store, mut metadata_store) = setup();
+
+        // Create a large test file (above DELTA_THRESHOLD of 4KB)
+        let test_file = tmp.path().join("large.txt");
+        let original_content = "Line 1\nLine 2\nLine 3\n".repeat(500); // ~11KB
+        fs::write(&test_file, &original_content).unwrap();
+
+        // Modify with small change
+        let mut modified_content = original_content.clone();
+        modified_content.push_str("New line at end\n");
+
+        let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
+        let modify_meta = executor
+            .execute(FileOperation::Modify {
+                path: test_file.clone(),
+                new_content: modified_content.as_bytes().to_vec(),
+            })
+            .unwrap();
+
+        // Verify modification occurred
+        assert_eq!(fs::read_to_string(&test_file).unwrap(), modified_content);
+
+        // Without JANUSKEY_USE_DELTA, delta should not be used
+        assert!(!modify_meta.is_delta, "Delta should be disabled by default");
+
+        // Undo the modify
+        let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
+        executor.undo(&modify_meta.id).unwrap();
+
+        // Verify original content is restored
+        assert_eq!(fs::read_to_string(&test_file).unwrap(), original_content);
+    }
+
+    #[test]
+    fn test_modify_small_file_uses_full_storage() {
+        let (tmp, content_store, mut metadata_store) = setup();
+
+        // Create a small test file (below DELTA_THRESHOLD)
+        let test_file = tmp.path().join("small.txt");
+        let original_content = "small content";
+        fs::write(&test_file, original_content).unwrap();
+
+        // Modify it
+        let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
+        let modify_meta = executor
+            .execute(FileOperation::Modify {
+                path: test_file.clone(),
+                new_content: b"different small content".to_vec(),
+            })
+            .unwrap();
+
+        // Small files should not use delta
+        assert!(!modify_meta.is_delta);
+
+        // Undo should still work
+        let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
+        executor.undo(&modify_meta.id).unwrap();
+
+        assert_eq!(fs::read_to_string(&test_file).unwrap(), original_content);
     }
 }

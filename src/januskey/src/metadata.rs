@@ -153,6 +153,9 @@ pub struct OperationMetadata {
     pub undone: bool,
     /// ID of the undo operation (if undone)
     pub undo_operation_id: Option<String>,
+    /// Whether content_hash points to a delta (not full content)
+    #[serde(default)]
+    pub is_delta: bool,
 }
 
 impl OperationMetadata {
@@ -172,7 +175,14 @@ impl OperationMetadata {
             transaction_id: None,
             undone: false,
             undo_operation_id: None,
+            is_delta: false,
         }
+    }
+
+    /// Builder pattern: set delta flag
+    pub fn with_delta(mut self, is_delta: bool) -> Self {
+        self.is_delta = is_delta;
+        self
     }
 
     /// Builder pattern: set secondary path

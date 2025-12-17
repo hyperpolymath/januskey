@@ -5,6 +5,7 @@
 // Through Maximal Principle Reduction (MPR)
 
 pub mod content_store;
+pub mod delta;
 pub mod error;
 pub mod metadata;
 pub mod obliteration;
