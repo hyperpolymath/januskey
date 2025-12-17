@@ -1,0 +1,26 @@
+# JanusKey Formal Proofs
+# Rocq/Coq project configuration
+#
+# To build: coq_makefile -f _CoqProject -o Makefile && make
+# Requires: Coq 8.18+ or Rocq
+
+-R . JanusKey
+
+# Core definitions
+JanusKey/Preliminaries.v
+JanusKey/ContentHash.v
+JanusKey/FileSystem.v
+JanusKey/ContentStore.v
+
+# RMR Primitive
+JanusKey/Operations.v
+JanusKey/RMR.v
+
+# RMO Primitive
+JanusKey/Obliteration.v
+JanusKey/RMO.v
+
+# Main theorems
+JanusKey/Reversibility.v
+JanusKey/Composition.v
+JanusKey/GDPR.v
