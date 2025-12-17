@@ -53,6 +53,9 @@ pub enum JanusError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("IO error: {0}")]
+    IoError(String),
+
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 

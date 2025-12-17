@@ -4,6 +4,7 @@
 // JanusKey: Provably Reversible File Operations
 // Through Maximal Principle Reduction (MPR)
 
+pub mod backend;
 pub mod content_store;
 pub mod delta;
 pub mod error;
@@ -12,6 +13,14 @@ pub mod obliteration;
 pub mod operations;
 pub mod transaction;
 
+// Feature-gated backend implementations
+#[cfg(feature = "ssh")]
+pub mod backend_ssh;
+
+#[cfg(feature = "s3")]
+pub mod backend_s3;
+
+pub use backend::{BackendFactory, FileBackend, LocalBackend, RemoteUri, S3Config, SshConfig};
 pub use content_store::{ContentHash, ContentStore};
 pub use error::{JanusError, Result};
 pub use metadata::{MetadataStore, OperationMetadata, OperationType};
