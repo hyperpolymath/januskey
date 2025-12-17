@@ -4,27 +4,15 @@
 // JanusKey: Provably Reversible File Operations
 // Through Maximal Principle Reduction (MPR)
 
-pub mod backend;
 pub mod content_store;
-pub mod delta;
 pub mod error;
 pub mod metadata;
-pub mod obliteration;
 pub mod operations;
 pub mod transaction;
 
-// Feature-gated backend implementations
-#[cfg(feature = "ssh")]
-pub mod backend_ssh;
-
-#[cfg(feature = "s3")]
-pub mod backend_s3;
-
-pub use backend::{BackendFactory, FileBackend, LocalBackend, RemoteUri, S3Config, SshConfig};
-pub use content_store::{ContentHash, ContentStore};
+pub use content_store::ContentStore;
 pub use error::{JanusError, Result};
 pub use metadata::{MetadataStore, OperationMetadata, OperationType};
-pub use obliteration::{ObliterationManager, ObliterationProof, ObliterationRecord};
 pub use operations::{FileOperation, OperationExecutor};
 pub use transaction::{Transaction, TransactionManager};
 
@@ -99,8 +87,6 @@ pub struct JanusKey {
     pub metadata_store: MetadataStore,
     /// Transaction manager
     pub transaction_manager: TransactionManager,
-    /// Obliteration manager (RMO primitive)
-    pub obliteration_manager: ObliterationManager,
 }
 
 impl JanusKey {
@@ -116,7 +102,6 @@ impl JanusKey {
         let content_store = ContentStore::new(jk_dir.join("content"), config.compression)?;
         let metadata_store = MetadataStore::new(jk_dir.join("metadata.json"))?;
         let transaction_manager = TransactionManager::new(jk_dir.join("transactions"))?;
-        let obliteration_manager = ObliterationManager::new(jk_dir.join("obliterations.json"))?;
 
         Ok(Self {
             root,
@@ -124,7 +109,6 @@ impl JanusKey {
             content_store,
             metadata_store,
             transaction_manager,
-            obliteration_manager,
         })
     }
 
@@ -141,7 +125,6 @@ impl JanusKey {
         let content_store = ContentStore::new(jk_dir.join("content"), config.compression)?;
         let metadata_store = MetadataStore::new(jk_dir.join("metadata.json"))?;
         let transaction_manager = TransactionManager::new(jk_dir.join("transactions"))?;
-        let obliteration_manager = ObliterationManager::new(jk_dir.join("obliterations.json"))?;
 
         Ok(Self {
             root,
@@ -149,7 +132,6 @@ impl JanusKey {
             content_store,
             metadata_store,
             transaction_manager,
-            obliteration_manager,
         })
     }
 

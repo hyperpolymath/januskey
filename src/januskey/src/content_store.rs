@@ -65,8 +65,7 @@ impl ContentStore {
     }
 
     /// Get path for a content hash
-    /// Made public for use by ObliterationManager
-    pub fn content_path(&self, hash: &ContentHash) -> PathBuf {
+    fn content_path(&self, hash: &ContentHash) -> PathBuf {
         let raw = hash.raw_hash();
         // Use first 2 chars as directory for distribution
         let (dir, file) = raw.split_at(2.min(raw.len()));
