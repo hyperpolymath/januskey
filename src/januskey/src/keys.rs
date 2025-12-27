@@ -19,6 +19,8 @@ use thiserror::Error;
 use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+use crate::attestation::AuditLog;
+
 /// Key management errors
 #[derive(Error, Debug)]
 pub enum KeyError {
@@ -182,17 +184,27 @@ impl SecretKey {
 /// Key manager for JanusKey
 pub struct KeyManager {
     store_path: PathBuf,
+    root_path: PathBuf,
     kek: Option<SecretKey>,
+    audit_log: AuditLog,
 }
 
 impl KeyManager {
     /// Create new key manager for a directory
     pub fn new(root: &Path) -> Self {
         let store_path = root.join(".januskey").join("keys");
+        let audit_log = AuditLog::new(root);
         Self {
             store_path,
+            root_path: root.to_path_buf(),
             kek: None,
+            audit_log,
         }
+    }
+
+    /// Get reference to audit log
+    pub fn audit_log(&self) -> &AuditLog {
+        &self.audit_log
     }
 
     /// Check if key store is initialized
@@ -214,6 +226,14 @@ impl KeyManager {
 
         // Derive KEK from passphrase
         let kek = derive_kek(passphrase, &salt)?;
+
+        // Derive attestation key from KEK
+        let mut attestation_key = [0u8; 32];
+        let mut hasher = Sha256::new();
+        hasher.update(kek.as_bytes());
+        hasher.update(b"attestation");
+        attestation_key.copy_from_slice(&hasher.finalize());
+
         self.kek = Some(kek);
 
         // Generate initial nonce
@@ -241,6 +261,10 @@ impl KeyManager {
             fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
         }
 
+        // Initialize audit log and record event
+        self.audit_log.init(attestation_key)?;
+        let _ = self.audit_log.log_store_init();
+
         Ok(())
     }
 
@@ -258,7 +282,17 @@ impl KeyManager {
             return Err(KeyError::InvalidPassphrase);
         }
 
+        // Derive attestation key from KEK
+        let mut attestation_key = [0u8; 32];
+        let mut hasher = Sha256::new();
+        hasher.update(kek.as_bytes());
+        hasher.update(b"attestation");
+        attestation_key.copy_from_slice(&hasher.finalize());
+
         self.kek = Some(kek);
+        self.audit_log.set_attestation_key(attestation_key);
+        let _ = self.audit_log.log_store_unlock();
+
         Ok(())
     }
 
@@ -294,7 +328,7 @@ impl KeyManager {
             expires_at,
             state: KeyState::Active,
             rotation_of: None,
-            fingerprint,
+            fingerprint: fingerprint.clone(),
             description,
         };
 
@@ -303,6 +337,10 @@ impl KeyManager {
         store.keys.push(wrapped);
 
         self.save_store(&store)?;
+
+        // Log key generation
+        let _ = self.audit_log.log_key_generated(id, &fingerprint, algorithm, purpose);
+
         Ok(id)
     }
 
@@ -348,6 +386,9 @@ impl KeyManager {
             return Err(KeyError::AlreadyRevoked(id));
         }
 
+        // Log key retrieval
+        let _ = self.audit_log.log_key_retrieved(id, &wrapped.metadata.fingerprint);
+
         unwrap_key(kek, &wrapped)
     }
 
@@ -388,7 +429,7 @@ impl KeyManager {
                 .map(|_| now + chrono::Duration::days(365)),
             state: KeyState::Active,
             rotation_of: Some(id),
-            fingerprint,
+            fingerprint: fingerprint.clone(),
             description: old_meta.description.clone(),
         };
 
@@ -397,9 +438,14 @@ impl KeyManager {
         store.keys.push(new_wrapped);
 
         // Mark old key as revoked
+        let old_fingerprint = store.keys[old_idx].metadata.fingerprint.clone();
         store.keys[old_idx].metadata.state = KeyState::Revoked;
 
         self.save_store(&store)?;
+
+        // Log rotation event
+        let _ = self.audit_log.log_key_rotated(id, &old_fingerprint, new_id, &fingerprint);
+
         Ok(new_id)
     }
 
@@ -421,8 +467,41 @@ impl KeyManager {
             return Err(KeyError::AlreadyRevoked(id));
         }
 
+        let fingerprint = key.metadata.fingerprint.clone();
         key.metadata.state = KeyState::Revoked;
         self.save_store(&store)?;
+
+        // Log revocation
+        let _ = self.audit_log.log_key_revoked(id, &fingerprint, None);
+
+        Ok(())
+    }
+
+    /// Revoke a key with reason
+    pub fn revoke_with_reason(&mut self, id: Uuid, reason: &str) -> Result<()> {
+        if self.kek.is_none() {
+            return Err(KeyError::NotInitialized);
+        }
+
+        let mut store = self.load_store()?;
+
+        let key = store
+            .keys
+            .iter_mut()
+            .find(|k| k.metadata.id == id)
+            .ok_or(KeyError::KeyNotFound(id))?;
+
+        if key.metadata.state == KeyState::Revoked {
+            return Err(KeyError::AlreadyRevoked(id));
+        }
+
+        let fingerprint = key.metadata.fingerprint.clone();
+        key.metadata.state = KeyState::Revoked;
+        self.save_store(&store)?;
+
+        // Log revocation with reason
+        let _ = self.audit_log.log_key_revoked(id, &fingerprint, Some(reason));
+
         Ok(())
     }
 
@@ -440,6 +519,9 @@ impl KeyManager {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(output, fs::Permissions::from_mode(0o600))?;
         }
+
+        // Log backup creation
+        let _ = self.audit_log.log_backup_created(output);
 
         Ok(())
     }

@@ -4,6 +4,7 @@
 // JanusKey: Provably Reversible File Operations
 // Through Maximal Principle Reduction (MPR)
 
+pub mod attestation;
 pub mod content_store;
 pub mod error;
 pub mod keys;
@@ -11,6 +12,7 @@ pub mod metadata;
 pub mod operations;
 pub mod transaction;
 
+pub use attestation::{AuditEntry, AuditEventType, AuditLog, IntegrityReport, KeyEventDetails};
 pub use content_store::ContentStore;
 pub use error::{JanusError, Result};
 pub use keys::{KeyAlgorithm, KeyError, KeyManager, KeyMetadata, KeyPurpose, KeyState};

@@ -10,7 +10,9 @@ use dialoguer::{Confirm, Password};
 use std::path::PathBuf;
 use uuid::Uuid;
 
+mod attestation;
 mod keys;
+use attestation::AuditEventType;
 use keys::{KeyAlgorithm, KeyManager, KeyPurpose, KeyState};
 
 #[derive(Parser)]
@@ -92,6 +94,38 @@ enum Commands {
 
     /// Show key store status
     Status,
+
+    /// View audit log
+    Audit {
+        #[command(subcommand)]
+        command: AuditCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum AuditCommands {
+    /// Show recent audit entries
+    Show {
+        /// Number of entries to show
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// Show audit history for a specific key
+    History {
+        /// Key ID (UUID)
+        key_id: Uuid,
+    },
+
+    /// Verify audit log integrity
+    Verify,
+
+    /// Export audit log to JSON
+    Export {
+        /// Output path for JSON file
+        #[arg(short, long)]
+        output: PathBuf,
+    },
 }
 
 fn main() {
@@ -124,6 +158,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Revoke { force, key_id } => cmd_revoke(&mut km, key_id, force)?,
         Commands::Backup { output } => cmd_backup(&mut km, &output)?,
         Commands::Status => cmd_status(&km)?,
+        Commands::Audit { command } => match command {
+            AuditCommands::Show { limit } => cmd_audit_show(&mut km, limit)?,
+            AuditCommands::History { key_id } => cmd_audit_history(&mut km, key_id)?,
+            AuditCommands::Verify => cmd_audit_verify(&mut km)?,
+            AuditCommands::Export { output } => cmd_audit_export(&mut km, &output)?,
+        },
     }
 
     Ok(())
@@ -446,4 +486,168 @@ fn format_state(state: KeyState) -> colored::ColoredString {
         KeyState::Generated => "generated".normal(),
         KeyState::Obliterated => "obliterated".red().bold(),
     }
+}
+
+fn format_event_type(event_type: AuditEventType) -> colored::ColoredString {
+    match event_type {
+        AuditEventType::StoreInitialized => "INIT".cyan(),
+        AuditEventType::StoreUnlocked => "UNLOCK".normal(),
+        AuditEventType::KeyGenerated => "GENERATE".green(),
+        AuditEventType::KeyRetrieved => "RETRIEVE".yellow(),
+        AuditEventType::KeyRotated => "ROTATE".blue(),
+        AuditEventType::KeyRevoked => "REVOKE".red(),
+        AuditEventType::KeyObliterated => "OBLITERATE".red().bold(),
+        AuditEventType::BackupCreated => "BACKUP".cyan(),
+        AuditEventType::BackupRestored => "RESTORE".cyan(),
+    }
+}
+
+fn cmd_audit_show(km: &mut KeyManager, limit: usize) -> Result<(), Box<dyn std::error::Error>> {
+    unlock_store(km)?;
+
+    let entries = km.audit_log().read_last_n(limit)?;
+
+    if entries.is_empty() {
+        println!("{}", "No audit entries found.".yellow());
+        return Ok(());
+    }
+
+    println!("{}", "Audit Log:".cyan().bold());
+    println!();
+    println!(
+        "{:<20} {:<12} {:<20} {}",
+        "Timestamp".bold(),
+        "Event".bold(),
+        "Actor".bold(),
+        "Details".bold()
+    );
+    println!("{}", "-".repeat(80));
+
+    for entry in entries {
+        let timestamp = entry.timestamp.format("%Y-%m-%d %H:%M:%S");
+        let event_str = format_event_type(entry.event_type);
+        let actor = if entry.actor.len() > 18 {
+            format!("{}...", &entry.actor[..15])
+        } else {
+            entry.actor.clone()
+        };
+
+        let details = if let Some(ref kd) = entry.key_details {
+            format!("key:{}", &kd.fingerprint)
+        } else if let Some(ref reason) = entry.reason {
+            if reason.len() > 30 {
+                format!("{}...", &reason[..27])
+            } else {
+                reason.clone()
+            }
+        } else {
+            "-".to_string()
+        };
+
+        println!(
+            "{:<20} {:<12} {:<20} {}",
+            timestamp.to_string().dimmed(),
+            event_str,
+            actor,
+            details.dimmed()
+        );
+    }
+
+    Ok(())
+}
+
+fn cmd_audit_history(km: &mut KeyManager, key_id: Uuid) -> Result<(), Box<dyn std::error::Error>> {
+    unlock_store(km)?;
+
+    let entries = km.audit_log().get_key_history(key_id)?;
+
+    if entries.is_empty() {
+        println!("{}", format!("No audit entries found for key {}", key_id).yellow());
+        return Ok(());
+    }
+
+    println!("{}", format!("Audit History for Key: {}", key_id).cyan().bold());
+    println!();
+
+    for entry in entries {
+        let timestamp = entry.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
+        let event_str = format_event_type(entry.event_type);
+
+        println!("{} {} by {}", timestamp.to_string().dimmed(), event_str, entry.actor);
+
+        if let Some(ref kd) = entry.key_details {
+            println!("  Fingerprint: {}", kd.fingerprint.cyan());
+            if let Some(old) = kd.old_state {
+                if let Some(new) = kd.new_state {
+                    println!("  State: {} → {}", format_state(old), format_state(new));
+                }
+            }
+            if let Some(from) = kd.rotated_from {
+                println!("  Rotated from: {}", from.to_string().dimmed());
+            }
+        }
+
+        if let Some(ref reason) = entry.reason {
+            println!("  Reason: {}", reason);
+        }
+
+        println!();
+    }
+
+    Ok(())
+}
+
+fn cmd_audit_verify(km: &mut KeyManager) -> Result<(), Box<dyn std::error::Error>> {
+    unlock_store(km)?;
+
+    println!("{}", "Verifying audit log integrity...".cyan());
+
+    let report = km.audit_log().verify_integrity()?;
+
+    println!();
+    if report.valid {
+        println!("{}", "✓ Audit log integrity verified".green());
+        println!();
+        println!("  Total entries: {}", report.total_entries);
+        println!("  Chain status:  {}", "intact".green());
+        println!("  Attestations:  {}", "valid".green());
+    } else {
+        println!("{}", "✗ Audit log integrity check FAILED".red().bold());
+        println!();
+        println!("  {}", report.message.red());
+        if let Some(idx) = report.first_invalid_index {
+            println!("  First invalid entry: {}", idx);
+        }
+        println!();
+        println!(
+            "{}",
+            "WARNING: The audit log may have been tampered with!".yellow().bold()
+        );
+    }
+
+    Ok(())
+}
+
+fn cmd_audit_export(km: &mut KeyManager, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    unlock_store(km)?;
+
+    if output.exists() {
+        let confirm = Confirm::new()
+            .with_prompt(format!("File {} already exists. Overwrite?", output.display()))
+            .default(false)
+            .interact()?;
+
+        if !confirm {
+            println!("{}", "Aborted.".yellow());
+            return Ok(());
+        }
+    }
+
+    km.audit_log().export_json(output)?;
+
+    println!("{}", "✓ Audit log exported successfully".green());
+    println!();
+    println!("  Location: {}", output.display());
+
+    Ok(())
 }
