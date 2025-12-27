@@ -1,0 +1,553 @@
+// SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Jonathan D.A. Jewell
+= JanusKey Key Lifecycle Management
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+This document specifies the complete lifecycle for cryptographic keys managed by JanusKey,
+from generation through destruction. Following MPR principles, key lifecycle transitions
+are enforced through type-state patterns, making invalid state transitions impossible.
+
+== Key Hierarchy
+
+[source]
+----
+                    ┌─────────────────────────┐
+                    │     Master Key (MK)     │
+                    │   Derived from user     │
+                    │   passphrase + salt     │
+                    │   via Argon2id          │
+                    └───────────┬─────────────┘
+                                │
+            ┌───────────────────┼───────────────────┐
+            │                   │                   │
+            ▼                   ▼                   ▼
+    ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+    │  Key Encrypt  │   │   Signing     │   │   Recovery    │
+    │   Key (KEK)   │   │   Key (SK)    │   │   Key (RK)    │
+    │  AES-256      │   │   Ed25519     │   │   AES-256     │
+    └───────┬───────┘   └───────────────┘   └───────────────┘
+            │
+            ▼
+    ┌───────────────────────────────────────────────────────┐
+    │              Data Encryption Keys (DEKs)              │
+    │   Per-file or per-operation symmetric keys            │
+    │   Wrapped with KEK, stored in key store               │
+    └───────────────────────────────────────────────────────┘
+----
+
+=== Key Types
+
+[cols="1,1,2,1,1"]
+|===
+| Key Type | Algorithm | Purpose | Default Lifetime | Rotation
+
+| Master Key (MK)
+| Argon2id derivation
+| Root of key hierarchy
+| Until passphrase change
+| On passphrase change
+
+| Key Encryption Key (KEK)
+| AES-256
+| Wraps DEKs at rest
+| 1 year
+| Annual or on compromise
+
+| Signing Key (SK)
+| Ed25519
+| Operation signatures, audit
+| 2 years
+| Biennial
+
+| Recovery Key (RK)
+| AES-256
+| Emergency key recovery
+| 5 years
+| Rare, manual
+
+| Data Encryption Key (DEK)
+| AES-256-GCM
+| Encrypt file content
+| Per-operation
+| Each operation
+|===
+
+== Lifecycle States
+
+Keys progress through a defined state machine:
+
+[source]
+----
+    ┌─────────────┐
+    │             │
+    │  GENERATED  │ ─────────────────────────────────────┐
+    │             │                                       │
+    └──────┬──────┘                                       │
+           │                                              │
+           │ activate()                                   │
+           ▼                                              │
+    ┌─────────────┐     rotate()      ┌─────────────┐    │
+    │             │ ─────────────────▶│             │    │
+    │   ACTIVE    │                   │  ROTATING   │    │
+    │             │◀───────────────── │             │    │
+    └──────┬──────┘    complete()     └─────────────┘    │
+           │                                              │
+           │ suspend() / expire()                         │
+           ▼                                              │
+    ┌─────────────┐                                       │
+    │             │                                       │
+    │  SUSPENDED  │                                       │
+    │             │                                       │
+    └──────┬──────┘                                       │
+           │                                              │
+           │ revoke() / destroy()                         │
+           ▼                                              │
+    ┌─────────────┐     obliterate()   ┌─────────────┐   │
+    │             │ ──────────────────▶│             │   │
+    │   REVOKED   │                    │ OBLITERATED │◀──┘
+    │             │                    │             │   destroy()
+    └─────────────┘                    └─────────────┘
+----
+
+=== State Descriptions
+
+[horizontal]
+GENERATED:: Key material created, not yet authorized for use
+ACTIVE:: Key available for cryptographic operations
+ROTATING:: Transition period; old key decrypts, new key encrypts
+SUSPENDED:: Temporarily unavailable (investigation, maintenance)
+REVOKED:: Permanently disabled, retained for audit
+OBLITERATED:: Cryptographically destroyed via RMO primitive
+
+== Key Generation
+
+=== Master Key Derivation
+
+[source,rust]
+----
+// Argon2id parameters (OWASP recommendations)
+const ARGON2_MEMORY_KB: u32 = 65536;  // 64 MB
+const ARGON2_ITERATIONS: u32 = 3;
+const ARGON2_PARALLELISM: u32 = 4;
+const SALT_LENGTH: usize = 16;
+
+fn derive_master_key(passphrase: &str, salt: &[u8; 16]) -> [u8; 32] {
+    argon2id::hash(
+        passphrase.as_bytes(),
+        salt,
+        ARGON2_MEMORY_KB,
+        ARGON2_ITERATIONS,
+        ARGON2_PARALLELISM,
+    )
+}
+----
+
+=== Symmetric Key Generation
+
+[source,rust]
+----
+fn generate_symmetric_key() -> Result<[u8; 32], CryptoError> {
+    let mut key = [0u8; 32];
+    getrandom::getrandom(&mut key)?;
+    Ok(key)
+}
+----
+
+=== Asymmetric Key Generation
+
+[source,rust]
+----
+fn generate_signing_keypair() -> Result<(SecretKey, PublicKey), CryptoError> {
+    let mut seed = [0u8; 32];
+    getrandom::getrandom(&mut seed)?;
+    let secret = ed25519::SecretKey::from_seed(&seed);
+    let public = secret.public_key();
+    seed.zeroize();
+    Ok((secret, public))
+}
+----
+
+=== Key Metadata
+
+Every generated key includes metadata:
+
+[source,rust]
+----
+struct KeyMetadata {
+    id: Uuid,                    // Unique identifier
+    algorithm: Algorithm,        // AES256GCM, Ed25519, X25519
+    purpose: KeyPurpose,         // Encryption, Signing, KeyWrap
+    created_at: DateTime<Utc>,   // Generation timestamp
+    expires_at: Option<DateTime<Utc>>, // Expiration (if any)
+    state: KeyState,             // Current lifecycle state
+    rotation_of: Option<Uuid>,   // Previous key (if rotated)
+    fingerprint: [u8; 32],       // SHA-256 of public component
+}
+----
+
+== Key Storage
+
+=== Storage Format
+
+Keys are stored in an encrypted key store at `.januskey/keys/keystore.jks`:
+
+[source]
+----
+┌────────────────────────────────────────────────────────────┐
+│                    Key Store Format                        │
+├────────────────────────────────────────────────────────────┤
+│  Magic Number (8 bytes): "JKKEYS01"                        │
+│  Version (4 bytes): 0x00000001                             │
+│  Salt (16 bytes): Random salt for MK derivation            │
+│  Nonce (12 bytes): AES-GCM nonce                           │
+│  HMAC (32 bytes): HMAC-SHA256 of encrypted payload         │
+│  Encrypted Payload (variable):                             │
+│    └─ AES-256-GCM encrypted key entries                    │
+│       └─ Each entry: KeyMetadata + WrappedKeyMaterial      │
+└────────────────────────────────────────────────────────────┘
+----
+
+=== Key Wrapping
+
+Individual keys are wrapped before storage:
+
+[source,rust]
+----
+struct WrappedKey {
+    metadata: KeyMetadata,
+    nonce: [u8; 12],           // Per-key nonce
+    ciphertext: Vec<u8>,       // AES-256-GCM encrypted key
+    tag: [u8; 16],             // GCM authentication tag
+}
+
+fn wrap_key(kek: &[u8; 32], key: &[u8], metadata: &KeyMetadata)
+    -> Result<WrappedKey, CryptoError>
+{
+    let mut nonce = [0u8; 12];
+    getrandom::getrandom(&mut nonce)?;
+
+    let cipher = Aes256Gcm::new(kek.into());
+    let aad = metadata.serialize(); // Bind metadata to ciphertext
+    let ciphertext = cipher.encrypt(&nonce.into(), key, &aad)?;
+
+    Ok(WrappedKey { metadata, nonce, ciphertext, tag })
+}
+----
+
+=== File Permissions
+
+[source,bash]
+----
+~/.januskey/
+├── keys/
+│   ├── keystore.jks    # mode 0600, owner-only
+│   └── recovery.jks    # mode 0600, stored separately
+└── config.json         # mode 0644
+----
+
+== Key Rotation
+
+=== Rotation Triggers
+
+[cols="1,2,2"]
+|===
+| Trigger | Condition | Action
+
+| Scheduled
+| Key approaching expiration (90% of lifetime)
+| Automatic rotation notification
+
+| Manual
+| Administrator initiates rotation
+| Immediate rotation
+
+| Compromise
+| Key material suspected leaked
+| Emergency rotation + revocation
+
+| Cryptographic
+| Algorithm deprecated (e.g., SHA-1)
+| Migration to new algorithm
+|===
+
+=== Rotation Procedure
+
+[source]
+----
+1. ROTATION INITIATION
+   ├─ Generate new key with same purpose
+   ├─ Set old key state = ROTATING
+   ├─ Set new key state = ACTIVE
+   └─ Log rotation event
+
+2. TRANSITION PERIOD (configurable, default 7 days)
+   ├─ Encrypt operations use NEW key
+   ├─ Decrypt operations try NEW first, fall back to OLD
+   └─ Re-encrypt critical data with NEW key (background)
+
+3. ROTATION COMPLETION
+   ├─ Verify all data accessible with NEW key
+   ├─ Set old key state = REVOKED
+   ├─ Archive old key metadata (not material)
+   └─ Log completion event
+----
+
+=== CLI Commands
+
+[source,bash]
+----
+# View rotation status
+jk-keys rotate --status
+
+# Initiate rotation for specific key
+jk-keys rotate --key-id <uuid>
+
+# Rotate all keys approaching expiration
+jk-keys rotate --auto
+
+# Emergency rotation (immediate, no transition period)
+jk-keys rotate --key-id <uuid> --emergency
+----
+
+== Key Recovery
+
+=== Recovery Mechanisms
+
+==== 1. Passphrase Recovery
+
+If the user forgets their passphrase but has a recovery key:
+
+[source]
+----
+┌─────────────────────────────────────────────────────────────┐
+│                   Recovery Key Flow                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. User generated recovery key at setup                    │
+│     └─ 24-word mnemonic (BIP-39) or 256-bit hex             │
+│                                                             │
+│  2. Recovery key encrypts backup of Master Key              │
+│     └─ Stored in recovery.jks (separate file)               │
+│                                                             │
+│  3. Recovery procedure:                                     │
+│     a) User provides recovery key                           │
+│     b) Decrypt backup Master Key                            │
+│     c) Re-derive KEK from Master Key                        │
+│     d) User sets new passphrase                             │
+│     e) Re-encrypt keystore with new passphrase              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+----
+
+==== 2. Backup Recovery
+
+Regular encrypted backups of the key store:
+
+[source,bash]
+----
+# Create encrypted backup
+jk-keys backup --output ~/keystore-backup-2025.jks.enc
+
+# Restore from backup
+jk-keys restore --input ~/keystore-backup-2025.jks.enc
+----
+
+==== 3. Key Escrow (Optional)
+
+For organizational deployments:
+
+[source]
+----
+┌──────────────────────────────────────────────────────────────┐
+│                   M-of-N Key Escrow                          │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Shamir's Secret Sharing splits recovery key:                │
+│    - Total shares: N (e.g., 5)                               │
+│    - Required to reconstruct: M (e.g., 3)                    │
+│                                                              │
+│  Shares distributed to:                                      │
+│    - Security officer                                        │
+│    - Legal/compliance                                        │
+│    - CTO/technical leadership                                │
+│    - External escrow service                                 │
+│    - Secure offline storage                                  │
+│                                                              │
+│  Reconstruction requires M shares + audit approval           │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+----
+
+=== Recovery CLI
+
+[source,bash]
+----
+# Generate recovery key during setup
+jk-keys init --with-recovery
+# Output: 24-word mnemonic (WRITE THIS DOWN!)
+
+# Recover using mnemonic
+jk-keys recover --method mnemonic
+# Interactive: Enter 24 words, set new passphrase
+
+# Recover using backup file
+jk-keys recover --method backup --file ~/backup.jks.enc
+----
+
+== Key Destruction
+
+=== Revocation vs. Obliteration
+
+[cols="1,2,2"]
+|===
+| Action | Revocation | Obliteration
+
+| Key material
+| Retained (encrypted)
+| Cryptographically destroyed
+
+| Metadata
+| Retained for audit
+| Retained for audit
+
+| Decrypt existing data
+| Possible (with override)
+| Impossible
+
+| Use case
+| Normal end-of-life
+| Compromise, GDPR Article 17
+|===
+
+=== Obliteration Procedure
+
+Uses JanusKey's RMO (Obliterative Wipe) primitive:
+
+[source,rust]
+----
+fn obliterate_key(key_id: Uuid) -> Result<ObliterationProof, Error> {
+    // 1. Locate key in store
+    let wrapped_key = keystore.get(key_id)?;
+
+    // 2. Extract to temporary secure memory
+    let key_material = unwrap_key(&wrapped_key)?;
+
+    // 3. Overwrite in memory (3+ passes)
+    let proof = rmo::obliterate(
+        &key_material,
+        ObliterationConfig {
+            passes: 3,
+            patterns: [0x00, 0xFF, RANDOM],
+            verify: true,
+        }
+    )?;
+
+    // 4. Remove from keystore
+    keystore.remove(key_id)?;
+
+    // 5. Update metadata (mark as obliterated)
+    keystore.metadata.update(key_id, KeyState::Obliterated)?;
+
+    // 6. Return cryptographic proof
+    Ok(proof)
+}
+----
+
+=== Destruction CLI
+
+[source,bash]
+----
+# Revoke a key (retain for audit)
+jk-keys revoke --key-id <uuid> --reason "scheduled rotation"
+
+# Obliterate a key (GDPR erasure)
+jk-keys obliterate --key-id <uuid> --confirm
+# Output: Obliteration proof (for compliance records)
+
+# Verify obliteration proof
+jk-keys verify-obliteration --proof <base64-proof>
+----
+
+== Audit Trail
+
+All key lifecycle events are logged:
+
+[source,json]
+----
+{
+  "event_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-15T14:30:00Z",
+  "event_type": "KEY_ROTATED",
+  "key_id": "123e4567-e89b-12d3-a456-426614174000",
+  "new_key_id": "789e0123-e89b-12d3-a456-426614174000",
+  "actor": "user@example.com",
+  "reason": "scheduled_rotation",
+  "metadata": {
+    "old_key_fingerprint": "sha256:abc123...",
+    "new_key_fingerprint": "sha256:def456..."
+  }
+}
+----
+
+== Best Practices
+
+=== DO
+
+* Use strong passphrases (16+ characters, mixed case, numbers, symbols)
+* Store recovery key in physically secure location
+* Rotate keys on schedule (don't wait for expiration)
+* Review audit logs regularly
+* Test recovery procedures annually
+
+=== DON'T
+
+* Share passphrase or recovery key electronically
+* Store recovery key on same device as keystore
+* Delay rotation after potential compromise
+* Disable audit logging
+* Skip passphrase on key generation (use `--no-passphrase` only for testing)
+
+== CLI Quick Reference
+
+[source,bash]
+----
+# Initialize key store
+jk-keys init
+
+# List all keys
+jk-keys list
+
+# Generate new key
+jk-keys generate --type aes256 --purpose encryption
+
+# Show key details
+jk-keys show --key-id <uuid>
+
+# Rotate key
+jk-keys rotate --key-id <uuid>
+
+# Revoke key
+jk-keys revoke --key-id <uuid>
+
+# Backup keystore
+jk-keys backup --output <path>
+
+# Recover from backup
+jk-keys recover --method backup --file <path>
+
+# Obliterate key (GDPR)
+jk-keys obliterate --key-id <uuid> --confirm
+----
+
+== References
+
+* NIST SP 800-57: Recommendation for Key Management (Parts 1-3)
+* NIST SP 800-130: Framework for Designing Key Management
+* RFC 9106: Argon2 Memory-Hard Function
+* BIP-39: Mnemonic code for generating deterministic keys
+* JanusKey Threat Model: `docs/security/THREAT_MODEL.adoc`

@@ -6,12 +6,14 @@
 
 pub mod content_store;
 pub mod error;
+pub mod keys;
 pub mod metadata;
 pub mod operations;
 pub mod transaction;
 
 pub use content_store::ContentStore;
 pub use error::{JanusError, Result};
+pub use keys::{KeyAlgorithm, KeyError, KeyManager, KeyMetadata, KeyPurpose, KeyState};
 pub use metadata::{MetadataStore, OperationMetadata, OperationType};
 pub use operations::{FileOperation, OperationExecutor};
 pub use transaction::{Transaction, TransactionManager};
