@@ -1,0 +1,307 @@
+// SPDX-License-Identifier: MIT OR AGPL-3.0-or-later
+// SPDX-FileCopyrightText: 2024-2025 Jonathan D.A. Jewell
+= JanusKey Key Management Threat Model
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Executive Summary
+
+This document defines the threat model for JanusKey's cryptographic key management subsystem.
+Following the **Maximal Principle Reduction (MPR)** methodology, security guarantees are achieved
+through architectural design rather than operational procedures.
+
+== Scope
+
+=== In Scope
+
+* Cryptographic key generation, storage, rotation, and recovery
+* Key derivation and hierarchical key structures
+* Local key encryption (at-rest protection)
+* Key lifecycle management
+* Integration with JanusKey reversible operations
+
+=== Out of Scope
+
+* Hardware Security Module (HSM) integration (future work)
+* Remote key management services
+* Multi-party computation (MPC) key sharing
+* Post-quantum cryptography (PQC) migration
+
+== Trust Boundaries
+
+[source]
+----
+┌─────────────────────────────────────────────────────────────────┐
+│                    USER SPACE (Untrusted)                       │
+│  ┌───────────────┐   ┌───────────────┐   ┌───────────────┐     │
+│  │   User CLI    │   │  Third-party  │   │   Scripts/    │     │
+│  │   Commands    │   │  Applications │   │   Automation  │     │
+│  └───────┬───────┘   └───────┬───────┘   └───────┬───────┘     │
+│          │                   │                   │              │
+│          └───────────────────┼───────────────────┘              │
+│                              │                                  │
+├──────────────────────────────┼──────────────────────────────────┤
+│              TRUST BOUNDARY: API VALIDATION                     │
+├──────────────────────────────┼──────────────────────────────────┤
+│                              ▼                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              JanusKey Key Management Core                │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │   │
+│  │  │    Key      │  │   Crypto    │  │  Lifecycle  │      │   │
+│  │  │  Generator  │  │   Engine    │  │   Manager   │      │   │
+│  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘      │   │
+│  │         │                │                │              │   │
+│  │         └────────────────┼────────────────┘              │   │
+│  │                          │                               │   │
+│  │  ┌───────────────────────▼───────────────────────────┐  │   │
+│  │  │             Encrypted Key Store                    │  │   │
+│  │  │   (AES-256-GCM wrapped, Argon2id derived KEK)     │  │   │
+│  │  └───────────────────────┬───────────────────────────┘  │   │
+│  └──────────────────────────┼───────────────────────────────┘   │
+│                             │                                   │
+├─────────────────────────────┼───────────────────────────────────┤
+│              TRUST BOUNDARY: FILESYSTEM                         │
+├─────────────────────────────┼───────────────────────────────────┤
+│                             ▼                                   │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                 Operating System                         │   │
+│  │   File permissions (0600), process isolation, memory     │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+----
+
+== Adversary Model
+
+=== Threat Actors
+
+[cols="1,2,2,1"]
+|===
+| Actor | Capabilities | Motivation | Risk Level
+
+| **Opportunistic Attacker**
+| File system access via malware, stolen device
+| Financial gain, data theft
+| HIGH
+
+| **Insider Threat**
+| Legitimate system access, knowledge of implementation
+| Espionage, sabotage, financial gain
+| MEDIUM
+
+| **Sophisticated Attacker (APT)**
+| Zero-day exploits, supply chain attacks, persistent access
+| State-sponsored espionage, infrastructure disruption
+| LOW (design target)
+
+| **Physical Attacker**
+| Device theft, cold boot attacks, hardware tampering
+| Key extraction, data theft
+| MEDIUM
+|===
+
+=== Attack Vectors
+
+==== AV-1: Key Extraction from Storage
+
+[horizontal]
+Description:: Attacker gains file system access and attempts to extract keys
+Preconditions:: Access to `.januskey/keys/` directory
+Mitigations::
+  * Keys encrypted at rest with AES-256-GCM
+  * Key Encryption Key (KEK) derived via Argon2id (memory-hard)
+  * Minimum 64MB memory cost, 3 iterations
+  * File permissions restricted to owner (0600)
+Residual Risk:: LOW - Requires passphrase brute-force against Argon2id
+
+==== AV-2: Memory Disclosure
+
+[horizontal]
+Description:: Attacker extracts keys from process memory (core dumps, swap, cold boot)
+Preconditions:: Root access or physical access to device
+Mitigations::
+  * Keys zeroized immediately after use via `zeroize` crate
+  * Memory locked with `mlock()` where available
+  * Short key material lifetime in memory
+Residual Risk:: MEDIUM - Cold boot attacks remain theoretical concern
+
+==== AV-3: Side-Channel Attacks
+
+[horizontal]
+Description:: Timing attacks, cache attacks on cryptographic operations
+Preconditions:: Co-located process or precise timing measurements
+Mitigations::
+  * Use of constant-time cryptographic primitives (RustCrypto)
+  * No branching on secret data
+  * AES-NI hardware acceleration where available
+Residual Risk:: LOW - RustCrypto audited for constant-time behavior
+
+==== AV-4: Key Reuse / Nonce Collision
+
+[horizontal]
+Description:: Cryptographic failure from nonce reuse in AES-GCM
+Preconditions:: Bug in nonce generation
+Mitigations::
+  * 96-bit random nonces from OS CSPRNG
+  * Unique nonce per encryption operation
+  * Counter-based nonce derivation for high-volume operations
+Residual Risk:: NEGLIGIBLE - 2^-48 collision probability per 2^32 operations
+
+==== AV-5: Weak Key Generation
+
+[horizontal]
+Description:: Predictable or biased key material
+Preconditions:: CSPRNG failure
+Mitigations::
+  * Keys generated via OS CSPRNG (`getrandom` syscall)
+  * Entropy health checks before generation
+  * Rejection sampling for curve points
+Residual Risk:: NEGLIGIBLE - OS CSPRNG failures are catastrophic system events
+
+==== AV-6: Supply Chain Attack
+
+[horizontal]
+Description:: Malicious code in dependencies compromises key material
+Preconditions:: Compromised crate on crates.io
+Mitigations::
+  * Minimal, audited dependencies (RustCrypto ecosystem)
+  * `Cargo.lock` committed, reviewed in PRs
+  * Dependabot security updates
+  * SLSA provenance verification (planned)
+Residual Risk:: MEDIUM - Ongoing ecosystem risk
+
+==== AV-7: Denial of Service on Key Operations
+
+[horizontal]
+Description:: Attacker corrupts key store, preventing legitimate use
+Preconditions:: Write access to `.januskey/` directory
+Mitigations::
+  * Key store integrity via HMAC
+  * JanusKey reversible operations protect key files
+  * Backup recovery mechanism
+Residual Risk:: LOW - Reversibility enables recovery
+
+== Security Properties
+
+=== Confidentiality
+
+[cols="1,3"]
+|===
+| Property | Implementation
+
+| Keys encrypted at rest
+| AES-256-GCM with Argon2id-derived KEK
+
+| Keys protected in memory
+| `zeroize` on drop, `mlock` where available
+
+| No key material in logs
+| Key IDs only, never raw key bytes
+|===
+
+=== Integrity
+
+[cols="1,3"]
+|===
+| Property | Implementation
+
+| Key store tamper detection
+| HMAC-SHA256 over encrypted key store
+
+| Key binding
+| Keys bound to purpose via key derivation context
+
+| Non-malleable encryption
+| AES-GCM provides authenticated encryption
+|===
+
+=== Availability
+
+[cols="1,3"]
+|===
+| Property | Implementation
+
+| Key recovery
+| Encrypted backup with recovery passphrase
+
+| Graceful degradation
+| Operations fail safely if keys unavailable
+
+| No single point of failure
+| Hierarchical keys allow re-derivation
+|===
+
+== Cryptographic Primitives
+
+[cols="2,2,2"]
+|===
+| Purpose | Algorithm | Rationale
+
+| Key Encryption
+| AES-256-GCM
+| NIST approved, hardware acceleration, authenticated
+
+| Key Derivation
+| Argon2id
+| Memory-hard, resistant to GPU/ASIC attacks
+
+| Asymmetric Keys
+| Ed25519 / X25519
+| Modern elliptic curves, constant-time, compact
+
+| Hashing
+| SHA-256, BLAKE3
+| SHA-256 for compatibility, BLAKE3 for performance
+
+| Random Generation
+| OS CSPRNG
+| `getrandom()` on Linux, `BCryptGenRandom` on Windows
+|===
+
+== Assumptions
+
+. Operating system provides secure process isolation
+. OS CSPRNG provides cryptographically secure random bytes
+. File system permissions are enforced by the kernel
+. User protects their passphrase adequately
+. System clock is approximately accurate (for key rotation schedules)
+
+== Limitations
+
+. No protection against compromised OS kernel
+. No protection against hardware backdoors
+. No protection if user passphrase is compromised
+. Memory protection incomplete on systems without `mlock` support
+. Side-channel resistance assumes absence of speculative execution attacks
+
+== Compliance Mapping
+
+[cols="1,2,2"]
+|===
+| Standard | Requirement | JanusKey Implementation
+
+| NIST SP 800-57
+| Key lengths appropriate for security strength
+| 256-bit symmetric, 256-bit ECC
+
+| NIST SP 800-132
+| Password-based key derivation
+| Argon2id with recommended parameters
+
+| GDPR Article 32
+| Appropriate technical measures
+| Encryption at rest, access controls
+
+| SOC 2
+| Logical access controls
+| File permissions, key encryption
+|===
+
+== References
+
+* NIST SP 800-57: Recommendation for Key Management
+* NIST SP 800-132: Recommendation for Password-Based Key Derivation
+* RFC 9106: Argon2 Memory-Hard Function
+* RFC 8439: ChaCha20-Poly1305 / AES-GCM AEAD
+* OWASP Cryptographic Storage Cheat Sheet
