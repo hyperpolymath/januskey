@@ -136,7 +136,7 @@ cargo install --path .
 
 == License
 
-Licensed under MIT OR AGPL-3.0-or-later.
+Licensed under MIT OR PMPL-1.0-or-later.
 
 See link:LICENSE.txt[LICENSE.txt] for details.
 
