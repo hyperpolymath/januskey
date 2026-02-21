@@ -154,3 +154,8 @@ JanusKey is based on research into provably reversible computing and Maximal Pri
 * Framework: RSR (Rhodium Standard Repository)
 * Language: Rust
 * Dublin Core: link:.well-known/dc.xml[.well-known/dc.xml]
+
+
+== Architecture
+
+See link:TOPOLOGY.md[TOPOLOGY.md] for a visual architecture map and completion dashboard.
