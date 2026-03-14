@@ -6,29 +6,29 @@
 [source,bibtex]
 ----
 @software{januskey_2025,
-  author = {Polymath, Hyper},
+  author = {Jewell, Jonathan D.A.},
   title = {januskey},
   year = {2025},
   url = {https://github.com/hyperpolymath/januskey},
-  license = {AGPL-3.0-or-later}
+  license = {PMPL-1.0-or-later}
 }
 ----
 
 == Harvard Style
 
-Polymath, H. (2025) _januskey_ [Computer software]. Available at: https://github.com/hyperpolymath/januskey
+Jewell, J.D.A. (2025) _januskey_ [Computer software]. Available at: https://github.com/hyperpolymath/januskey
 
 == OSCOLA
 
-Hyper Polymath, 'januskey' (2025) <https://github.com/hyperpolymath/januskey>
+Jonathan D.A. Jewell, 'januskey' (2025) <https://github.com/hyperpolymath/januskey>
 
 == MLA
 
-Polymath, Hyper. "januskey." 2025, github.com/hyperpolymath/januskey.
+Jewell, Jonathan D.A. "januskey." 2025, github.com/hyperpolymath/januskey.
 
 == APA 7
 
-Polymath, H. (2025). _januskey_ [Computer software]. GitHub. https://github.com/hyperpolymath/januskey
+Jewell, J. D. A. (2025). _januskey_ [Computer software]. GitHub. https://github.com/hyperpolymath/januskey
 
 == See Also
 
