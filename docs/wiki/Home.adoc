@@ -107,7 +107,7 @@ jk commit     # Or: jk rollback
 
 === License
 
-JanusKey is dual-licensed under MIT OR AGPL-3.0-or-later.
+JanusKey is dual-licensed under MIT OR PMPL-1.0-or-later.
 
 === Contributing
 
