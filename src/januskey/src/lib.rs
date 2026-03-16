@@ -4,6 +4,7 @@
 // JanusKey: Provably Reversible File Operations
 // Through Maximal Principle Reduction (MPR)
 
+#![forbid(unsafe_code)]
 pub mod attestation;
 pub mod content_store;
 pub mod error;
