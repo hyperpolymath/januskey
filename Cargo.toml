@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+
+[workspace]
+members = ["crates/reversible-core", "crates/januskey-cli"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR PMPL-1.0-or-later"
+repository = "https://github.com/hyperpolymath/januskey"
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

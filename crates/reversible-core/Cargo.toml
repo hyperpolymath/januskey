@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+
+[package]
+name = "reversible-core"
+version = "0.1.0"
+description = "Core types for provably reversible operations — content-addressed storage, operation metadata, and transaction management"
+keywords = ["reversible", "content-addressed", "transactions", "undo", "formal-verification"]
+categories = ["data-structures", "filesystem"]
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "1"
+hex = "0.4"
+flate2 = "1"
+walkdir = "2"
+glob = "0.3"
+whoami = "1"
+
+[dev-dependencies]
+tempfile = "3"
