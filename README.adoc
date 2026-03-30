@@ -14,7 +14,7 @@ Jonathan D.A. Jewell <jonathan.jewell@gmail.com>
 :url-bitbucket: https://bitbucket.org/hyperpolymath/januskey
 :url-codeberg: https://codeberg.org/hyperpolymath/januskey
 
-*Provably Reversible File Operations Through Maximal Principle Reduction*
+*Reversible File Operations (formal proofs pending) Through Maximal Principle Reduction*
 
 image:https://img.shields.io/badge/RSR-Certified-gold[RSR Certified,link=https://github.com/hyperpolymath/rhodium-standard-repositories]
 
@@ -146,7 +146,7 @@ See link:CONTRIBUTING.adoc[CONTRIBUTING.adoc].
 
 == Research
 
-JanusKey is based on research into provably reversible computing and Maximal Principle Reduction. See the white paper in `docs/` for formal proofs and theoretical foundations.
+JanusKey is based on research into reversible computing (formal proofs are a target, not yet complete) and Maximal Principle Reduction. See the white paper in `docs/` for formal proofs and theoretical foundations.
 
 == Metadata
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR PMPL-1.0-or-later
 // SPDX-FileCopyrightText: 2025 Jonathan D.A. Jewell
 //
-// JanusKey CLI: Provably Reversible File Operations
+// JanusKey CLI: Reversible File Operations (formal proofs pending)
 // "Never lose data again"
 
 use anyhow::{Context, Result};
@@ -22,7 +22,7 @@ use std::path::PathBuf;
     name = "jk",
     version = "1.0.0",
     author = "Jonathan D.A. Jewell <jonathan.jewell@gmail.com>",
-    about = "JanusKey: Provably reversible file operations",
+    about = "JanusKey: Reversible file operations (formal proofs pending)",
     long_about = "JanusKey makes every file operation reversible through Maximal Principle Reduction.\n\
                   Delete files, modify content, move things around—and always be able to undo.\n\n\
                   Data loss is architecturally impossible."

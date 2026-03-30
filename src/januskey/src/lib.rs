@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR PMPL-1.0-or-later
 // SPDX-FileCopyrightText: 2025 Jonathan D.A. Jewell
 //
-// JanusKey: Provably Reversible File Operations
+// JanusKey: Reversible File Operations (formal proofs pending)
 // Through Maximal Principle Reduction (MPR)
 
 #![forbid(unsafe_code)]
