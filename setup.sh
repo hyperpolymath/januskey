@@ -42,7 +42,7 @@ detect_shell() {
     elif [ -n "${KSH_VERSION:-}" ]; then CURRENT_SHELL="ksh"
     # Check by process name for shells that don't set version vars
     elif command -v ps >/dev/null 2>&1; then
-        SHELL_PROC=$(ps -p $$ -o comm= 2>/dev/null || echo "unknown")
+        SHELL_PROC=$(ps -p "$$" -o comm= 2>/dev/null || echo "unknown")
         case "$SHELL_PROC" in
             *dash*)    CURRENT_SHELL="dash" ;;
             *tcsh*)    CURRENT_SHELL="tcsh" ;;
@@ -88,7 +88,7 @@ detect_platform() {
         Linux*)
             OS="linux"
             if [ -f /etc/os-release ]; then
-                DISTRO=$(. /etc/os-release && echo "$ID")
+                DISTRO=$(. /etc/os-release && printf '%s' "$ID")
             elif [ -f /etc/redhat-release ]; then
                 DISTRO="rhel"
             elif [ -f /etc/debian_version ]; then
