@@ -11,7 +11,16 @@ license = "MIT OR PMPL-1.0-or-later"
 repository = "https://github.com/hyperpolymath/januskey"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
 
+[workspace.dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3"
+hex = "0.4"
+
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
+
+[profile.bench]
+opt-level = 3
+lto = true

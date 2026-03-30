@@ -44,6 +44,13 @@ base64 = "0.22"
 tempfile = "3"
 assert_cmd = "2"
 predicates = "3"
+criterion = { workspace = true }
+hex = { workspace = true }
+
+[[bench]]
+name = "januskey_benchmarks"
+harness = false
+path = "../../benches/januskey_benchmarks.rs"
 
 [[bin]]
 name = "jk"
