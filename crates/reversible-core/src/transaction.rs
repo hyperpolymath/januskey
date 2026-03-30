@@ -152,7 +152,8 @@ impl TransactionManager {
         self.log.active_transaction_id = Some(id);
         self.save()?;
 
-        Ok(self.log.transactions.last().unwrap())
+        // SAFETY: We just pushed a transaction above, so last() is guaranteed Some
+        Ok(self.log.transactions.last().expect("transaction was just pushed"))
     }
 
     /// Get current active transaction
@@ -284,20 +285,20 @@ mod tests {
 
     #[test]
     fn test_transaction_lifecycle() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("failed to create temp dir");
         let path = tmp.path().join("transactions.json");
-        let mut manager = TransactionManager::new(path).unwrap();
+        let mut manager = TransactionManager::new(path).expect("failed to create transaction manager");
 
         // Begin
-        manager.begin(Some("test".to_string())).unwrap();
+        manager.begin(Some("test".to_string())).expect("failed to begin transaction");
         assert!(manager.has_active());
 
         // Add operations
-        manager.add_operation("op-1".to_string()).unwrap();
-        manager.add_operation("op-2".to_string()).unwrap();
+        manager.add_operation("op-1".to_string()).expect("failed to add operation op-1");
+        manager.add_operation("op-2".to_string()).expect("failed to add operation op-2");
 
         // Commit
-        let tx = manager.commit().unwrap();
+        let tx = manager.commit().expect("failed to commit transaction");
         assert_eq!(tx.state, TransactionState::Committed);
         assert_eq!(tx.operation_ids.len(), 2);
         assert!(!manager.has_active());
@@ -305,11 +306,11 @@ mod tests {
 
     #[test]
     fn test_cannot_begin_while_active() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("failed to create temp dir");
         let path = tmp.path().join("transactions.json");
-        let mut manager = TransactionManager::new(path).unwrap();
+        let mut manager = TransactionManager::new(path).expect("failed to create transaction manager");
 
-        manager.begin(None).unwrap();
+        manager.begin(None).expect("failed to begin first transaction");
         assert!(manager.begin(None).is_err());
     }
 }

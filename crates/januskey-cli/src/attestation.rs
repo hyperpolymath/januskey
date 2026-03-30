@@ -478,30 +478,30 @@ mod tests {
 
     #[test]
     fn test_audit_log_init() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("failed to create temp dir");
         let mut log = AuditLog::new(tmp.path());
-        log.init([0u8; 32]).unwrap();
+        log.init([0u8; 32]).expect("failed to init audit log");
 
         assert!(tmp.path().join(".januskey/keys/audit.log").exists());
     }
 
     #[test]
     fn test_audit_log_events() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("failed to create temp dir");
         let mut log = AuditLog::new(tmp.path());
-        log.init([1u8; 32]).unwrap();
+        log.init([1u8; 32]).expect("failed to init audit log");
 
         // Log some events
-        log.log_store_init().unwrap();
+        log.log_store_init().expect("failed to log store init");
         log.log_key_generated(
             Uuid::new_v4(),
             "abc123",
             KeyAlgorithm::Aes256Gcm,
             KeyPurpose::Encryption,
         )
-        .unwrap();
+        .expect("failed to log key generation");
 
-        let entries = log.read_all().unwrap();
+        let entries = log.read_all().expect("failed to read audit entries");
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].event_type, AuditEventType::StoreInitialized);
         assert_eq!(entries[1].event_type, AuditEventType::KeyGenerated);
@@ -509,42 +509,42 @@ mod tests {
 
     #[test]
     fn test_audit_log_chain_integrity() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("failed to create temp dir");
         let mut log = AuditLog::new(tmp.path());
-        log.init([2u8; 32]).unwrap();
+        log.init([2u8; 32]).expect("failed to init audit log");
 
-        log.log_store_init().unwrap();
-        log.log_store_unlock().unwrap();
+        log.log_store_init().expect("failed to log store init");
+        log.log_store_unlock().expect("failed to log store unlock");
         log.log_key_generated(
             Uuid::new_v4(),
             "def456",
             KeyAlgorithm::Ed25519,
             KeyPurpose::Signing,
         )
-        .unwrap();
+        .expect("failed to log key generation");
 
-        let report = log.verify_integrity().unwrap();
+        let report = log.verify_integrity().expect("failed to verify integrity");
         assert!(report.valid);
         assert_eq!(report.total_entries, 3);
     }
 
     #[test]
     fn test_key_history() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("failed to create temp dir");
         let mut log = AuditLog::new(tmp.path());
-        log.init([3u8; 32]).unwrap();
+        log.init([3u8; 32]).expect("failed to init audit log");
 
         let key_id = Uuid::new_v4();
         let new_key_id = Uuid::new_v4();
 
         log.log_key_generated(key_id, "abc", KeyAlgorithm::Aes256Gcm, KeyPurpose::Encryption)
-            .unwrap();
+            .expect("failed to log key generation");
         log.log_key_rotated(key_id, "abc", new_key_id, "def")
-            .unwrap();
+            .expect("failed to log key rotation");
         log.log_key_revoked(key_id, "abc", Some("rotated"))
-            .unwrap();
+            .expect("failed to log key revocation");
 
-        let history = log.get_key_history(key_id).unwrap();
+        let history = log.get_key_history(key_id).expect("failed to get key history");
         assert_eq!(history.len(), 3);
     }
 }

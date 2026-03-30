@@ -52,3 +52,9 @@
 ## Priority
 
 **HIGH.** A key management system with zero integration tests and zero benchmarks. 34 inline unit tests for 26 modules is decent unit coverage, but no integration or E2E means the pieces are never tested together. For a security-critical tool, this is insufficient. Fuzz targets exist but need to actually run.
+
+## FAKE-FUZZ ALERT
+
+- `tests/fuzz/placeholder.txt` is a scorecard placeholder inherited from rsr-template-repo — it does NOT provide real fuzz testing
+- Replace with an actual fuzz harness (see rsr-template-repo/tests/fuzz/README.adoc) or remove the file
+- Priority: P2 — creates false impression of fuzz coverage
