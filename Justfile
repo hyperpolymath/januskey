@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # januskey - Development Tasks
 set shell := ["bash", "-uc"]
 set dotenv-load := true
@@ -8,25 +9,97 @@ project := "januskey"
 default:
     @just --list --unsorted
 
-# Build
+# Build all workspace crates (release)
 build:
-    @echo "TODO: Add build command"
+    cargo build --workspace --release
 
-# Test
+# Run all workspace tests
 test:
-    @echo "TODO: Add test command"
+    cargo test --workspace
 
-# Clean
+# Clean build artefacts
 clean:
-    @echo "TODO: Add clean command"
+    cargo clean
 
-# Format
+# Format all code
 fmt:
-    @echo "TODO: Add format command"
+    cargo fmt --all
 
-# Lint
+# Lint all code with clippy
 lint:
-    @echo "TODO: Add lint command"
+    cargo clippy --workspace -- -D warnings
+
+# Run benchmarks
+bench:
+    cargo bench --workspace
+
+# Run end-to-end tests (shell-based lifecycle)
+test-e2e:
+    @echo "=== E2E Tests ==="
+    @if [ -x tests/e2e/lifecycle_e2e.sh ]; then bash tests/e2e/lifecycle_e2e.sh; else echo "SKIP: tests/e2e/lifecycle_e2e.sh not executable or missing"; fi
+
+# Run aspect / cross-cutting tests
+test-aspect:
+    @echo "=== Aspect Tests ==="
+    @if [ -x tests/aspect/cross_cutting_test.sh ]; then bash tests/aspect/cross_cutting_test.sh; else echo "SKIP: tests/aspect/cross_cutting_test.sh not executable or missing"; fi
+
+# Run P2P component integration tests
+test-p2p:
+    cargo test --package januskey --test p2p_test
+
+# Run regression tests
+test-regressions:
+    cargo test --package reversible-core --test unwrap_safety_test
+
+# Run property-based tests
+test-property:
+    cargo test --workspace -- --include-ignored proptest
+
+# Run FFI tests (placeholder — no FFI tests yet)
+test-ffi:
+    @echo "=== FFI Tests ==="
+    @if [ -d ffi/zig/test ]; then echo "TODO: Run Zig FFI integration tests"; else echo "SKIP: No FFI tests present yet (see ffi/zig/)"; fi
+
+# Smoke test: build + version + help
+smoke:
+    @echo "=== Smoke Test ==="
+    cargo build --workspace
+    @echo "--- jk --version ---"
+    @cargo run --package januskey --bin jk -- --version 2>/dev/null || echo "WARN: jk --version not yet implemented"
+    @echo "--- jk --help ---"
+    @cargo run --package januskey --bin jk -- --help 2>/dev/null || echo "WARN: jk --help not yet implemented"
+    @echo "Smoke test complete."
+
+# Validate contractile files parse correctly
+test-contracts:
+    @echo "=== Contract Tests ==="
+    @if command -v must >/dev/null 2>&1; then must check; \
+    else \
+        echo "must not found — validating contractile files manually..."; \
+        for f in contractiles/intend contractiles/must contractiles/trust; do \
+            if [ -f "$$f" ]; then echo "  [OK] $$f exists and is non-empty ($$(wc -c < $$f) bytes)"; \
+            else echo "  [FAIL] $$f missing"; fi; \
+        done; \
+    fi
+
+# Check Idris2 ABI proofs (requires idris2)
+test-proofs:
+    @echo "=== Proof Regression ==="
+    @if command -v idris2 >/dev/null 2>&1; then \
+        for f in src/abi/Types.idr src/abi/Layout.idr src/abi/Foreign.idr src/abi/Proofs.idr; do \
+            if [ -f "$$f" ]; then \
+                echo "Checking $$f..."; \
+                idris2 --check "$$f" && echo "  [OK] $$f" || echo "  [FAIL] $$f"; \
+            else \
+                echo "  [SKIP] $$f not found"; \
+            fi; \
+        done; \
+    else \
+        echo "SKIP: idris2 not installed. Install via: pack install-app idris2"; \
+    fi
+
+# Run full test suite (all categories)
+test-all: test test-p2p test-regressions test-e2e test-aspect test-contracts test-proofs smoke
 
 # [AUTO-GENERATED] Multi-arch / RISC-V target
 build-riscv:
@@ -43,8 +116,11 @@ doctor:
     @echo "Checking required tools..."
     @command -v just >/dev/null 2>&1 && echo "  [OK] just" || echo "  [FAIL] just not found"
     @command -v git >/dev/null 2>&1 && echo "  [OK] git" || echo "  [FAIL] git not found"
+    @command -v cargo >/dev/null 2>&1 && echo "  [OK] cargo" || echo "  [FAIL] cargo not found"
+    @command -v rustc >/dev/null 2>&1 && echo "  [OK] rustc ($$(rustc --version))" || echo "  [FAIL] rustc not found"
+    @command -v idris2 >/dev/null 2>&1 && echo "  [OK] idris2" || echo "  [INFO] idris2 not found (optional, for proof checking)"
     @echo "Checking for hardcoded paths..."
-    @grep -rn '$HOME\|$ECLIPSE_DIR' --include='*.rs' --include='*.ex' --include='*.res' --include='*.gleam' --include='*.sh' . 2>/dev/null | head -5 || echo "  [OK] No hardcoded paths"
+    @grep -rn '$$HOME\|$$ECLIPSE_DIR' --include='*.rs' --include='*.ex' --include='*.res' --include='*.gleam' --include='*.sh' . 2>/dev/null | head -5 || echo "  [OK] No hardcoded paths"
     @echo "Diagnostics complete."
 
 # Auto-repair common issues

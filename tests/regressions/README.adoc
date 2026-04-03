@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+
+= Regression Tests
+
+Regression tests live in the workspace crate `tests/` directories so that
+`cargo test --workspace` discovers them automatically:
+
+* `crates/reversible-core/tests/unwrap_safety_test.rs` -- Error handling regressions
+* `crates/januskey-cli/tests/p2p_test.rs` -- Component integration regressions
+
+This directory is reserved for non-Rust regression artefacts (shell scripts,
+fixture files, etc.).

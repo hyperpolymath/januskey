@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+
+= Fuzz Testing
+:toc:
+
+== Status
+
+Fuzz testing is **not yet implemented** for JanusKey.
+
+== Plan
+
+Fuzz targets should cover:
+
+* `content_store::store` — arbitrary byte sequences
+* `content_store::retrieve` — corrupted content paths
+* `transaction::TransactionManager` — arbitrary operation sequences
+* `obliteration::secure_overwrite` — edge-case file sizes (0 bytes, very large)
+* `keys::KeyManager` — malformed passphrases, corrupted key stores
+* JSON deserialization of all config/metadata types
+
+== Implementation
+
+When implemented, this will use https://rust-fuzz.github.io/book/cargo-fuzz.html[cargo-fuzz]
+with `libFuzzer`. Fuzz targets will live in `fuzz/fuzz_targets/` at the workspace root
+(standard cargo-fuzz layout), not in this directory.
+
+This `tests/fuzz/` directory is reserved for fuzz regression corpus files and
+documentation only.
