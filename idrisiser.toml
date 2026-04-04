@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# idrisiser manifest for januskey
+#
+# Generates Idris2 dependent-type wrappers for the JanusKey key-management
+# library.  JanusKey is security-critical: it handles key generation,
+# wrapping, derivation, rotation, and revocation using Argon2id + AES-256-GCM.
+# These wrappers prove that:
+#   - Generated key material is always exactly KEY_LENGTH (32) bytes
+#   - Key material is never the all-zero array after successful generation
+#   - KEK derivation from a passphrase is deterministic for a fixed salt
+#   - wrap_key / unwrap_key form an inverse pair (round-trip)
+#   - Revoked or Obliterated keys cannot be retrieved
+#   - Rotated key records its predecessor UUID in rotation_of
+
+[project]
+name = "januskey"
+module-prefix = "Januskey.Verified"
+
+# ---------------------------------------------------------------------------
+# Interface 1 — key generation and lifecycle
+# ---------------------------------------------------------------------------
+[[interfaces]]
+name = "key-generation"
+source = "idrisiser/key-generation.tsig"
+format = "type-sig"
+verify = [
+  "SecretKey.generate",
+  "KeyManager.generate",
+  "KeyManager.rotate",
+  "KeyManager.revoke",
+  "KeyManager.retrieve",
+]
+preconditions = [
+  "KeyManager is initialised (unlock or init called successfully before any key operation)",
+  "SecretKey.generate uses a cryptographically secure random number generator",
+  "KeyManager.rotate is called with a key ID that exists and is not already Revoked",
+  "KeyManager.revoke is called with a key ID that exists and is not already Revoked",
+  "KeyManager.retrieve is called with a key ID that is Active or Rotating",
+]
+postconditions = [
+  "SecretKey.generate returns Ok(key) where key.as_bytes().len() == 32",
+  "SecretKey.generate key material is not all-zero bytes",
+  "KeyManager.generate returns Ok(uuid) and the stored key has state == Active",
+  "KeyManager.rotate returns Ok(new_id) where new_id != old_id",
+  "KeyManager.rotate marks old key as Revoked",
+  "KeyManager.rotate new key has rotation_of == Some(old_id)",
+  "KeyManager.revoke sets key state to Revoked",
+  "KeyManager.retrieve returns Err(AlreadyRevoked) for any Revoked or Obliterated key",
+  "KeyManager.retrieve returns Ok(key) where key.as_bytes().len() == 32",
+]
+invariants = [
+  "KEY_LENGTH is always 32 (AES-256 key size invariant)",
+  "Generated key material length is always exactly KEY_LENGTH bytes",
+  "Generated key material is never the all-zero array (security invariant)",
+  "A revoked key can never transition back to Active state",
+  "rotation_of for a rotated key is always Some(predecessor_uuid) — never None",
+  "Key fingerprint is always exactly 16 hex characters (8 bytes of SHA-256)",
+]
+
+# ---------------------------------------------------------------------------
+# Interface 2 — key derivation (KEK via Argon2id)
+# ---------------------------------------------------------------------------
+[[interfaces]]
+name = "key-derivation"
+source = "idrisiser/key-derivation.tsig"
+format = "type-sig"
+verify = ["derive_kek"]
+preconditions = [
+  "passphrase is a non-empty UTF-8 string",
+  "salt is exactly SALT_LENGTH (16) bytes",
+  "Argon2id parameters satisfy OWASP minimum: memory >= 64MB, iterations >= 3, parallelism >= 4",
+]
+postconditions = [
+  "derive_kek returns Ok(kek) where kek.as_bytes().len() == 32",
+  "derive_kek is deterministic: same (passphrase, salt) always produces the same kek bytes",
+  "derive_kek returns Err(CryptoError) only if Argon2 parameter construction fails",
+]
+invariants = [
+  "KEK derivation is deterministic for a fixed (passphrase, salt) pair",
+  "Output length is always exactly KEY_LENGTH (32) bytes",
+  "KEK bytes are not all-zero for any non-empty passphrase (probabilistic invariant)",
+  "Argon2id memory parameter is always >= 65536 KB (64 MB) per OWASP guidance",
+]
+
+# ---------------------------------------------------------------------------
+# Interface 3 — wrap/unwrap round-trip (AES-256-GCM)
+# ---------------------------------------------------------------------------
+[[interfaces]]
+name = "wrap-unwrap-round-trip"
+source = "idrisiser/wrap-unwrap.tsig"
+format = "type-sig"
+verify = ["wrap_key", "unwrap_key"]
+preconditions = [
+  "kek is a valid 32-byte SecretKey",
+  "key material passed to wrap_key is exactly KEY_LENGTH bytes",
+  "WrappedKey passed to unwrap_key was produced by wrap_key with the same kek",
+  "Nonce used in wrap_key is unique per wrapping operation (freshly generated)",
+]
+postconditions = [
+  "wrap_key returns Ok(wrapped) where wrapped.metadata == the provided metadata",
+  "wrap_key nonce is exactly NONCE_LENGTH (12) bytes",
+  "unwrap_key(kek, wrap_key(kek, key, meta).unwrap()) == Ok(key) — round-trip",
+  "unwrap_key returns Err(CryptoError) if kek does not match the wrapping kek",
+  "unwrap_key returns Err(CryptoError) if plaintext.len() != 32",
+]
+invariants = [
+  "wrap_key and unwrap_key form an inverse pair under the same kek",
+  "Tampering with ciphertext or AAD causes unwrap_key to return Err",
+  "Nonce in WrappedKey is always exactly NONCE_LENGTH (12) bytes",
+  "Unwrapped key length is always exactly KEY_LENGTH (32) bytes",
+]
+
+[proofs]
+require-totality = true
+round-trip-proofs = true
+qtt-tracking = true
+search-depth = 150

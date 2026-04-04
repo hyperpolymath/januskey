@@ -1,0 +1,9 @@
+-- SPDX-License-Identifier: PMPL-1.0-or-later
+-- Type signatures for januskey key generation (src/januskey/src/keys.rs)
+-- Format: name : Type (idrisiser type-sig format)
+
+SecretKey.generate : () -> Result SecretKey KeyError
+KeyManager.generate : KeyManager -> KeyAlgorithm -> KeyPurpose -> Option String -> Option Nat -> Result Uuid KeyError
+KeyManager.rotate : KeyManager -> Uuid -> Result Uuid KeyError
+KeyManager.revoke : KeyManager -> Uuid -> Result () KeyError
+KeyManager.retrieve : KeyManager -> Uuid -> Result SecretKey KeyError

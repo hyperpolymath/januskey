@@ -1,0 +1,6 @@
+-- SPDX-License-Identifier: PMPL-1.0-or-later
+-- Type signatures for januskey AES-256-GCM wrap/unwrap (src/januskey/src/keys.rs)
+-- Format: name : Type (idrisiser type-sig format)
+
+wrap_key : SecretKey -> Bytes 32 -> KeyMetadata -> Result WrappedKey KeyError
+unwrap_key : SecretKey -> WrappedKey -> Result SecretKey KeyError
