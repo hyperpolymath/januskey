@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
       - name: Install panic-attack
-        run: cargo install panic-attacker 2>/dev/null || echo "panic-attack unavailable"
+        run: cargo install --git https://github.com/hyperpolymath/panic-attacker.git 2>/dev/null || echo "panic-attack unavailable"
       - name: Run assail scan
         run: |
           if command -v panic-attack >/dev/null 2>&1; then
