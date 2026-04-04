@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# k9iser manifest for januskey
+# Key management and cryptographic identity service
+
+[project]
+name = "januskey"
+safety_tier = "yard"
+
+[[source]]
+path = "Cargo.toml"
+type = "cargo"
+output = "generated/k9iser/cargo-manifest.k9"
+
+[[source]]
+path = "Justfile"
+type = "justfile"
+output = "generated/k9iser/justfile-recipes.k9"
+
+[[source]]
+path = ".github/workflows/hypatia-scan.yml"
+type = "workflow"
+output = "generated/k9iser/ci-security.k9"
+
+[[constraint]]
+rule = "build.dependencies has no banned_packages"
+severity = "error"
+
+[[constraint]]
+rule = "workflows includes hypatia-scan"
+severity = "error"
+
+[[constraint]]
+rule = "services.januskey.tls is enabled in production"
+severity = "warn"
