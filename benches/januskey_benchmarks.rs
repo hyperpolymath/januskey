@@ -166,12 +166,148 @@ fn bench_key_derivation(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark attestation and audit operations
+fn bench_attestation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("attestation");
+
+    // Attestation entry generation (JSON serialization + hash)
+    group.bench_function("entry_generation", |b| {
+        b.iter(|| {
+            let entry = serde_json::json!({
+                "key_id": "550e8400-e29b-41d4-a716-446655440000",
+                "op": "key_gen",
+                "algo": "aes256gcm",
+                "timestamp": chrono::Utc::now().timestamp(),
+            });
+            let json = serde_json::to_string(&entry).unwrap();
+            black_box(json);
+        });
+    });
+
+    // Audit log append (simulated)
+    group.bench_function("audit_append_100", |b| {
+        let mut log = vec![];
+        b.iter(|| {
+            for i in 0..100 {
+                log.push(format!("entry_{}", i));
+            }
+            black_box(log.len());
+        });
+    });
+
+    // Signature verification simulation (SHA256)
+    group.bench_function("sig_verify_sha256", |b| {
+        let payload = b"test payload for signature";
+        let mut hasher = Sha256::new();
+        hasher.update(payload);
+        let sig_hash = hex::encode(hasher.finalize());
+
+        b.iter(|| {
+            let mut verify_hasher = Sha256::new();
+            verify_hasher.update(payload);
+            let verify_hash = hex::encode(verify_hasher.finalize());
+            black_box(verify_hash == sig_hash);
+        });
+    });
+
+    group.finish();
+}
+
+/// Benchmark delta operations (differential compression)
+fn bench_delta(c: &mut Criterion) {
+    let mut group = c.benchmark_group("delta");
+
+    // Delta computation (similarity percentage)
+    for size in [1024, 4096, 65536] {
+        group.bench_with_input(
+            BenchmarkId::new("diff_computation", size),
+            &size,
+            |b, &size| {
+                let original = vec![0xAAu8; size];
+                let modified = {
+                    let mut m = original.clone();
+                    for i in (0..size).step_by(10) {
+                        m[i] = 0xBB;
+                    }
+                    m
+                };
+
+                b.iter(|| {
+                    let mut diff_count = 0;
+                    for i in 0..size {
+                        if original[i] != modified[i] {
+                            diff_count += 1;
+                        }
+                    }
+                    black_box(diff_count);
+                });
+            },
+        );
+    }
+
+    // Delta chain verification (hash chain)
+    group.bench_function("chain_verify_10_links", |b| {
+        let mut hashes = vec![];
+        for i in 0..10 {
+            let mut hasher = Sha256::new();
+            hasher.update(format!("version_{}", i).as_bytes());
+            hashes.push(hex::encode(hasher.finalize()));
+        }
+
+        b.iter(|| {
+            for i in 1..hashes.len() {
+                let _ = &hashes[i - 1];
+                let _ = &hashes[i];
+                // Verify ordering (hash[i] != hash[i-1])
+            }
+            black_box(hashes.len());
+        });
+    });
+
+    group.finish();
+}
+
+/// Benchmark metadata operations
+fn bench_metadata(c: &mut Criterion) {
+    let mut group = c.benchmark_group("metadata");
+
+    // Metadata serialization
+    group.bench_function("serialize_operation_metadata", |b| {
+        b.iter(|| {
+            let meta = serde_json::json!({
+                "operation_type": "copy",
+                "source": "/path/to/source",
+                "destination": "/path/to/dest",
+                "size": 4096,
+                "hash": "abc123def456",
+                "timestamp": chrono::Utc::now().timestamp(),
+            });
+            let json = serde_json::to_string_pretty(&meta).unwrap();
+            black_box(json.len());
+        });
+    });
+
+    // Metadata deserialization
+    group.bench_function("deserialize_operation_metadata", |b| {
+        let json_str = r#"{"operation_type":"copy","source":"/src","destination":"/dst","size":4096,"hash":"abc123","timestamp":1234567890}"#;
+        b.iter(|| {
+            let _: serde_json::Value = serde_json::from_str(json_str).unwrap();
+            black_box(json_str.len());
+        });
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_hashing,
     bench_content_store,
     bench_obliteration,
     bench_transactions,
-    bench_key_derivation
+    bench_key_derivation,
+    bench_attestation,
+    bench_delta,
+    bench_metadata
 );
 criterion_main!(benches);

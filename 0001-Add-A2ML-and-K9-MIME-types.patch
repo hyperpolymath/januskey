@@ -1,0 +1,134 @@
+From d622c11cdebf4784dd37bc5fa0bf4ba9c9e6c49f Mon Sep 17 00:00:00 2001
+From: "Jonathan D.A. Jewell" <6759885+hyperpolymath@users.noreply.github.com>
+Date: Fri, 3 Apr 2026 18:04:21 +0100
+Subject: [PATCH] Add A2ML and K9 MIME types
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add two new vendor MIME types:
+
+- application/vnd.a2ml (*.a2ml) — A2ML Attested Markup Language,
+  a TOML-like structured metadata format used for machine-readable
+  project state, ecosystem, and attestation files.
+
+- application/vnd.k9+nickel (*.k9, *.k9.ncl) — K9 Self-Validating
+  Component, a Nickel-based format with three security tiers
+  (Kennel/Yard/Hunt) and a "K9!" magic number at offset 0.
+
+Both formats are text-based. A2ML is a subclass of text/plain.
+K9 files use the "K9!" magic number for reliable content detection.
+
+Includes test files for both formats.
+
+References:
+- A2ML spec: https://github.com/hyperpolymath/standards/tree/main/a2ml
+- K9 spec: https://github.com/hyperpolymath/standards/tree/main/k9-svc
+---
+ data/freedesktop.org.xml.in      | 19 +++++++++++++++++++
+ tests/mime-detection/list        |  7 +++++++
+ tests/mime-detection/test.a2ml   |  6 ++++++
+ tests/mime-detection/test.k9     |  9 +++++++++
+ tests/mime-detection/test.k9.ncl |  9 +++++++++
+ 5 files changed, 50 insertions(+)
+ create mode 100644 tests/mime-detection/test.a2ml
+ create mode 100644 tests/mime-detection/test.k9
+ create mode 100644 tests/mime-detection/test.k9.ncl
+
+diff --git a/data/freedesktop.org.xml.in b/data/freedesktop.org.xml.in
+index 2d39ec5..ced8a71 100644
+--- a/data/freedesktop.org.xml.in
++++ b/data/freedesktop.org.xml.in
+@@ -121,6 +121,14 @@ command to generate the output files.
+     </magic>
+     <glob pattern="*.epub"/>
+   </mime-type>
++  <mime-type type="application/vnd.a2ml">
++    <comment>A2ML Attested Markup Language</comment>
++    <acronym>A2ML</acronym>
++    <expanded-acronym>Attested Markup Language</expanded-acronym>
++    <generic-icon name="text-x-generic"/>
++    <sub-class-of type="text/plain"/>
++    <glob pattern="*.a2ml"/>
++  </mime-type>
+   <mime-type type="application/vnd.amazon.mobi8-ebook">
+     <comment>Kindle book document</comment>
+     <sub-class-of type="application/x-mobipocket-ebook"/>
+@@ -675,6 +683,17 @@ command to generate the output files.
+     <root-XML namespaceURI="http://cyclonedx.org/schema/bom/1.5" localName="bom"/>
+     <root-XML namespaceURI="http://cyclonedx.org/schema/bom/1.6" localName="bom"/>
+   </mime-type>
++  <mime-type type="application/vnd.k9+nickel">
++    <comment>K9 Self-Validating Component</comment>
++    <acronym>K9</acronym>
++    <expanded-acronym>K9 Self-Validating Component</expanded-acronym>
++    <generic-icon name="text-x-script"/>
++    <magic>
++      <match type="string" value="K9!" offset="0"/>
++    </magic>
++    <glob pattern="*.k9"/>
++    <glob pattern="*.k9.ncl"/>
++  </mime-type>
+   <mime-type type="application/vnd.lotus-1-2-3">
+     <comment>Lotus 1-2-3 spreadsheet</comment>
+     <generic-icon name="x-office-spreadsheet"/>
+diff --git a/tests/mime-detection/list b/tests/mime-detection/list
+index 0a5d01c..0bcfef3 100644
+--- a/tests/mime-detection/list
++++ b/tests/mime-detection/list
+@@ -1372,3 +1372,10 @@ test.wbs.puml text/vnd.plantuml
+ test.chen.puml text/vnd.plantuml
+ test.chart.puml text/vnd.plantuml
+ test.files.puml text/vnd.plantuml
++
++# A2ML Attested Markup Language
++test.a2ml application/vnd.a2ml ox
++
++# K9 Self-Validating Component
++test.k9 application/vnd.k9+nickel
++test.k9.ncl application/vnd.k9+nickel
+diff --git a/tests/mime-detection/test.a2ml b/tests/mime-detection/test.a2ml
+new file mode 100644
+index 0000000..c8d5922
+--- /dev/null
++++ b/tests/mime-detection/test.a2ml
+@@ -0,0 +1,6 @@
++# SPDX-License-Identifier: CC0-1.0
++# test.a2ml — A2ML test file for MIME type detection
++
++[metadata]
++project = "shared-mime-info-test"
++author = "Test"
+diff --git a/tests/mime-detection/test.k9 b/tests/mime-detection/test.k9
+new file mode 100644
+index 0000000..c49b316
+--- /dev/null
++++ b/tests/mime-detection/test.k9
+@@ -0,0 +1,9 @@
++K9!
++# SPDX-License-Identifier: CC0-1.0
++# test.k9 — K9 test file for MIME type detection
++
++---
++metadata:
++  name: test-k9
++  version: 1.0.0
++  description: MIME type test
+diff --git a/tests/mime-detection/test.k9.ncl b/tests/mime-detection/test.k9.ncl
+new file mode 100644
+index 0000000..52164f5
+--- /dev/null
++++ b/tests/mime-detection/test.k9.ncl
+@@ -0,0 +1,9 @@
++K9!
++# SPDX-License-Identifier: CC0-1.0
++# test.k9.ncl — K9 Nickel test file for MIME type detection
++{
++  pedigree = {
++    schema_version = "1.0.0",
++    component_type = "test",
++  },
++}
+-- 
+2.53.0
+

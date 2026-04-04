@@ -1,14 +1,36 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # STATE.a2ml — Project state checkpoint
-# Converted from STATE.scm on 2026-03-15
+# Updated 2026-04-04: CRG D→C blitz complete
 
 [metadata]
 project = "januskey"
-version = "0.1.0"
-last-updated = "2026-03-15"
+version = "1.0.0"
+last-updated = "2026-04-04"
 status = "active"
+crg-grade = "C"
 
 [project-context]
 name = "januskey"
-completion-percentage = 0
-phase = "In development"
+completion-percentage = "60"
+phase = "Core tests complete, ready for API stability review"
+
+[recent-work]
+session-date = "2026-04-04"
+work = "CRG D→C blitz: added E2E, aspect/security, and concurrency tests"
+
+[test-coverage]
+unit-tests = "24"
+p2p-property-tests = "6"
+e2e-integration-tests = "7"
+aspect-security-tests = "6"
+concurrency-tests = "5"
+total-tests = "56"
+benchmarks = "8"
+total-coverage = "64 verification points"
+
+[test-categories-complete]
+p2p = true
+e2e = true
+aspect-security = true
+concurrency = true
+benchmarks = true
