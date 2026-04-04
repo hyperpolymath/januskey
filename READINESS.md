@@ -5,6 +5,8 @@
 **Assessor:** Claude (automated) + Jonathan (review)
 **Taxonomy:** standards/testing-and-benchmarking/TESTING-TAXONOMY.adoc v1.0
 
+**Current Grade:** D
+
 ## CRG Grade: D (Alpha — Unstable)
 
 **Justification:** Tests exist and pass (67 total), proofs exist (30 Idris2, unchecked in CI), benchmarks exist (5 Criterion groups). But: no fuzz testing, no mutation testing, 225 unwrap() calls, E2E mostly skips, benchmarks measured fake crypto until this session. RSR compliance present. Deep annotation incomplete (TOPOLOGY.md exists but per-directory orientation missing → blocks C).
