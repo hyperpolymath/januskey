@@ -3,6 +3,8 @@
 set shell := ["bash", "-uc"]
 set dotenv-load := true
 
+import? "contractile.just"
+
 project := "januskey"
 
 # Show all recipes
