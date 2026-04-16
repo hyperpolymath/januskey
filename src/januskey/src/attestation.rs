@@ -478,30 +478,30 @@ mod tests {
 
     #[test]
     fn test_audit_log_init() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let mut log = AuditLog::new(tmp.path());
-        log.init([0u8; 32]).unwrap();
+        log.init([0u8; 32]).expect("TODO: handle error");
 
         assert!(tmp.path().join(".januskey/keys/audit.log").exists());
     }
 
     #[test]
     fn test_audit_log_events() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let mut log = AuditLog::new(tmp.path());
-        log.init([1u8; 32]).unwrap();
+        log.init([1u8; 32]).expect("TODO: handle error");
 
         // Log some events
-        log.log_store_init().unwrap();
+        log.log_store_init().expect("TODO: handle error");
         log.log_key_generated(
             Uuid::new_v4(),
             "abc123",
             KeyAlgorithm::Aes256Gcm,
             KeyPurpose::Encryption,
         )
-        .unwrap();
+        .expect("TODO: handle error");
 
-        let entries = log.read_all().unwrap();
+        let entries = log.read_all().expect("TODO: handle error");
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].event_type, AuditEventType::StoreInitialized);
         assert_eq!(entries[1].event_type, AuditEventType::KeyGenerated);
@@ -509,42 +509,42 @@ mod tests {
 
     #[test]
     fn test_audit_log_chain_integrity() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let mut log = AuditLog::new(tmp.path());
-        log.init([2u8; 32]).unwrap();
+        log.init([2u8; 32]).expect("TODO: handle error");
 
-        log.log_store_init().unwrap();
-        log.log_store_unlock().unwrap();
+        log.log_store_init().expect("TODO: handle error");
+        log.log_store_unlock().expect("TODO: handle error");
         log.log_key_generated(
             Uuid::new_v4(),
             "def456",
             KeyAlgorithm::Ed25519,
             KeyPurpose::Signing,
         )
-        .unwrap();
+        .expect("TODO: handle error");
 
-        let report = log.verify_integrity().unwrap();
+        let report = log.verify_integrity().expect("TODO: handle error");
         assert!(report.valid);
         assert_eq!(report.total_entries, 3);
     }
 
     #[test]
     fn test_key_history() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let mut log = AuditLog::new(tmp.path());
-        log.init([3u8; 32]).unwrap();
+        log.init([3u8; 32]).expect("TODO: handle error");
 
         let key_id = Uuid::new_v4();
         let new_key_id = Uuid::new_v4();
 
         log.log_key_generated(key_id, "abc", KeyAlgorithm::Aes256Gcm, KeyPurpose::Encryption)
-            .unwrap();
+            .expect("TODO: handle error");
         log.log_key_rotated(key_id, "abc", new_key_id, "def")
-            .unwrap();
+            .expect("TODO: handle error");
         log.log_key_revoked(key_id, "abc", Some("rotated"))
-            .unwrap();
+            .expect("TODO: handle error");
 
-        let history = log.get_key_history(key_id).unwrap();
+        let history = log.get_key_history(key_id).expect("TODO: handle error");
         assert_eq!(history.len(), 3);
     }
 }

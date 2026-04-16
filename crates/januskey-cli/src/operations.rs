@@ -481,11 +481,11 @@ mod tests {
     use tempfile::TempDir;
 
     fn setup() -> (TempDir, ContentStore, MetadataStore) {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let content_store =
-            ContentStore::new(tmp.path().join("content"), false).unwrap();
+            ContentStore::new(tmp.path().join("content"), false).expect("TODO: handle error");
         let metadata_store =
-            MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+            MetadataStore::new(tmp.path().join("metadata.json")).expect("TODO: handle error");
         (tmp, content_store, metadata_store)
     }
 
@@ -495,7 +495,7 @@ mod tests {
 
         // Create a test file
         let test_file = tmp.path().join("test.txt");
-        fs::write(&test_file, "hello world").unwrap();
+        fs::write(&test_file, "hello world").expect("TODO: handle error");
 
         // Delete it
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
@@ -503,16 +503,16 @@ mod tests {
             .execute(FileOperation::Delete {
                 path: test_file.clone(),
             })
-            .unwrap();
+            .expect("TODO: handle error");
 
         assert!(!test_file.exists());
 
         // Undo the delete
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
-        executor.undo(&delete_meta.id).unwrap();
+        executor.undo(&delete_meta.id).expect("TODO: handle error");
 
         assert!(test_file.exists());
-        assert_eq!(fs::read_to_string(&test_file).unwrap(), "hello world");
+        assert_eq!(fs::read_to_string(&test_file).expect("TODO: handle error"), "hello world");
     }
 
     #[test]
@@ -521,7 +521,7 @@ mod tests {
 
         // Create a test file
         let test_file = tmp.path().join("test.txt");
-        fs::write(&test_file, "original content").unwrap();
+        fs::write(&test_file, "original content").expect("TODO: handle error");
 
         // Modify it
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
@@ -530,15 +530,15 @@ mod tests {
                 path: test_file.clone(),
                 new_content: b"modified content".to_vec(),
             })
-            .unwrap();
+            .expect("TODO: handle error");
 
-        assert_eq!(fs::read_to_string(&test_file).unwrap(), "modified content");
+        assert_eq!(fs::read_to_string(&test_file).expect("TODO: handle error"), "modified content");
 
         // Undo the modify
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
-        executor.undo(&modify_meta.id).unwrap();
+        executor.undo(&modify_meta.id).expect("TODO: handle error");
 
-        assert_eq!(fs::read_to_string(&test_file).unwrap(), "original content");
+        assert_eq!(fs::read_to_string(&test_file).expect("TODO: handle error"), "original content");
     }
 
     #[test]
@@ -548,7 +548,7 @@ mod tests {
         // Create a test file
         let source = tmp.path().join("source.txt");
         let dest = tmp.path().join("dest.txt");
-        fs::write(&source, "content").unwrap();
+        fs::write(&source, "content").expect("TODO: handle error");
 
         // Move it
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
@@ -557,14 +557,14 @@ mod tests {
                 source: source.clone(),
                 destination: dest.clone(),
             })
-            .unwrap();
+            .expect("TODO: handle error");
 
         assert!(!source.exists());
         assert!(dest.exists());
 
         // Undo the move
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
-        executor.undo(&move_meta.id).unwrap();
+        executor.undo(&move_meta.id).expect("TODO: handle error");
 
         assert!(source.exists());
         assert!(!dest.exists());
@@ -577,7 +577,7 @@ mod tests {
         // Create a test file
         let source = tmp.path().join("source.txt");
         let dest = tmp.path().join("dest.txt");
-        fs::write(&source, "content").unwrap();
+        fs::write(&source, "content").expect("TODO: handle error");
 
         // Copy it
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
@@ -586,14 +586,14 @@ mod tests {
                 source: source.clone(),
                 destination: dest.clone(),
             })
-            .unwrap();
+            .expect("TODO: handle error");
 
         assert!(source.exists());
         assert!(dest.exists());
 
         // Undo the copy (deletes the copy)
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
-        executor.undo(&copy_meta.id).unwrap();
+        executor.undo(&copy_meta.id).expect("TODO: handle error");
 
         assert!(source.exists());
         assert!(!dest.exists());
