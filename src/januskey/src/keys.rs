@@ -636,20 +636,20 @@ mod tests {
 
     #[test]
     fn test_key_manager_init() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let mut km = KeyManager::new(tmp.path());
 
         assert!(!km.is_initialized());
-        km.init("test-passphrase").unwrap();
+        km.init("test-passphrase").expect("TODO: handle error");
         assert!(km.is_initialized());
     }
 
     #[test]
     fn test_key_generation_and_retrieval() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let mut km = KeyManager::new(tmp.path());
 
-        km.init("test-passphrase").unwrap();
+        km.init("test-passphrase").expect("TODO: handle error");
 
         let id = km
             .generate(
@@ -658,33 +658,33 @@ mod tests {
                 Some("Test key".to_string()),
                 None,
             )
-            .unwrap();
+            .expect("TODO: handle error");
 
-        let meta = km.get(id).unwrap();
+        let meta = km.get(id).expect("TODO: handle error");
         assert_eq!(meta.id, id);
         assert_eq!(meta.algorithm, KeyAlgorithm::Aes256Gcm);
         assert_eq!(meta.purpose, KeyPurpose::Encryption);
         assert_eq!(meta.state, KeyState::Active);
 
-        let key = km.retrieve(id).unwrap();
+        let key = km.retrieve(id).expect("TODO: handle error");
         assert_eq!(key.as_bytes().len(), 32);
     }
 
     #[test]
     fn test_key_rotation() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let mut km = KeyManager::new(tmp.path());
 
-        km.init("test-passphrase").unwrap();
+        km.init("test-passphrase").expect("TODO: handle error");
 
         let old_id = km
             .generate(KeyAlgorithm::Aes256Gcm, KeyPurpose::Encryption, None, None)
-            .unwrap();
+            .expect("TODO: handle error");
 
-        let new_id = km.rotate(old_id).unwrap();
+        let new_id = km.rotate(old_id).expect("TODO: handle error");
 
-        let old_meta = km.get(old_id).unwrap();
-        let new_meta = km.get(new_id).unwrap();
+        let old_meta = km.get(old_id).expect("TODO: handle error");
+        let new_meta = km.get(new_id).expect("TODO: handle error");
 
         assert_eq!(old_meta.state, KeyState::Revoked);
         assert_eq!(new_meta.state, KeyState::Active);
@@ -693,14 +693,14 @@ mod tests {
 
     #[test]
     fn test_wrong_passphrase() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let mut km = KeyManager::new(tmp.path());
 
-        km.init("correct-passphrase").unwrap();
+        km.init("correct-passphrase").expect("TODO: handle error");
 
         // Generate a key so we have something to verify against
         km.generate(KeyAlgorithm::Aes256Gcm, KeyPurpose::Encryption, None, None)
-            .unwrap();
+            .expect("TODO: handle error");
 
         // Re-open with wrong passphrase
         let mut km2 = KeyManager::new(tmp.path());

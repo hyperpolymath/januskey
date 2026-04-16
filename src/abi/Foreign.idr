@@ -1,181 +1,217 @@
--- SPDX-License-Identifier: PMPL-1.0-or-later
--- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
---
--- JanusKey ABI Foreign — C FFI declarations
--- Maps Idris2 types to C-compatible foreign function interface
--- Generated C headers go to generated/abi/januskey.h
+||| SPDX-License-Identifier: PMPL-1.0-or-later
+||| Foreign Function Interface Declarations for JANUSKEY
+|||
+||| This module declares all C-compatible functions that will be
+||| implemented in the Zig FFI layer.
+|||
+||| All functions are declared here with type signatures and safety proofs.
+||| Implementations live in ffi/zig/
 
-module JanusKey.ABI.Foreign
+module Januskey.ABI.Foreign
 
-import JanusKey.ABI.Types
-import JanusKey.ABI.Layout
-import Data.Vect
-import Data.So
+import Januskey.ABI.Types
+import Januskey.ABI.Layout
 
 %default total
 
--- ============================================================
--- C Type Mappings
--- ============================================================
+--------------------------------------------------------------------------------
+-- Library Lifecycle
+--------------------------------------------------------------------------------
 
-||| C-compatible error codes
+||| Initialize the library
+||| Returns a handle to the library instance, or Nothing on failure
+export
+%foreign "C:januskey_init, libjanuskey"
+prim__init : PrimIO Bits64
+
+||| Safe wrapper for library initialization
+export
+init : IO (Maybe Handle)
+init = do
+  ptr <- primIO prim__init
+  pure (createHandle ptr)
+
+||| Clean up library resources
+export
+%foreign "C:januskey_free, libjanuskey"
+prim__free : Bits64 -> PrimIO ()
+
+||| Safe wrapper for cleanup
+export
+free : Handle -> IO ()
+free h = primIO (prim__free (handlePtr h))
+
+--------------------------------------------------------------------------------
+-- Core Operations
+--------------------------------------------------------------------------------
+
+||| Example operation: process data
+export
+%foreign "C:januskey_process, libjanuskey"
+prim__process : Bits64 -> Bits32 -> PrimIO Bits32
+
+||| Safe wrapper with error handling
+export
+process : Handle -> Bits32 -> IO (Either Result Bits32)
+process h input = do
+  result <- primIO (prim__process (handlePtr h) input)
+  pure $ case result of
+    0 => Left Error
+    n => Right n
+
+--------------------------------------------------------------------------------
+-- String Operations
+--------------------------------------------------------------------------------
+
+||| Convert C string to Idris String
+export
+%foreign "support:idris2_getString, libidris2_support"
+prim__getString : Bits64 -> String
+
+||| Free C string
+export
+%foreign "C:januskey_free_string, libjanuskey"
+prim__freeString : Bits64 -> PrimIO ()
+
+||| Get string result from library
+export
+%foreign "C:januskey_get_string, libjanuskey"
+prim__getResult : Bits64 -> PrimIO Bits64
+
+||| Safe string getter
+export
+getString : Handle -> IO (Maybe String)
+getString h = do
+  ptr <- primIO (prim__getResult (handlePtr h))
+  if ptr == 0
+    then pure Nothing
+    else do
+      let str = prim__getString ptr
+      primIO (prim__freeString ptr)
+      pure (Just str)
+
+--------------------------------------------------------------------------------
+-- Array/Buffer Operations
+--------------------------------------------------------------------------------
+
+||| Process array data
+export
+%foreign "C:januskey_process_array, libjanuskey"
+prim__processArray : Bits64 -> Bits64 -> Bits32 -> PrimIO Bits32
+
+||| Safe array processor
+export
+processArray : Handle -> (buffer : Bits64) -> (len : Bits32) -> IO (Either Result ())
+processArray h buf len = do
+  result <- primIO (prim__processArray (handlePtr h) buf len)
+  pure $ case resultFromInt result of
+    Just Ok => Right ()
+    Just err => Left err
+    Nothing => Left Error
+  where
+    resultFromInt : Bits32 -> Maybe Result
+    resultFromInt 0 = Just Ok
+    resultFromInt 1 = Just Error
+    resultFromInt 2 = Just InvalidParam
+    resultFromInt 3 = Just OutOfMemory
+    resultFromInt 4 = Just NullPointer
+    resultFromInt _ = Nothing
+
+--------------------------------------------------------------------------------
+-- Error Handling
+--------------------------------------------------------------------------------
+
+||| Get last error message
+export
+%foreign "C:januskey_last_error, libjanuskey"
+prim__lastError : PrimIO Bits64
+
+||| Retrieve last error as string
+export
+lastError : IO (Maybe String)
+lastError = do
+  ptr <- primIO prim__lastError
+  if ptr == 0
+    then pure Nothing
+    else pure (Just (prim__getString ptr))
+
+||| Get error description for result code
+export
+errorDescription : Result -> String
+errorDescription Ok = "Success"
+errorDescription Error = "Generic error"
+errorDescription InvalidParam = "Invalid parameter"
+errorDescription OutOfMemory = "Out of memory"
+errorDescription NullPointer = "Null pointer"
+
+--------------------------------------------------------------------------------
+-- Version Information
+--------------------------------------------------------------------------------
+
+||| Get library version
+export
+%foreign "C:januskey_version, libjanuskey"
+prim__version : PrimIO Bits64
+
+||| Get version as string
+export
+version : IO String
+version = do
+  ptr <- primIO prim__version
+  pure (prim__getString ptr)
+
+||| Get library build info
+export
+%foreign "C:januskey_build_info, libjanuskey"
+prim__buildInfo : PrimIO Bits64
+
+||| Get build information
+export
+buildInfo : IO String
+buildInfo = do
+  ptr <- primIO prim__buildInfo
+  pure (prim__getString ptr)
+
+--------------------------------------------------------------------------------
+-- Callback Support
+--------------------------------------------------------------------------------
+
+||| Callback function type (C ABI)
 public export
-data CError : Type where
-  JK_OK                  : CError  -- 0
-  JK_ERR_NOT_INITIALIZED : CError  -- 1
-  JK_ERR_INVALID_PATH    : CError  -- 2
-  JK_ERR_IO              : CError  -- 3
-  JK_ERR_CRYPTO          : CError  -- 4
-  JK_ERR_TX_NOT_ACTIVE   : CError  -- 5
-  JK_ERR_TX_CONFLICT     : CError  -- 6
-  JK_ERR_KEY_NOT_FOUND   : CError  -- 7
-  JK_ERR_KEY_REVOKED     : CError  -- 8
-  JK_ERR_OBLITERATION    : CError  -- 9
-  JK_ERR_ATTESTATION     : CError  -- 10
-  JK_ERR_BUFFER_TOO_SMALL : CError -- 11
+Callback : Type
+Callback = Bits64 -> Bits32 -> Bits32
 
-||| Convert CError to numeric code for C
-public export
-errorCode : CError -> Int
-errorCode JK_OK                  = 0
-errorCode JK_ERR_NOT_INITIALIZED = 1
-errorCode JK_ERR_INVALID_PATH    = 2
-errorCode JK_ERR_IO              = 3
-errorCode JK_ERR_CRYPTO          = 4
-errorCode JK_ERR_TX_NOT_ACTIVE   = 5
-errorCode JK_ERR_TX_CONFLICT     = 6
-errorCode JK_ERR_KEY_NOT_FOUND   = 7
-errorCode JK_ERR_KEY_REVOKED     = 8
-errorCode JK_ERR_OBLITERATION    = 9
-errorCode JK_ERR_ATTESTATION     = 10
-errorCode JK_ERR_BUFFER_TOO_SMALL = 11
+||| Register a callback
+export
+%foreign "C:januskey_register_callback, libjanuskey"
+prim__registerCallback : Bits64 -> AnyPtr -> PrimIO Bits32
 
-||| Proof: all error codes are non-negative
-public export
-errorCodeNonNeg : (e : CError) -> So (errorCode e >= 0)
-errorCodeNonNeg JK_OK                  = Oh
-errorCodeNonNeg JK_ERR_NOT_INITIALIZED = Oh
-errorCodeNonNeg JK_ERR_INVALID_PATH    = Oh
-errorCodeNonNeg JK_ERR_IO              = Oh
-errorCodeNonNeg JK_ERR_CRYPTO          = Oh
-errorCodeNonNeg JK_ERR_TX_NOT_ACTIVE   = Oh
-errorCodeNonNeg JK_ERR_TX_CONFLICT     = Oh
-errorCodeNonNeg JK_ERR_KEY_NOT_FOUND   = Oh
-errorCodeNonNeg JK_ERR_KEY_REVOKED     = Oh
-errorCodeNonNeg JK_ERR_OBLITERATION    = Oh
-errorCodeNonNeg JK_ERR_ATTESTATION     = Oh
-errorCodeNonNeg JK_ERR_BUFFER_TOO_SMALL = Oh
+||| Safe callback registration
+export
+registerCallback : Handle -> Callback -> IO (Either Result ())
+registerCallback h cb = do
+  result <- primIO (prim__registerCallback (handlePtr h) (cast cb))
+  pure $ case resultFromInt result of
+    Just Ok => Right ()
+    Just err => Left err
+    Nothing => Left Error
+  where
+    resultFromInt : Bits32 -> Maybe Result
+    resultFromInt 0 = Just Ok
+    resultFromInt _ = Just Error
 
-||| Proof: JK_OK is the only success code
-public export
-onlyOkIsSuccess : (e : CError) -> errorCode e = 0 -> e = JK_OK
-onlyOkIsSuccess JK_OK Refl = Refl
+--------------------------------------------------------------------------------
+-- Utility Functions
+--------------------------------------------------------------------------------
 
--- ============================================================
--- Foreign Function Signatures
--- These map to the C header generated/abi/januskey.h
--- ============================================================
+||| Check if library is initialized
+export
+%foreign "C:januskey_is_initialized, libjanuskey"
+prim__isInitialized : Bits64 -> PrimIO Bits32
 
-||| Opaque handle to a JanusKey instance
-public export
-data JKHandle : Type where
-  MkJKHandle : (ptr : Int) -> JKHandle
-
-||| FFI: Initialize a JanusKey repository
-||| C: int jk_init(const char* path, jk_handle_t* out_handle)
-public export
-record JKInitArgs where
-  constructor MkInitArgs
-  repoPath : ValidPath
-
-||| FFI: Open an existing JanusKey repository
-||| C: int jk_open(const char* path, jk_handle_t* out_handle)
-public export
-record JKOpenArgs where
-  constructor MkOpenArgs
-  repoPath : ValidPath
-
-||| FFI: Execute a file operation
-||| C: int jk_execute(jk_handle_t handle, jk_op_kind_t op,
-|||                    const char* src, const char* dst)
-public export
-record JKExecuteArgs where
-  constructor MkExecArgs
-  handle  : JKHandle
-  op      : OpKind
-  src     : ValidPath
-  dst     : Maybe ValidPath
-
-||| FFI: Undo the last operation
-||| C: int jk_undo(jk_handle_t handle)
-public export
-record JKUndoArgs where
-  constructor MkUndoArgs
-  handle : JKHandle
-
-||| FFI: Obliterate a file (irreversible secure deletion)
-||| C: int jk_obliterate(jk_handle_t handle, const char* path,
-|||                       jk_oblit_proof_t* out_proof)
-public export
-record JKObliterateArgs where
-  constructor MkOblitArgs
-  handle : JKHandle
-  target : ValidPath
-
-||| FFI: Generate a new key
-||| C: int jk_generate_key(jk_handle_t handle, jk_algorithm_t algo,
-|||                         const char* passphrase, jk_key_id_t* out_id)
-public export
-record JKKeyGenArgs where
-  constructor MkKeyGenArgs
-  handle     : JKHandle
-  algorithm  : KeyAlgorithm
-  passphrase : String
-
-||| FFI: Rotate a key
-||| C: int jk_rotate_key(jk_handle_t handle, jk_key_id_t old_id,
-|||                       const char* new_passphrase, jk_key_id_t* out_new_id)
-public export
-record JKKeyRotateArgs where
-  constructor MkKeyRotateArgs
-  handle        : JKHandle
-  oldKeyId      : KeyId
-  newPassphrase : String
-
-||| FFI: Begin a transaction
-||| C: int jk_tx_begin(jk_handle_t handle, jk_tx_t* out_tx)
-||| FFI: Commit a transaction
-||| C: int jk_tx_commit(jk_handle_t handle, jk_tx_t tx)
-||| FFI: Rollback a transaction
-||| C: int jk_tx_rollback(jk_handle_t handle, jk_tx_t tx)
-
--- ============================================================
--- Safety Contracts for FFI Boundary
--- ============================================================
-
-||| Contract: every FFI call returns a valid error code
-public export
-data ValidFFIReturn : Int -> Type where
-  IsValid : So (code >= 0) -> So (code <= 11) -> ValidFFIReturn code
-
-||| Contract: init must be called before any other operation
-public export
-data Initialized : JKHandle -> Type where
-  WasInitialized : Initialized h
-
-||| Contract: obliterate consumes the file linearly
-public export
-data ObliterateContract : JKHandle -> ValidPath -> Type where
-  ||| After obliterate returns JK_OK, the file at path is
-  ||| provably destroyed (3-pass overwrite + verification)
-  OblitContract : (h : JKHandle)
-               -> (p : ValidPath)
-               -> (proof : ObliterationProof)
-               -> ObliterateContract h p
-
-||| Contract: key generation produces unique IDs
-public export
-data KeyGenContract : JKHandle -> KeyAlgorithm -> Type where
-  ||| Generated key ID is unique within this repository
-  KeyGenUnique : (h : JKHandle) -> (a : KeyAlgorithm) -> (kid : KeyId)
-              -> KeyGenContract h a
+||| Check initialization status
+export
+isInitialized : Handle -> IO Bool
+isInitialized h = do
+  result <- primIO (prim__isInitialized (handlePtr h))
+  pure (result /= 0)

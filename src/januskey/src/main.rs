@@ -156,7 +156,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Determine working directory
-    let working_dir = cli.dir.unwrap_or_else(|| std::env::current_dir().unwrap());
+    let working_dir = cli.dir.unwrap_or_else(|| std::env::current_dir().expect("TODO: handle error"));
 
     match cli.command {
         Commands::Init => cmd_init(&working_dir),
@@ -286,7 +286,7 @@ fn cmd_delete(
         pb.set_style(
             ProgressStyle::default_bar()
                 .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-                .unwrap()
+                .expect("TODO: handle error")
                 .progress_chars("#>-"),
         );
         Some(pb)

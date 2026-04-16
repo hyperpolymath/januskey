@@ -223,38 +223,38 @@ mod tests {
 
     #[test]
     fn test_store_and_retrieve() {
-        let tmp = TempDir::new().unwrap();
-        let store = ContentStore::new(tmp.path().to_path_buf(), false).unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
+        let store = ContentStore::new(tmp.path().to_path_buf(), false).expect("TODO: handle error");
 
         let content = b"test content";
-        let hash = store.store(content).unwrap();
+        let hash = store.store(content).expect("TODO: handle error");
 
-        let retrieved = store.retrieve(&hash).unwrap();
+        let retrieved = store.retrieve(&hash).expect("TODO: handle error");
         assert_eq!(content.to_vec(), retrieved);
     }
 
     #[test]
     fn test_store_compressed() {
-        let tmp = TempDir::new().unwrap();
-        let store = ContentStore::new(tmp.path().to_path_buf(), true).unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
+        let store = ContentStore::new(tmp.path().to_path_buf(), true).expect("TODO: handle error");
 
         let content = b"test content that should compress well when repeated ".repeat(100);
-        let hash = store.store(&content).unwrap();
+        let hash = store.store(&content).expect("TODO: handle error");
 
-        let retrieved = store.retrieve(&hash).unwrap();
+        let retrieved = store.retrieve(&hash).expect("TODO: handle error");
         assert_eq!(content, retrieved.as_slice());
     }
 
     #[test]
     fn test_deduplication() {
-        let tmp = TempDir::new().unwrap();
-        let store = ContentStore::new(tmp.path().to_path_buf(), false).unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
+        let store = ContentStore::new(tmp.path().to_path_buf(), false).expect("TODO: handle error");
 
         let content = b"duplicate content";
-        let hash1 = store.store(content).unwrap();
-        let hash2 = store.store(content).unwrap();
+        let hash1 = store.store(content).expect("TODO: handle error");
+        let hash2 = store.store(content).expect("TODO: handle error");
 
         assert_eq!(hash1, hash2);
-        assert_eq!(store.count().unwrap(), 1);
+        assert_eq!(store.count().expect("TODO: handle error"), 1);
     }
 }

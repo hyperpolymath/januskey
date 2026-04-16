@@ -143,7 +143,7 @@ impl TransactionManager {
         self.log.active_transaction_id = Some(id.clone());
         self.save()?;
 
-        Ok(self.log.transactions.last().unwrap())
+        Ok(self.log.transactions.last().expect("TODO: handle error"))
     }
 
     /// Get current active transaction
@@ -319,11 +319,11 @@ mod tests {
     use tempfile::TempDir;
 
     fn setup() -> (TempDir, ContentStore, MetadataStore, TransactionManager) {
-        let tmp = TempDir::new().unwrap();
-        let content_store = ContentStore::new(tmp.path().join("content"), false).unwrap();
-        let metadata_store = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
+        let content_store = ContentStore::new(tmp.path().join("content"), false).expect("TODO: handle error");
+        let metadata_store = MetadataStore::new(tmp.path().join("metadata.json")).expect("TODO: handle error");
         let transaction_manager =
-            TransactionManager::new(tmp.path().join("transactions.json")).unwrap();
+            TransactionManager::new(tmp.path().join("transactions.json")).expect("TODO: handle error");
         (tmp, content_store, metadata_store, transaction_manager)
     }
 
@@ -332,14 +332,14 @@ mod tests {
         let (tmp, content_store, mut metadata_store, mut tx_manager) = setup();
 
         // Begin transaction
-        tx_manager.begin(Some("test-tx".to_string())).unwrap();
+        tx_manager.begin(Some("test-tx".to_string())).expect("TODO: handle error");
         assert!(tx_manager.has_active());
 
         // Create test files
         let file1 = tmp.path().join("file1.txt");
         let file2 = tmp.path().join("file2.txt");
-        fs::write(&file1, "content1").unwrap();
-        fs::write(&file2, "content2").unwrap();
+        fs::write(&file1, "content1").expect("TODO: handle error");
+        fs::write(&file2, "content2").expect("TODO: handle error");
 
         // Execute operations in transaction
         {
@@ -347,10 +347,10 @@ mod tests {
                 TransactionExecutor::new(&content_store, &mut metadata_store, &mut tx_manager);
             executor
                 .execute(FileOperation::Delete { path: file1.clone() })
-                .unwrap();
+                .expect("TODO: handle error");
             executor
                 .execute(FileOperation::Delete { path: file2.clone() })
-                .unwrap();
+                .expect("TODO: handle error");
         }
 
         assert!(!file1.exists());
@@ -359,7 +359,7 @@ mod tests {
         // Rollback
         tx_manager
             .rollback(&content_store, &mut metadata_store)
-            .unwrap();
+            .expect("TODO: handle error");
 
         // Files should be restored
         assert!(file1.exists());
@@ -372,22 +372,22 @@ mod tests {
         let (tmp, content_store, mut metadata_store, mut tx_manager) = setup();
 
         // Begin transaction
-        tx_manager.begin(None).unwrap();
+        tx_manager.begin(None).expect("TODO: handle error");
 
         // Create and delete a file
         let file = tmp.path().join("test.txt");
-        fs::write(&file, "content").unwrap();
+        fs::write(&file, "content").expect("TODO: handle error");
 
         {
             let mut executor =
                 TransactionExecutor::new(&content_store, &mut metadata_store, &mut tx_manager);
             executor
                 .execute(FileOperation::Delete { path: file.clone() })
-                .unwrap();
+                .expect("TODO: handle error");
         }
 
         // Commit
-        let tx = tx_manager.commit().unwrap();
+        let tx = tx_manager.commit().expect("TODO: handle error");
         assert_eq!(tx.state, TransactionState::Committed);
         assert!(!file.exists());
         assert!(!tx_manager.has_active());
@@ -397,7 +397,7 @@ mod tests {
     fn test_cannot_begin_while_active() {
         let (_tmp, _content_store, _metadata_store, mut tx_manager) = setup();
 
-        tx_manager.begin(None).unwrap();
+        tx_manager.begin(None).expect("TODO: handle error");
         let result = tx_manager.begin(None);
         assert!(result.is_err());
     }

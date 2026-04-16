@@ -380,10 +380,10 @@ mod tests {
     use tempfile::TempDir;
 
     fn setup() -> (TempDir, ContentStore, ObliterationManager) {
-        let tmp = TempDir::new().unwrap();
-        let content_store = ContentStore::new(tmp.path().join("content"), false).unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
+        let content_store = ContentStore::new(tmp.path().join("content"), false).expect("TODO: handle error");
         let obliteration_manager =
-            ObliterationManager::new(tmp.path().join("obliterations.json")).unwrap();
+            ObliterationManager::new(tmp.path().join("obliterations.json")).expect("TODO: handle error");
         (tmp, content_store, obliteration_manager)
     }
 
@@ -412,7 +412,7 @@ mod tests {
 
         // Store some content
         let content = b"sensitive data to be obliterated";
-        let hash = content_store.store(content).unwrap();
+        let hash = content_store.store(content).expect("TODO: handle error");
 
         // Verify it exists
         assert!(content_store.exists(&hash));
@@ -425,7 +425,7 @@ mod tests {
                 Some("User request".to_string()),
                 Some("GDPR Article 17".to_string()),
             )
-            .unwrap();
+            .expect("TODO: handle error");
 
         // Verify obliteration
         assert!(!content_store.exists(&hash));
@@ -441,35 +441,35 @@ mod tests {
 
         // Store and obliterate content
         let content = b"data to obliterate";
-        let hash = content_store.store(content).unwrap();
+        let hash = content_store.store(content).expect("TODO: handle error");
         let record = obliteration_manager
             .obliterate(&content_store, &hash, None, None)
-            .unwrap();
+            .expect("TODO: handle error");
 
         // Reopen manager and verify log
         let obliteration_manager2 =
-            ObliterationManager::new(tmp.path().join("obliterations.json")).unwrap();
+            ObliterationManager::new(tmp.path().join("obliterations.json")).expect("TODO: handle error");
         assert_eq!(obliteration_manager2.count(), 1);
 
-        let retrieved = obliteration_manager2.get(&record.id).unwrap();
+        let retrieved = obliteration_manager2.get(&record.id).expect("TODO: handle error");
         assert_eq!(retrieved.content_hash, hash);
     }
 
     #[test]
     fn test_secure_overwrite() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("TODO: handle error");
         let test_file = tmp.path().join("test.txt");
 
         // Create file with known content
         let original = b"sensitive information that must be destroyed";
-        fs::write(&test_file, original).unwrap();
+        fs::write(&test_file, original).expect("TODO: handle error");
 
         // Perform secure overwrite
-        let passes = secure_overwrite(&test_file).unwrap();
+        let passes = secure_overwrite(&test_file).expect("TODO: handle error");
         assert_eq!(passes, OVERWRITE_PASSES);
 
         // Read back and verify content changed
-        let remaining = fs::read(&test_file).unwrap();
+        let remaining = fs::read(&test_file).expect("TODO: handle error");
         assert_ne!(remaining, original.to_vec());
     }
 
@@ -481,7 +481,7 @@ mod tests {
         let hashes: Vec<ContentHash> = (0..5)
             .map(|i| {
                 let content = format!("content {}", i);
-                content_store.store(content.as_bytes()).unwrap()
+                content_store.store(content.as_bytes()).expect("TODO: handle error")
             })
             .collect();
 
