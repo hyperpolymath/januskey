@@ -1,5 +1,5 @@
 = JanusKey Wiki
-Jonathan D.A. Jewell <jonathan.jewell@gmail.com>
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :toc: left
 :toclevels: 3
 :icons: font

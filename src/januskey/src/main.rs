@@ -21,7 +21,7 @@ use std::path::PathBuf;
 #[command(
     name = "jk",
     version = "1.0.0",
-    author = "Jonathan D.A. Jewell <jonathan.jewell@gmail.com>",
+    author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>",
     about = "JanusKey: Reversible file operations (formal proofs pending)",
     long_about = "JanusKey makes every file operation reversible through Maximal Principle Reduction.\n\
                   Delete files, modify content, move things around—and always be able to undo.\n\n\
