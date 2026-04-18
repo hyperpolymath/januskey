@@ -7,7 +7,7 @@ project = "januskey"
 version = "1.0.0"
 last-updated = "2026-04-04"
 status = "active"
-crg-grade = "C"
+crg-grade = "D"
 
 [project-context]
 name = "januskey"
