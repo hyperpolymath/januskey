@@ -317,4 +317,92 @@ items    = [
   "Approve order of pre-exposure fixes (T-D-01, etc.)",
 ]
 
+# ──────────────────────────────────────────────────────────────────────
+# 6. TRUSTFILE AUDIT (added 2026-04-19 follow-up pass)
+# ──────────────────────────────────────────────────────────────────────
+
+[trustfile-audit]
+audit-date       = "2026-04-19"
+path             = "contractiles/trust/Trustfile.a2ml"
+trigger          = "User directive 'Trustfile for this is absolutely tight' during MCP-threat-model session"
+pre-state-level  = "maximal"
+post-state-level = "minimal"
+
+[trustfile-audit.pre-state-findings]
+findings = [
+  "@trust-level: maximal — widest tier; treats LLM as co-developer with broad read+build+test+lint+format",
+  "Only 2 integrity checks: license-content + no-secrets-committed",
+  "No checks for committed key material (.age, .pem, .key, keystore.*)",
+  "No checks for network-egress denial",
+  "No checks for subprocess/exec scope narrowing",
+  "No check that threat-model.a2ml exists before MCP cartridge build",
+  "No self-integrity check (an LLM could silently widen the trust level)",
+  "@trust-deny list covered only git-ops (delete-branch, force-push, publish); zero crypto-specific denials",
+  "No binding of MCP cartridge surface to the threat-model verdict list (retrieve_key / init / unlock)",
+  "No guard against the home-rolled HMAC bug flagged by the threat-model pass",
+]
+severity-assessment = "high — ships a crypto tool with generic template trust posture"
+
+[trustfile-audit.changes-applied]
+inverted-default = "@trust-level: maximal → minimal; @trust-boundary: repo → repo-source-only"
+added-crypto-denials = [
+  "read-key-material / write-key-material",
+  "read-keystore / write-keystore",
+  "read-audit-log / write-audit-log",
+  "modify-trustfile / modify-threat-model (no LLM self-widening)",
+  "exec-arbitrary-binary / spawn-subprocess-outside-build-set",
+  "network-egress-any / network-ingress-any (crypto tool is local-only)",
+  "write-outside-repo / read-home-directory / read-ssh-config",
+  "evaluate-ciphertext-from-agent / sign-data-from-agent",
+  "derive-key-from-agent-passphrase / export-secret-of-any-kind",
+]
+added-allowed-exec-binaries = [
+  "cargo, rustc, rustfmt, clippy-driver, just, git, grep, find, cat, head, tail, wc, diff, python3",
+]
+added-denied-exec-binaries = [
+  "ssh, scp, sftp, rsync, curl, wget, nc, openssl, gpg, age, sops (belt-and-braces)",
+  "sudo, su, doas, pkexec",
+  "docker, podman, nix-shell, guix",
+]
+added-integrity-checks = [
+  "no-key-material-in-tree",
+  "no-plaintext-keystore",
+  "trustfile-self-integrity (widening requires human-approved commit phrase)",
+  "threat-model-present (MCP exposure blocked when threat-model.a2ml is absent)",
+  "no-homerolled-hmac (blocks MCP exposure while attestation.rs:182-191 pattern present)",
+  "no-metadata-only-key-types (Ed25519/X25519 must be real, not enum-only)",
+  "no-runtime-secrets-in-env (keystore-only, no JANUSKEY_* env pulls)",
+  "no-runtime-secrets-in-cli-argv (no passphrase on argv; /proc leak risk)",
+  "mcp-exposure-gated-on-threat-model (cartridge build blocked while draft-pending-human-review)",
+  "do-not-expose-list-is-enforced (retrieve_key/init/unlock must not appear in janus-mcp cartridge registry)",
+]
+severity-of-new-checks = "majority severity:critical — a blocking check, not an advisory"
+
+[trustfile-audit.escalated-to-human]
+items = [
+  "Whether to block read access to crates/**/attestation.rs entirely from LLM agents until the home-rolled HMAC is rewritten",
+  "Whether python3 should be on @allowed-exec-binaries given estate rule 'Python only for SaltStack' — currently allowed for the Justfile doctor recipe; could be removed and doctor rewritten in pure shell",
+  "Whether @allowed-exec-binaries should be further narrowed by forbidding 'find' in favour of explicit path globs",
+  "Whether to add a time-bound trust expiry: Trustfile auto-downgrades to 'deny-all' after N days without a re-audit commit",
+]
+
+[trustfile-audit.dogfood-check]
+trust-runner-present = false
+note = "contractiles/trust/ has only Trustfile.a2ml, no trust.ncl runner. Per memory rule 'Contractile trident = A2ML + .ncl runner + manifest', the runner is missing. This audit does not build the runner — scoped to a separate contractile-layout sweep. The declarative Trustfile is useful as a specification; the runner will enforce it when added."
+checks-reviewed-for-shell-portability = true
+checks-using-bash-idioms = [
+  "no-key-material-in-tree",
+  "no-plaintext-keystore",
+  "no-runtime-secrets-in-env",
+  "no-runtime-secrets-in-cli-argv",
+]
+
+[trustfile-audit.post-state-verdict]
+status = "tightened — baseline now among the tightest in the estate for a crypto tool"
+outstanding = [
+  "Build trust.ncl runner (separate contractile-layout task)",
+  "Resolve escalated-to-human items in YOUR-ACTIONS §18",
+  "After attestation.rs HMAC fix, re-run `trust` to confirm no-homerolled-hmac passes",
+]
+
 # END OF DRAFT

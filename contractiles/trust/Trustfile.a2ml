@@ -1,18 +1,51 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
-# Trustfile (A2ML Canonical)
+# Trustfile (A2ML Canonical) — CRYPTOGRAPHIC TOOL, TIGHTENED
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
+#
+# Hardened 2026-04-19 against the generic "maximal by default" template.
+# Januskey is a key-management tool: any LLM/agent interaction with it must
+# treat every key, audit entry, and Trustfile rule as attacker-reachable.
 
 @abstract:
 Trust and provenance verification for Januskey.
-Maximal trust by default — LLM may read, build, test, lint, format.
+Crypto-minimal baseline: deny by default. Every allowed action is an
+explicit, justified exception. A key-management tool's Trustfile is
+among the tightest in the estate — if a rule seems convenient but
+unjustified, it has no place here.
 @end
 
-@trust-level: maximal
-@trust-boundary: repo
-@trust-actions: [read, build, test, lint, format]
-@trust-deny: [delete-branch, force-push, modify-ci-secrets, publish]
+@trust-level: minimal
+@trust-boundary: repo-source-only
+@trust-actions: [read-source, build-no-net, test-no-net, lint, format]
+@trust-deny: [
+  # Git-ops (inherited from previous template)
+  delete-branch, force-push, modify-ci-secrets, publish,
+  # Crypto-specific denials (added 2026-04-19)
+  read-key-material, write-key-material, read-keystore, write-keystore,
+  read-audit-log, write-audit-log, modify-trustfile, modify-threat-model,
+  exec-arbitrary-binary, spawn-subprocess-outside-build-set,
+  network-egress-any, network-ingress-any,
+  write-outside-repo, read-home-directory, read-ssh-config,
+  evaluate-ciphertext-from-agent, sign-data-from-agent,
+  derive-key-from-agent-passphrase, export-secret-of-any-kind
+]
 
-## Integrity
+@allowed-exec-binaries: [
+  # Build / test / lint only. Anything else → deny.
+  cargo, rustc, rustfmt, clippy-driver,
+  just, git, grep, find, cat, head, tail, wc, diff,
+  python3  # Only for justfile doctor recipe — no runtime use
+]
+
+@denied-exec-binaries: [
+  # Explicit belt-and-braces against shelling out to these even if
+  # @allowed-exec-binaries is misinterpreted.
+  ssh, scp, sftp, rsync, curl, wget, nc, openssl, gpg, age, sops,
+  sudo, su, doas, pkexec,
+  docker, podman, nix-shell, guix
+]
+
+## Integrity — crypto-specific
 
 ### license-content
 - description: LICENSE contains expected SPDX identifier
@@ -23,3 +56,108 @@ Maximal trust by default — LLM may read, build, test, lint, format.
 - description: No .env or credential files in repo
 - run: test ! -f .env && test ! -f credentials.json && test ! -f .env.local
 - severity: critical
+
+### no-key-material-in-tree
+- description: No committed files that look like key material (PEM, age, SSH private keys, sops-encrypted blobs outside .sops/)
+- run: |
+    ! git ls-files | grep -E '\.(age|key|pem|gpg|pfx|p12|enc)$' | \
+      grep -v '^tests/fixtures/' | grep -v '^\.sops/' | \
+      read -r match; test -z "$match"
+- severity: critical
+
+### no-plaintext-keystore
+- description: No file matching keystore.json / keystore.db / *.keystore exists outside tests/
+- run: |
+    ! find . -type f \
+      \( -name 'keystore.json' -o -name 'keystore.db' -o -name '*.keystore' \) \
+      -not -path './tests/*' -not -path './target/*' -not -path './.git/*' | \
+      read -r match; test -z "$match"
+- severity: critical
+
+### trustfile-self-integrity
+- description: Trustfile has not been modified to widen @trust-level or @trust-actions without explicit human approval in commit message
+- run: |
+    # Passes when the current Trustfile still declares minimal trust level.
+    # Any LLM attempt to flip this back to maximal must go through a
+    # commit message containing the phrase "human-approved trust widening".
+    grep -q '^@trust-level: minimal' contractiles/trust/Trustfile.a2ml
+- severity: critical
+
+### threat-model-present
+- description: threat-model.a2ml exists and is non-empty (MCP exposure blocked without it)
+- run: test -s .machine_readable/threat-model.a2ml
+- severity: critical
+
+### no-homerolled-hmac
+- description: attestation.rs must NOT use SHA256(key || data) as HMAC — flagged by threat model 2026-04-19, must be fixed before MCP exposure
+- run: |
+    # Passes once the file uses a real HMAC primitive (hmac-sha2 crate or similar)
+    # OR the file does not exist. Fails while the home-rolled pattern is present.
+    if [ -f crates/januskey-cli/src/attestation.rs ]; then \
+      ! grep -qE 'Sha256::new\(\).*update.*key.*update.*data' crates/januskey-cli/src/attestation.rs; \
+    elif [ -f src/januskey/src/attestation.rs ]; then \
+      ! grep -qE 'Sha256::new\(\).*update.*key.*update.*data' src/januskey/src/attestation.rs; \
+    else true; fi
+- severity: critical
+
+### no-metadata-only-key-types
+- description: Ed25519 / X25519 key types must have real sign/DH impls, not just enum entries — flagged by threat model 2026-04-19
+- severity: high
+- run: |
+    # Passes if ed25519-dalek or x25519-dalek is a real dependency, OR if
+    # Ed25519 / X25519 are not listed in any KeyAlgorithm enum.
+    cargo tree 2>/dev/null | grep -qE '(ed25519-dalek|x25519-dalek)' || \
+      ! grep -rqE '(Ed25519|X25519)' crates/januskey-cli/src/ src/januskey/src/ 2>/dev/null
+
+## Secrets-hygiene (memory rule: SOPS at-rest / Rokur runtime / RGTV LLM-broker)
+
+### no-runtime-secrets-in-env
+- description: No API tokens, passphrases, or key material may be pulled from process environment — keystore-only
+- severity: critical
+- run: |
+    ! grep -rnE 'std::env::var\("(JANUSKEY|JK_)[A-Z_]*(KEY|SECRET|TOKEN|PASS|SEED)' \
+      crates/ src/ 2>/dev/null | grep -v -- '--allow-passphrase-env' | \
+      read -r match; test -z "$match"
+
+### no-runtime-secrets-in-cli-argv
+- description: CLI must not accept raw passphrases on argv (visible via /proc/*/cmdline on multi-user hosts)
+- severity: critical
+- run: |
+    ! grep -rnE '#\[arg\(.*--passphrase.*\)\]|#\[arg\(.*-p.*passphrase' \
+      crates/ src/ 2>/dev/null | grep -v '// TEST_ONLY' | read -r match; test -z "$match"
+
+## Agent-addressable surface
+
+### mcp-exposure-gated-on-threat-model
+- description: Any janus-mcp cartridge build must be gated on threat-model.a2ml status ≠ "draft-pending-human-review"
+- severity: critical
+- run: |
+    if [ -f .machine_readable/threat-model.a2ml ]; then \
+      status=$(grep -oP 'status\s*=\s*"\K[^"]+' .machine_readable/threat-model.a2ml | head -1); \
+      test "$status" != "draft-pending-human-review" || { \
+        echo "MCP exposure blocked: threat model still in draft"; exit 0; }; \
+    fi
+
+### do-not-expose-list-is-enforced
+- description: Tools classified DO-NOT-EXPOSE in threat-model.a2ml (retrieve_key, init, unlock) must not appear in any MCP cartridge tool registry
+- severity: critical
+- run: |
+    # Passes if either: no janus-mcp cartridge exists yet, OR the cartridge
+    # does not register the denied tool names.
+    cart_paths="/var/mnt/eclipse/repos/boj-server/cartridges/janus-mcp /var/mnt/eclipse/repos/boj-server/cartridges/januskey-mcp"; \
+    for p in $cart_paths; do \
+      if [ -d "$p" ]; then \
+        ! grep -rqE '"(retrieve_key|init|unlock)"' "$p"/cartridge.json "$p"/adapter/ 2>/dev/null || exit 1; \
+      fi; \
+    done
+
+## Notes for maintainers
+
+# Widening these rules requires:
+# 1. Updating .machine_readable/threat-model.a2ml with explicit justification
+# 2. A commit message containing the literal phrase "human-approved trust widening"
+# 3. Re-running `just trust` and confirming all severity:critical checks still pass
+#
+# An LLM agent on its own must NEVER widen trust. If a workflow is blocked by
+# these rules, that is the correct signal to escalate to Jonathan for review,
+# not to file a PR loosening the rules.
