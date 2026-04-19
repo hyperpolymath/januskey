@@ -1,0 +1,320 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+# (MPL-2.0 is automatic legal fallback until PMPL is formally recognised)
+#
+# threat-model.a2ml — DRAFT threat model for exposing januskey via an MCP cartridge
+#
+# STATUS: DRAFT — authored by AI assistant on 2026-04-19.
+# NOT final. Requires human sign-off by Jonathan D.A. Jewell before any
+# `januskey-mcp` cartridge is wired into boj-server. Pending decisions are
+# recorded in ~/Desktop/YOUR-ACTIONS-todo.md §18.
+#
+# Scope: the Rust crate `januskey-cli` (source: crates/januskey-cli/src/)
+# which currently provides passphrase-gated AEAD key custody + reversible
+# filesystem operations + tamper-evident audit log.
+#
+# Priority order (hyperpolymath standing rule):
+#   dependability > security > interop > usability > performance > versatility > extension
+# Findings below are SORTED by that order, not by raw CVSS severity.
+
+[metadata]
+document         = "januskey MCP threat model (draft)"
+project          = "januskey"
+version          = "0.1.0-draft"
+author           = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+ai-drafter       = "Claude (opus-4-7, background agent)"
+date-drafted     = "2026-04-19"
+status           = "draft-pending-human-review"
+supersedes       = ""
+reviewed-by      = ""
+approved-by      = ""
+approval-date    = ""
+
+# ──────────────────────────────────────────────────────────────────────
+# 1. CRYPTO PRIMITIVE INVENTORY
+#    (what's actually in the tree, with file:line anchors)
+# ──────────────────────────────────────────────────────────────────────
+
+[primitives.aead]
+name         = "AES-256-GCM"
+crate        = "aes-gcm (RustCrypto)"
+use          = "Wrapping individual key material in the keystore"
+where        = "crates/januskey-cli/src/keys.rs:7-10,589-621"
+nonce-source = "rand::thread_rng() — 12 bytes per wrap"
+nonce-size   = "12"
+aad          = "key UUID bytes (keys.rs:593,611)"
+notes        = "Per-key fresh nonce generated at wrap time. Nonces stored alongside ciphertext in WrappedKey."
+
+[primitives.kdf]
+name        = "Argon2id"
+crate       = "argon2"
+where       = "crates/januskey-cli/src/keys.rs:565-582"
+memory-kb   = "65536"
+iterations  = "3"
+parallelism = "4"
+salt-length = "16"
+output-len  = "32"
+notes       = "OWASP-recommended params. Salt stored in KeyStoreHeader (keys.rs:151)."
+
+[primitives.hash]
+name   = "SHA-256"
+crate  = "sha2"
+where  = "crates/januskey-cli/src/keys.rs:15,232-235,314-316,415-417 + attestation.rs:9,94-109,182-191 + obliteration.rs:17,64-68,89-94"
+uses   = "key fingerprints (first 8 bytes hex), audit-chain linking, HMAC-like attestation, obliteration commitment"
+
+[primitives.mac]
+name         = "Home-rolled HMAC-SHA256 (H(key || data || prev))"
+where        = "crates/januskey-cli/src/attestation.rs:182-191"
+finding      = "NOT real HMAC — it's plain SHA-256 over concatenated inputs. Vulnerable to length-extension attacks. Should be replaced with `hmac` crate before MCP exposure widens the threat surface."
+severity     = "high (dependability + security)"
+recommended  = "Use hmac::Hmac<Sha256> from the RustCrypto `hmac` crate. Fix BEFORE MCP exposure."
+
+[primitives.rng]
+name   = "rand::thread_rng()"
+crate  = "rand"
+where  = "keys.rs:179,225,241,587 + obliteration.rs:60,298 + attestation.rs (indirect)"
+use    = "salt generation, nonce generation, key material, obliteration nonces, overwrite patterns"
+notes  = "ThreadRng is a ChaCha-based CSPRNG auto-seeded from OS entropy. Acceptable."
+
+[primitives.key-material]
+key-length     = "32 bytes (AES-256)"
+zeroize-on-drop = "yes (SecretKey uses zeroize::ZeroizeOnDrop, keys.rs:163-166)"
+in-memory      = "KEK held in KeyManager.kek: Option<SecretKey>"
+
+[primitives.key-algorithms-declared]
+aes256-gcm = "generation + wrap/unwrap implemented"
+ed25519    = "declared in KeyAlgorithm enum; no sign/verify code present"
+x25519     = "declared in KeyAlgorithm enum; no DH code present"
+finding    = "Ed25519/X25519 are metadata-only today — the enum accepts them but no signing or DH operations are implemented. Any MCP tool that claims to sign with Ed25519 would be false advertising until implemented."
+
+[primitives.storage]
+keystore-path         = ".januskey/keys/keystore.jks"
+format                = "serde_json of KeyStoreData (keys.rs:531-546)"
+unix-permissions      = "0o600 set on keystore.jks and audit.log"
+weakness              = "JSON serialisation leaks metadata (UUIDs, algorithms, fingerprints, timestamps, descriptions) in plaintext — only the key bytes are encrypted."
+location-for-review   = "keys.rs:257-262, 542-546; attestation.rs:141-145"
+
+[primitives.secure-delete]
+name     = "DoD 5220.22-M inspired 3-pass overwrite"
+where    = "crates/januskey-cli/src/obliteration.rs:25-28,278-318"
+passes   = "0x00, 0xFF, random"
+caveat   = "On COW/journaling filesystems (Btrfs, XFS, ZFS, SSD FTL) this does not reliably erase the underlying blocks. Documented limitation, but worth re-stating if MCP exposes it."
+
+[primitives.safety-flags]
+forbid-unsafe-code = "yes (crates/januskey-cli/src/lib.rs:14)"
+
+# ──────────────────────────────────────────────────────────────────────
+# 2. PROPOSED MCP TOOL SURFACE
+#    (inferred from existing CLI subcommands; shape mirrors
+#     boj-server/cartridges/cloud-mcp/cartridge.json)
+# ──────────────────────────────────────────────────────────────────────
+
+[surface.assumptions]
+cartridge-name      = "januskey-mcp"
+cartridge-shape     = "abi/ + adapter/ + cartridge.json + ffi/ + mod.js + panels/ (~270-290 LOC)"
+reference           = "boj-server/cartridges/cloud-mcp/, boj-server/cartridges/gossamer-mcp/"
+caller-model        = "Any LLM agent with boj-server access — MUST be treated as potentially prompt-injected / adversarial"
+agent-as-adversary  = "yes (explicit threat class)"
+
+[[surface.tool]]
+name        = "januskey_status"
+purpose     = "Report whether a keystore is initialised at a given path + operation counts"
+inputs      = "{ dir: string }"
+outputs     = "{ initialised: bool, store_path: string, operation_count: int }"
+touches     = "read-only metadata"
+verdict     = "safe-to-expose"
+
+[[surface.tool]]
+name        = "januskey_list_keys"
+purpose     = "List metadata for keys in the store (no key material)"
+inputs      = "{ dir: string, active_only: bool, passphrase: string }"
+outputs     = "Array<{ id, algorithm, purpose, state, fingerprint, created_at, expires_at, description }>"
+touches     = "unlocks KEK in-process to verify passphrase; reads keystore.jks"
+verdict     = "requires-constraint"
+constraint  = "Passphrase MUST NOT flow through conversational MCP transport in plaintext. Either (a) require pre-unlocked session held by the cartridge with TTL + rate limit, or (b) accept only a session token the cartridge minted after a human-interactive unlock via a separate panel."
+
+[[surface.tool]]
+name        = "januskey_show_key"
+purpose     = "Show metadata for a single key by UUID"
+inputs      = "{ dir: string, key_id: uuid, passphrase-or-session: string }"
+outputs     = "KeyMetadata"
+touches     = "keystore read"
+verdict     = "requires-constraint"
+constraint  = "Same session-token rule as list_keys."
+
+[[surface.tool]]
+name        = "januskey_generate_key"
+purpose     = "Create a new key in the store"
+inputs      = "{ dir: string, algorithm: enum, purpose: enum, description?: string, expires_in_days?: int, session-token: string }"
+outputs     = "{ key_id: uuid, fingerprint: string }"
+touches     = "keystore write, audit log append"
+verdict     = "requires-constraint"
+constraint  = "(a) Rate-limit to N/hour per session. (b) Refuse algorithm=Ed25519|X25519 until real signing/DH is implemented — emit AlgorithmNotImplemented error rather than storing a metadata-only key. (c) Reject descriptions > 256 bytes (prevents log-flooding via adversarial agent)."
+
+[[surface.tool]]
+name        = "januskey_rotate_key"
+purpose     = "Rotate a key (generate new, revoke old, link via rotation_of)"
+inputs      = "{ dir: string, key_id: uuid, session-token: string }"
+outputs     = "{ new_key_id: uuid, fingerprint: string }"
+touches     = "keystore write, audit log append"
+verdict     = "requires-constraint"
+constraint  = "Rate-limit; explicit confirmation panel required for key_id already referenced by active encrypted data (beyond scope of today's januskey but should be a hook)."
+
+[[surface.tool]]
+name        = "januskey_revoke_key"
+purpose     = "Mark a key as revoked (no deletion of material)"
+inputs      = "{ dir: string, key_id: uuid, reason?: string, session-token: string }"
+outputs     = "{ ok: bool }"
+touches     = "keystore write, audit log append"
+verdict     = "requires-constraint"
+constraint  = "Revocation is effectively irreversible (restore requires backup restore). Require human confirmation panel for any revocation initiated by an agent, or allow only if the agent passes a `--confirmed-by-human` token the cartridge minted after a user clicked a confirm panel."
+
+[[surface.tool]]
+name        = "januskey_retrieve_key"
+purpose     = "Decrypt and return raw 32-byte key material to the caller"
+inputs      = "{ dir: string, key_id: uuid, session-token: string }"
+outputs     = "{ key_bytes: base64 }"
+touches     = "keystore read + KEK decrypt"
+verdict     = "DO-NOT-EXPOSE"
+reason      = "Raw key material leaving the process over an MCP transport that is routed through an LLM agent is the textbook key-exfiltration scenario. A prompt-injected agent can pull the bytes and paste them into a chat log, a URL, a file, or another tool. The CLI only exposes this via explicit user command + passphrase prompt at a TTY. The MCP boundary cannot recreate that assurance."
+alternative = "If the calling workflow needs to USE a key, expose `januskey_encrypt(key_id, plaintext)` / `januskey_decrypt(key_id, ciphertext)` / `januskey_sign(key_id, msg)` tools that keep material process-local and return only the cryptographic result. Export of raw key material stays CLI-only and TTY-interactive."
+
+[[surface.tool]]
+name        = "januskey_backup"
+purpose     = "Copy keystore.jks (still KEK-wrapped) to an output path"
+inputs      = "{ dir: string, output_path: string, session-token: string }"
+outputs     = "{ bytes_written: int, path: string }"
+touches     = "filesystem write"
+verdict     = "requires-constraint"
+constraint  = "(a) output_path MUST be validated against an allowlist of backup directories (e.g. forbid /tmp, forbid /dev, forbid anything under a shared or world-readable path). (b) Reject if output_path exists unless caller passes `overwrite: true` (default false). (c) Rate-limit: 1/hour per session (prevents denial-of-service by disk-filling). (d) The KEK-wrapped keystore is still a high-value artefact for offline passphrase attack — log the path in audit."
+
+[[surface.tool]]
+name        = "januskey_audit_show"
+purpose     = "Read last N audit entries"
+inputs      = "{ dir: string, limit: int, session-token: string }"
+outputs     = "Array<AuditEntry>"
+touches     = "audit log read"
+verdict     = "safe-to-expose"
+note        = "Metadata-only; no key material. Useful for agents doing compliance queries."
+
+[[surface.tool]]
+name        = "januskey_audit_history"
+purpose     = "Read audit entries for a single key UUID"
+inputs      = "{ dir: string, key_id: uuid, session-token: string }"
+outputs     = "Array<AuditEntry>"
+touches     = "audit log read"
+verdict     = "safe-to-expose"
+
+[[surface.tool]]
+name        = "januskey_audit_verify"
+purpose     = "Verify hash-chain + per-entry attestation integrity"
+inputs      = "{ dir: string, session-token: string }"
+outputs     = "IntegrityReport"
+touches     = "audit log read; computes attestations with in-memory attestation key"
+verdict     = "requires-constraint"
+constraint  = "Fix the home-rolled HMAC (attestation.rs:182-191) to use real hmac::Hmac<Sha256> BEFORE exposing this over MCP. As-is, an attacker who sees any three entries can potentially forge a fourth via length-extension. This is a dependability concern (false positives on `valid=true`), not just security."
+
+[[surface.tool]]
+name        = "januskey_audit_export"
+purpose     = "Dump the full audit log as pretty JSON to a path"
+inputs      = "{ dir: string, output_path: string, session-token: string }"
+outputs     = "{ bytes_written: int, path: string }"
+touches     = "filesystem write"
+verdict     = "requires-constraint"
+constraint  = "Same path-allowlist rule as backup."
+
+[[surface.tool]]
+name        = "januskey_init"
+purpose     = "Initialise a new keystore + set passphrase"
+inputs      = "{ dir: string, passphrase: string }"
+outputs     = "{ ok: bool }"
+touches     = "creates .januskey/keys/keystore.jks + audit.log"
+verdict     = "DO-NOT-EXPOSE"
+reason      = "Passphrase setting is the root-of-trust establishment moment. An agent receiving or generating a passphrase is a perfect prompt-injection target (the agent picks a weak or attacker-known passphrase). Must be interactive at a TTY."
+alternative = "Keep CLI-only. If automation is ever needed, introduce a separate admin tool that accepts a sealed passphrase from a hardware token / OS keyring, not from an LLM prompt."
+
+[[surface.tool]]
+name        = "januskey_unlock"
+purpose     = "Unlock an existing keystore with passphrase"
+inputs      = "{ dir: string, passphrase: string }"
+outputs     = "{ session-token: string, ttl-seconds: int }"
+touches     = "derives KEK, verifies via trial-decrypt, holds in cartridge memory"
+verdict     = "DO-NOT-EXPOSE (as-is)"
+reason      = "Same concern: passphrase flowing through agent transport. Also: unlock error messages distinguish `InvalidPassphrase` from `NotInitialized` (keys.rs:283) — a remote brute-force vector if the tool is ever reachable beyond local."
+alternative = "Provide unlock only via a local Gossamer panel (human types passphrase into an OS-native field; cartridge gets a session-token back). MCP tools then use the session-token, never the passphrase."
+
+[[surface.tool]]
+name        = "januskey_reversible_fs_ops"
+purpose     = "The jk (not jk-keys) side: reversible delete/modify/move/copy/undo"
+inputs      = "various (see main.rs)"
+outputs     = "various"
+touches     = "filesystem, content store, metadata store"
+verdict     = "requires-constraint"
+constraint  = "Out of scope for the crypto threat model, but worth flagging: an agent with reversible-fs access to an arbitrary `dir:` can effectively edit files. Restrict to an allowlist of roots. Already soft-restricted by `JanusKey::open` requiring `.januskey/` present, which is a reasonable default guard but not a security boundary."
+
+# ──────────────────────────────────────────────────────────────────────
+# 3. STRIDE + CRYPTO-SPECIFIC THREAT ANALYSIS
+#    (per-tool findings, sorted by hyperpolymath priority order)
+# ──────────────────────────────────────────────────────────────────────
+
+[threats.dependability]
+T-D-01 = "Home-rolled HMAC in attestation.rs:182-191 — SHA256(key||data||prev) is length-extension-vulnerable. An `audit_verify` that reports `valid=true` after forged entries is a false negative on tamper detection. Fix BEFORE MCP exposure."
+T-D-02 = "Metadata-only Ed25519/X25519 — `generate_key` claims to make a signing key but no signing code exists. An agent that trusts the success return will build on a lie."
+T-D-03 = "Keystore integrity — only the `magic` field is checked for unseen stores (keys.rs:559). A corrupted/attacker-tampered store with valid magic but mangled ciphertext will appear to 'unlock successfully' for an empty store and fail later."
+
+[threats.security]
+T-S-01 = "Spoofing — MCP caller identity is not cryptographically bound to any actor. Audit log records `user@hostname` of the process, not of the remote agent. Consider adding a per-session `agent_id` field at cartridge boundary."
+T-S-02 = "Tampering — covered by T-D-01; audit chain integrity is weaker than claimed."
+T-S-03 = "Repudiation — agent can act as human, and the log can't distinguish. Mitigation: cartridge stamps `via_mcp=true` + agent-session-id on every entry before passing to januskey core."
+T-S-04 = "Information disclosure (metadata) — JSON keystore leaks UUIDs/fingerprints/descriptions even when the store is 'locked'. Agent calling `list_keys` without passphrase could still read the JSON directly via any file-read tool if it has one. Mitigation: treat metadata as not-secret, be careful what goes in `description`."
+T-S-05 = "Information disclosure (plaintext key) — T-retrieve — covered by DO-NOT-EXPOSE on `januskey_retrieve_key`."
+T-S-06 = "Denial of service — rapid `generate_key` fills audit log; rapid `backup`/`audit_export` fills disk. Covered by rate-limit constraints."
+T-S-07 = "Elevation of privilege — none directly; januskey runs as invoking user. But a cartridge running at boj-server's UID may be higher-privileged than the requesting human — handle passphrases carefully if cartridge UID != human UID."
+
+[threats.crypto-specific]
+T-C-01 = "Padding oracle — N/A; AES-GCM is AEAD, no padding. Good."
+T-C-02 = "Timing side-channel on passphrase verify — `verify_kek` does trial-decrypt via aes-gcm, which uses constant-time primitives; Argon2 derivation time is input-dependent only on param choice, not passphrase contents. Low risk. Still: error path distinguishes `InvalidPassphrase` vs `CryptoError(Decryption failed)` (keys.rs:621) — currently the same user-visible error, but if any future refactor leaks that distinction via timing or message variation, it becomes a confirmation oracle."
+T-C-03 = "Nonce reuse — per-wrap fresh random 12-byte nonce (keys.rs:586-588). At birthday bound 2^32 wraps per key, risk becomes meaningful. Since KEK is per-store and wraps are per-key-generation (low volume), this is fine in practice, but document the bound."
+T-C-04 = "Key reuse across sessions — KEK is reused across every wrap in the store's lifetime. Standard pattern for a keystore; acceptable."
+T-C-05 = "Chosen-ciphertext plaintext recovery — AES-GCM is IND-CCA2; would need key or tag break. Not exposed by current API if `retrieve_key` stays DO-NOT-EXPOSE."
+T-C-06 = "Error-message key leak — `CryptoError(e.to_string())` propagates aes-gcm error strings (keys.rs:597,621). RustCrypto's aes-gcm is careful, but an MCP tool SHOULD map all crypto errors to a single opaque `CRYPTO_FAILED` before returning, to deny the agent any distinguishability signal."
+T-C-07 = "Weak RNG seeding — thread_rng is OS-seeded CSPRNG; fine on Linux/macOS. On exotic sandboxes (e.g. Wasm without getrandom wiring), this would panic; not a concern for boj-server Linux deployment."
+T-C-08 = "Algorithm-downgrade — no negotiation protocol; AES-256-GCM is hard-coded for wrap. Safe."
+T-C-09 = "Agent-as-adversary — PRIMARY THREAT CLASS. Every tool must be evaluated assuming the caller is prompt-injected. Driving principle: no tool should give the caller (a) raw key material, (b) the ability to set the passphrase, (c) irreversible destruction without human confirmation."
+
+# ──────────────────────────────────────────────────────────────────────
+# 4. SUMMARY VERDICT TABLE
+# ──────────────────────────────────────────────────────────────────────
+
+[verdict.counts]
+safe-to-expose     = "3  (status, audit_show, audit_history)"
+requires-constraint = "8  (list_keys, show_key, generate_key, rotate_key, revoke_key, backup, audit_verify, audit_export + the separate reversible-fs surface)"
+do-not-expose      = "3  (retrieve_key, init, unlock)"
+total-tools        = "14 inferred"
+
+[verdict.pre-exposure-fixes]
+must-land-first = [
+  "Replace home-rolled HMAC with hmac::Hmac<Sha256> (attestation.rs:182-191)",
+  "Emit AlgorithmNotImplemented for Ed25519/X25519 until real implementations exist",
+  "Add `via_mcp` and `agent_session_id` fields to AuditEntry for MCP-initiated events",
+  "Centralise crypto-error mapping to a single opaque variant at MCP boundary",
+  "Design + ship a Gossamer unlock panel (OS-native passphrase entry) before any MCP-unlock tool is considered",
+]
+
+# ──────────────────────────────────────────────────────────────────────
+# 5. HUMAN-ONLY DECISIONS
+#    (mirrored in ~/Desktop/YOUR-ACTIONS-todo.md §18)
+# ──────────────────────────────────────────────────────────────────────
+
+[human-decisions.see-also]
+location = "~/Desktop/YOUR-ACTIONS-todo.md §18 — Januskey MCP threat-model decisions pending"
+items    = [
+  "Confirm retrieve_key stays DO-NOT-EXPOSE",
+  "Confirm init/unlock stay DO-NOT-EXPOSE (passphrase flow)",
+  "Approve Gossamer-panel-mediated session-token model",
+  "Approve backup/audit_export path-allowlist policy",
+  "Approve rate limits and their numeric values",
+  "Approve order of pre-exposure fixes (T-D-01, etc.)",
+]
+
+# END OF DRAFT
