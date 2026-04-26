@@ -466,7 +466,7 @@ mod tests {
 
         let delta = Delta::compute(original, new);
         assert!(delta.is_full());
-        assert_eq!(delta.apply(original).expect("TODO: handle error"), new.to_vec());
+        assert_eq!(delta.apply(original).unwrap(), new.to_vec());
     }
 
     #[test]
@@ -474,7 +474,7 @@ mod tests {
         let original = b"line 1\nline 2\nline 3\nline 4\nline 5\n".repeat(100);
         let new = original.clone();
         // Modify line 50
-        let new_str = String::from_utf8(new.clone()).expect("TODO: handle error");
+        let new_str = String::from_utf8(new.clone()).unwrap();
         let lines: Vec<&str> = new_str.lines().collect();
         let mut new_lines = lines.clone();
         new_lines[49] = "modified line 50";
@@ -488,7 +488,7 @@ mod tests {
         }
 
         // Applying delta should produce new content
-        let restored = delta.apply(&original).expect("TODO: handle error");
+        let restored = delta.apply(&original).unwrap();
         assert_eq!(restored, new_content.as_bytes());
     }
 
@@ -498,7 +498,7 @@ mod tests {
         let new = b"Modified content here\nWith multiple lines\nAnd some different text\n".repeat(50);
 
         let delta = Delta::compute(&original, &new);
-        let restored = delta.apply(&original).expect("TODO: handle error");
+        let restored = delta.apply(&original).unwrap();
 
         assert_eq!(restored, new.to_vec());
     }

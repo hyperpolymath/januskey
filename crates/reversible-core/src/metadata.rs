@@ -394,21 +394,21 @@ mod tests {
 
     #[test]
     fn test_metadata_store() {
-        let tmp = TempDir::new().expect("TODO: handle error");
+        let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("metadata.json");
 
-        let mut store = MetadataStore::new(path.clone()).expect("TODO: handle error");
+        let mut store = MetadataStore::new(path.clone()).unwrap();
 
         let meta =
             OperationMetadata::new(OperationType::Delete, PathBuf::from("/test.txt"));
         let id = meta.id.clone();
-        store.append(meta).expect("TODO: handle error");
+        store.append(meta).unwrap();
 
         assert_eq!(store.count(), 1);
         assert!(store.get(&id).is_some());
 
         // Reopen and verify persistence
-        let store2 = MetadataStore::new(path).expect("TODO: handle error");
+        let store2 = MetadataStore::new(path).unwrap();
         assert_eq!(store2.count(), 1);
         assert!(store2.get(&id).is_some());
     }

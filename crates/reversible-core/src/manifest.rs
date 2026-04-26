@@ -121,9 +121,9 @@ mod tests {
 
     #[test]
     fn test_generate_manifest() {
-        let tmp = TempDir::new().expect("TODO: handle error");
+        let tmp = TempDir::new().unwrap();
         let mut store =
-            MetadataStore::new(tmp.path().join("metadata.json")).expect("TODO: handle error");
+            MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
 
         let op = OperationMetadata::new(
             OperationType::Delete,
@@ -131,7 +131,7 @@ mod tests {
         )
         .with_content_hash(ContentHash::from_bytes(b"file content"));
 
-        store.append(op).expect("TODO: handle error");
+        store.append(op).unwrap();
 
         let manifest = ManifestEmitter::generate("januskey", &store);
 
@@ -145,9 +145,9 @@ mod tests {
 
     #[test]
     fn test_empty_manifest() {
-        let tmp = TempDir::new().expect("TODO: handle error");
+        let tmp = TempDir::new().unwrap();
         let store =
-            MetadataStore::new(tmp.path().join("metadata.json")).expect("TODO: handle error");
+            MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
 
         let manifest = ManifestEmitter::generate("test", &store);
         assert!(manifest.contains("@manifest"));
@@ -156,15 +156,15 @@ mod tests {
 
     #[test]
     fn test_merkle_root_deterministic() {
-        let tmp = TempDir::new().expect("TODO: handle error");
+        let tmp = TempDir::new().unwrap();
         let mut store =
-            MetadataStore::new(tmp.path().join("metadata.json")).expect("TODO: handle error");
+            MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
 
         let op = OperationMetadata::new(
             OperationType::Create,
             PathBuf::from("/a.txt"),
         );
-        store.append(op).expect("TODO: handle error");
+        store.append(op).unwrap();
 
         let m1 = ManifestEmitter::generate("test", &store);
         let m2 = ManifestEmitter::generate("test", &store);

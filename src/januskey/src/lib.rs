@@ -153,11 +153,11 @@ mod tests {
 
     #[test]
     fn test_init_and_open() {
-        let tmp = TempDir::new().expect("TODO: handle error");
-        let jk = JanusKey::init(tmp.path()).expect("TODO: handle error");
+        let tmp = TempDir::new().unwrap();
+        let jk = JanusKey::init(tmp.path()).unwrap();
         assert!(JanusKey::is_initialized(tmp.path()));
 
-        let jk2 = JanusKey::open(tmp.path()).expect("TODO: handle error");
+        let jk2 = JanusKey::open(tmp.path()).unwrap();
         assert_eq!(jk.root, jk2.root);
     }
 }
