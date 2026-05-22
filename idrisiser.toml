@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # idrisiser manifest for januskey
 #
 # Generates Idris2 dependent-type wrappers for the JanusKey key-management

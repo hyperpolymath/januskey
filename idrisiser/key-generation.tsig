@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: PMPL-1.0-or-later
+-- SPDX-License-Identifier: MPL-2.0
 -- Type signatures for januskey key generation (src/januskey/src/keys.rs)
 -- Format: name : Type (idrisiser type-sig format)
 

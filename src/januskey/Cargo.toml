@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # SPDX-FileCopyrightText: 2025 Jonathan D.A. Jewell
 
 [package]
@@ -7,7 +7,7 @@ version = "1.0.0"
 edition = "2021"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
 description = "Provably reversible file operations through Maximal Principle Reduction"
-license = "MIT OR PMPL-1.0-or-later"
+license = "MIT OR MPL-2.0"
 repository = "https://github.com/hyperpolymath/januskey"
 keywords = ["reversible", "filesystem", "transactions", "undo", "backup"]
 categories = ["command-line-utilities", "filesystem"]

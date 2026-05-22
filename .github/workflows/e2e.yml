@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # JanusKey E2E + P2P + Aspect + Bench + Panic-Attack CI
 name: E2E + Aspect + Bench + Security
 

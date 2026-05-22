@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR PMPL-1.0-or-later
+// SPDX-License-Identifier: MIT OR MPL-2.0
 // SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 //
 // A2ML Manifest Emitter

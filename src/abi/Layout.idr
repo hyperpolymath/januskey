@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: PMPL-1.0-or-later
+-- SPDX-License-Identifier: MPL-2.0
 -- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
 --
 -- JanusKey ABI Layout — Memory layout proofs and C-compatible structures

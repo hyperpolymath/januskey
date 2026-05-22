@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: PMPL-1.0-or-later -->
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Component Readiness Assessment — januskey
 
 **Assessed:** 2026-04-03
