@@ -14,6 +14,7 @@ jobs:
   rust-build-test:
     name: Rust Build + Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
@@ -30,6 +31,7 @@ jobs:
   benchmarks:
     name: Criterion Benchmarks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
@@ -40,6 +42,7 @@ jobs:
   e2e-lifecycle:
     name: E2E Lifecycle Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
@@ -52,6 +55,7 @@ jobs:
   aspect-tests:
     name: Aspect Tests (Cross-Cutting)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run aspect tests
@@ -60,6 +64,7 @@ jobs:
   zig-ffi:
     name: Zig FFI Build + Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install Zig
@@ -75,6 +80,7 @@ jobs:
   panic-attack:
     name: Panic Attack Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
