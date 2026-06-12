@@ -12,7 +12,10 @@ JK_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PASS=0
 FAIL=0
 
-check() { if eval "$2"; then echo "[PASS] $1"; ((PASS++)); else echo "[FAIL] $1"; ((FAIL++)); fi; }
+# NB: use POSIX arithmetic assignment, not ((PASS++)) — under `set -e` a
+# post-increment whose old value is 0 returns exit status 1 and kills the
+# script after the very first check.
+check() { if eval "$2"; then echo "[PASS] $1"; PASS=$((PASS+1)); else echo "[FAIL] $1"; FAIL=$((FAIL+1)); fi; }
 
 echo "=== JanusKey Aspect Tests ==="
 

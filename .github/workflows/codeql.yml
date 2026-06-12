@@ -31,7 +31,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - language: javascript-typescript
+          # januskey has no JavaScript/TypeScript source — the
+          # javascript-typescript extractor errors with "no source code seen"
+          # (exit 32, configuration error). CodeQL's GitHub Actions analysis
+          # scans the workflow YAML that does exist here, keeping this a
+          # meaningful security check (same fix as oblibeny + maa-framework).
+          - language: actions
             build-mode: none
 
     steps:

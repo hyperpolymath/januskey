@@ -1,3 +1,4 @@
+K9!
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 #
@@ -11,6 +12,21 @@ let methodology_guard = {
   name = "methodology-guard",
   version = "1.0.0",
   description = "Validates that agent work respects declared methodology constraints",
+
+  # Required by the repo's "Validate K9 contracts" gate: every .k9.ncl
+  # carries a pedigree. This guard only reads files and reports — data-only,
+  # no network / write / subprocess access.
+  pedigree = {
+    schema_version = "1.0.0",
+    component_type = "methodology-validator",
+    security = {
+      leash = 'Kennel,
+      trust_level = "data-only",
+      allow_network = false,
+      allow_filesystem_write = false,
+      allow_subprocess = false,
+    },
+  },
 
   checks = {
     divergent_invariant_language = {

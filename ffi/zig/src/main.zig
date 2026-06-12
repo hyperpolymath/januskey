@@ -38,8 +38,10 @@ pub const Result = enum(c_int) {
     null_pointer = 4,
 };
 
-/// Library handle (opaque to prevent direct access)
-pub const Handle = opaque {
+/// Library handle. Opaque on the C side (the header only forward-declares
+/// it); on the Zig side it must be a sized struct — `opaque` types cannot
+/// have fields, and `allocator.create(Handle)` below needs a known size.
+pub const Handle = struct {
     // Internal state hidden from C
     allocator: std.mem.Allocator,
     initialized: bool,
