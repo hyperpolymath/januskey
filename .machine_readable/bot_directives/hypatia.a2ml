@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MPL-2.0
+# hypatia.a2ml — directives for the Hypatia security scanner in januskey
+
+[metadata]
+repo = "januskey"
+last-updated = "2026-06-12"
+owner = "hyperpolymath"
+
+[scanner]
+ignore-file = ".hypatia-ignore"
+ignore-file-present = false
+workflow = ".github/workflows/hypatia-scan.yml"
+workflow-notes = "Thin wrapper around hyperpolymath/standards hypatia-scan-reusable.yml (standards#191), SHA-pinned; synced to canonical via PRs #31/#32/#40, repinned to merge-commit SHA via #46. Local scan state lives in .hypatia/ (activity.jsonl, last-visit.json)."
+
+[accepted-findings]
+status = "none-recorded"
+notes = "No accepted false-positives are on record for januskey as of 2026-06-12. If the scanner flags caller-side properties of the reusable workflow wrappers (rust-ci, hypatia-scan, mirror, secret-scanner, scorecard are all thin `uses:` wrappers), evaluate against the reusable's own configuration in hyperpolymath/standards before accepting; record any acceptance here with a reason."
+
+[prohibited-actions]
+auto-delete-branches = false
+auto-merge = false
+modify-workflows = false
+escalation = "open an issue, do not spam PR comments"

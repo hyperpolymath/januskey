@@ -1,25 +1,35 @@
 # SPDX-License-Identifier: MPL-2.0
-# Trustfile (A2ML Canonical) — CRYPTOGRAPHIC TOOL, TIGHTENED
-# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
+# Trustfile — Trust boundaries and integrity invariants for januskey
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 #
-# Hardened 2026-04-19 against the generic "maximal by default" template.
-# Januskey is a key-management tool: any LLM/agent interaction with it must
-# treat every key, audit entry, and Trustfile rule as attacker-reachable.
+# CRYPTOGRAPHIC TOOL, TIGHTENED. Hardened 2026-04-19 against the generic
+# "maximal by default" template. Januskey is a key-management tool: any
+# LLM/agent interaction with it must treat every key, audit entry, and
+# Trustfile rule as attacker-reachable.
+#
+# Provenance: populated 2026-06-12 by porting the hardened
+# contractiles/trust/Trustfile.a2ml (2026-04-19, removed by the estate
+# flattening) plus the provenance/integrity keys of the old nested
+# .machine_readable/contractiles/trust/Trustfile.a2ml and the deny-list of
+# .machine_readable/TRUST.contractile. Replaces the rsr-template-repo stub
+# (which wrongly declared trust level "maximal").
 
 @abstract:
-Trust and provenance verification for Januskey.
+Trust and provenance verification for januskey.
 Crypto-minimal baseline: deny by default. Every allowed action is an
 explicit, justified exception. A key-management tool's Trustfile is
 among the tightest in the estate — if a rule seems convenient but
-unjustified, it has no place here.
+unjustified, it has no place here. Trust never overrides MUST.
 @end
 
 @trust-level: minimal
 @trust-boundary: repo-source-only
 @trust-actions: [read-source, build-no-net, test-no-net, lint, format]
 @trust-deny: [
-  # Git-ops (inherited from previous template)
-  delete-branch, force-push, modify-ci-secrets, publish,
+  # Git-ops (inherited from the previous template)
+  delete-branch, force-push, push-to-main, modify-ci-secrets, publish,
+  delete-files-bulk, modify-license, modify-security-policy,
+  remove-proofs, disable-ci-checks,
   # Crypto-specific denials (added 2026-04-19)
   read-key-material, write-key-material, read-keystore, write-keystore,
   read-audit-log, write-audit-log, modify-trustfile, modify-threat-model,
@@ -45,12 +55,24 @@ unjustified, it has no place here.
   docker, podman, nix-shell, guix
 ]
 
-## Integrity — crypto-specific
+## Provenance
+
+### source-control-provenance
+- description: Source control is git on GitHub, CI-verified; commit signing preferred
+- run: git log -1 --format='%ae' | grep -qE '(hyperpolymath|j\.d\.a\.jewell|noreply.github.com)'
+- severity: warning
 
 ### license-content
 - description: LICENSE contains expected SPDX identifier
-- run: grep -q 'SPDX\|License\|MIT\|Apache\|PMPL\|MPL' LICENSE
+- run: grep -q 'SPDX\|License\|MPL' LICENSE
 - severity: critical
+
+### dependency-pinning
+- description: GitHub Actions are SHA-pinned; Cargo.lock is committed
+- run: test -f Cargo.lock
+- severity: critical
+
+## Integrity — crypto-specific
 
 ### no-secrets-committed
 - description: No .env or credential files in repo
@@ -80,7 +102,7 @@ unjustified, it has no place here.
     # Passes when the current Trustfile still declares minimal trust level.
     # Any LLM attempt to flip this back to maximal must go through a
     # commit message containing the phrase "human-approved trust widening".
-    grep -q '^@trust-level: minimal' contractiles/trust/Trustfile.a2ml
+    grep -q '^@trust-level: minimal' .machine_readable/contractiles/Trustfile.a2ml
 - severity: critical
 
 ### threat-model-present
@@ -150,6 +172,13 @@ unjustified, it has no place here.
         ! grep -rqE '"(retrieve_key|init|unlock)"' "$p"/cartridge.json "$p"/adapter/ 2>/dev/null || exit 1; \
       fi; \
     done
+
+## Verification goals (ported from the nested trust contractile)
+
+### reproducible-builds
+- description: Reproducible builds are a goal; SBOM generation required; attestation sigstore-preferred
+- severity: advisory
+- run: echo "goal-tracking entry — see READINESS.md aspect matrix"
 
 ## Notes for maintainers
 

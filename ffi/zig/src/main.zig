@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // JANUSKEY FFI Implementation
 //
 // This module implements the C-compatible FFI declared in src/abi/Foreign.idr
 // All types and layouts must match the Idris2 ABI definitions.
 //
-// SPDX-License-Identifier: MPL-2.0
 
 const std = @import("std");
 
@@ -37,8 +38,10 @@ pub const Result = enum(c_int) {
     null_pointer = 4,
 };
 
-/// Library handle (opaque to prevent direct access)
-pub const Handle = opaque {
+/// Library handle. Opaque on the C side (the header only forward-declares
+/// it); on the Zig side it must be a sized struct — `opaque` types cannot
+/// have fields, and `allocator.create(Handle)` below needs a known size.
+pub const Handle = struct {
     // Internal state hidden from C
     allocator: std.mem.Allocator,
     initialized: bool,

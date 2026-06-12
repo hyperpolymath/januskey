@@ -12,7 +12,10 @@ JK_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PASS=0
 FAIL=0
 
-check() { if eval "$2"; then echo "[PASS] $1"; ((PASS++)); else echo "[FAIL] $1"; ((FAIL++)); fi; }
+# NB: use POSIX arithmetic assignment, not ((PASS++)) — under `set -e` a
+# post-increment whose old value is 0 returns exit status 1 and kills the
+# script after the very first check.
+check() { if eval "$2"; then echo "[PASS] $1"; PASS=$((PASS+1)); else echo "[FAIL] $1"; FAIL=$((FAIL+1)); fi; }
 
 echo "=== JanusKey Aspect Tests ==="
 
@@ -32,11 +35,16 @@ check "Zig SPDX headers (${zig_spdx}/${zig_total})" "[ '${zig_spdx}' -eq '${zig_
 
 # --- Forbidden Patterns ---
 echo "--- Forbidden Patterns ---"
-check "No believe_me in proofs" "! grep -rq 'believe_me' '${JK_DIR}/src/abi/' 2>/dev/null"
-check "No assert_total in proofs" "! grep -rq 'assert_total' '${JK_DIR}/src/abi/' 2>/dev/null"
+# NB: strip Idris '--' comment lines before matching, otherwise the header
+# comment in Proofs.idr ("No believe_me, no assert_total ... fully total")
+# matches the very greps that assert their absence.
+check "No believe_me in proofs" "! grep -rh 'believe_me' '${JK_DIR}/src/abi/' 2>/dev/null | grep -v '^\s*--' | grep -q ."
+check "No assert_total in proofs" "! grep -rh 'assert_total' '${JK_DIR}/src/abi/' 2>/dev/null | grep -v '^\s*--' | grep -q ."
 check "No postulate in proofs" "! grep -rq '^postulate' '${JK_DIR}/src/abi/' 2>/dev/null"
-check "No sorry in proofs" "! grep -rq 'sorry' '${JK_DIR}/src/abi/' 2>/dev/null"
-check "No unsafe in reversible-core" "! grep -rq 'unsafe' '${JK_DIR}/crates/reversible-core/src/' 2>/dev/null"
+check "No sorry in proofs" "! grep -rh 'sorry' '${JK_DIR}/src/abi/' 2>/dev/null | grep -v '^\s*--' | grep -q ."
+# NB: exclude the '#![forbid(unsafe_code)]' attribute (which BANS unsafe)
+# and '//' comment lines from the unsafe check.
+check "No unsafe in reversible-core" "! grep -rh 'unsafe' '${JK_DIR}/crates/reversible-core/src/' 2>/dev/null | grep -v 'forbid(unsafe_code)' | grep -v '^\s*//' | grep -q ."
 
 # --- Documentation ---
 echo "--- Documentation ---"
