@@ -5,7 +5,9 @@
 // Tests: init/close, execute/undo, transactions, obliteration, error codes
 
 const std = @import("std");
-const jk = @import("../src/main.zig");
+// Provided as a named module by build.zig (addAnonymousImport) — a relative
+// "../src/main.zig" import is outside the test module's path in Zig 0.13.
+const jk = @import("januskey");
 
 // ============================================================
 // Layout verification (compile-time, matches Layout.idr)

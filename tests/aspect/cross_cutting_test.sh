@@ -35,11 +35,16 @@ check "Zig SPDX headers (${zig_spdx}/${zig_total})" "[ '${zig_spdx}' -eq '${zig_
 
 # --- Forbidden Patterns ---
 echo "--- Forbidden Patterns ---"
-check "No believe_me in proofs" "! grep -rq 'believe_me' '${JK_DIR}/src/abi/' 2>/dev/null"
-check "No assert_total in proofs" "! grep -rq 'assert_total' '${JK_DIR}/src/abi/' 2>/dev/null"
+# NB: strip Idris '--' comment lines before matching, otherwise the header
+# comment in Proofs.idr ("No believe_me, no assert_total ... fully total")
+# matches the very greps that assert their absence.
+check "No believe_me in proofs" "! grep -rh 'believe_me' '${JK_DIR}/src/abi/' 2>/dev/null | grep -v '^\s*--' | grep -q ."
+check "No assert_total in proofs" "! grep -rh 'assert_total' '${JK_DIR}/src/abi/' 2>/dev/null | grep -v '^\s*--' | grep -q ."
 check "No postulate in proofs" "! grep -rq '^postulate' '${JK_DIR}/src/abi/' 2>/dev/null"
-check "No sorry in proofs" "! grep -rq 'sorry' '${JK_DIR}/src/abi/' 2>/dev/null"
-check "No unsafe in reversible-core" "! grep -rq 'unsafe' '${JK_DIR}/crates/reversible-core/src/' 2>/dev/null"
+check "No sorry in proofs" "! grep -rh 'sorry' '${JK_DIR}/src/abi/' 2>/dev/null | grep -v '^\s*--' | grep -q ."
+# NB: exclude the '#![forbid(unsafe_code)]' attribute (which BANS unsafe)
+# and '//' comment lines from the unsafe check.
+check "No unsafe in reversible-core" "! grep -rh 'unsafe' '${JK_DIR}/crates/reversible-core/src/' 2>/dev/null | grep -v 'forbid(unsafe_code)' | grep -v '^\s*//' | grep -q ."
 
 # --- Documentation ---
 echo "--- Documentation ---"

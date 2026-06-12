@@ -17,6 +17,7 @@ let methodology_guard = {
   # carries a pedigree. This guard only reads files and reports — data-only,
   # no network / write / subprocess access.
   pedigree = {
+    name = "methodology-guard",
     schema_version = "1.0.0",
     component_type = "methodology-validator",
     security = {
