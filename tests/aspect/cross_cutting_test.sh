@@ -29,8 +29,11 @@ idr_total=$(find "${JK_DIR}/src/abi" -name '*.idr' 2>/dev/null | wc -l)
 idr_spdx=$(grep -rl 'SPDX-License-Identifier' "${JK_DIR}/src/abi" --include='*.idr' 2>/dev/null | wc -l)
 check "Idris2 SPDX headers (${idr_spdx}/${idr_total})" "[ '${idr_spdx}' -eq '${idr_total}' ]"
 
-zig_total=$(find "${JK_DIR}/ffi/zig" -name '*.zig' 2>/dev/null | wc -l)
-zig_spdx=$(grep -rl 'SPDX-License-Identifier' "${JK_DIR}/ffi/zig" --include='*.zig' 2>/dev/null | wc -l)
+# NB: prune Zig build artefacts (.zig-cache/, zig-out/) — `zig build` drops a
+# generated dependencies.zig in the cache with no SPDX header, which would
+# otherwise skew the count when this runs in a tree that has been built.
+zig_total=$(find "${JK_DIR}/ffi/zig" -type d \( -name '.zig-cache' -o -name 'zig-out' \) -prune -o -name '*.zig' -print 2>/dev/null | wc -l)
+zig_spdx=$(find "${JK_DIR}/ffi/zig" -type d \( -name '.zig-cache' -o -name 'zig-out' \) -prune -o -name '*.zig' -print 2>/dev/null | xargs -r grep -l 'SPDX-License-Identifier' 2>/dev/null | wc -l)
 check "Zig SPDX headers (${zig_spdx}/${zig_total})" "[ '${zig_spdx}' -eq '${zig_total}' ]"
 
 # --- Forbidden Patterns ---
