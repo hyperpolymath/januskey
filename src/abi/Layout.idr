@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: MPL-2.0
--- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
+-- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 --
 -- JanusKey ABI Layout — Memory layout proofs and C-compatible structures
 -- Proves that Rust and Zig FFI representations are bit-compatible
