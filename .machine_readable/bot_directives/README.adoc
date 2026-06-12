@@ -1,16 +1,36 @@
 // SPDX-License-Identifier: MPL-2.0
-// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-= Agent Instructions
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Bot Directives
 :toc: preamble
 
-Methodology-aware configuration for AI agents. Read by any AI agent
-(Claude, Gemini, Copilot, etc.) at session start.
+Per-repo directives for automated agents working on januskey, plus
+methodology-aware configuration read by any AI agent (Claude, Gemini,
+Copilot, etc.) at session start.
+
+== Precedence
+
+Maintainer instruction > these directives > bot defaults.
+
+== Scope
+
+These directives apply to the Hypatia scanner (`hypatia.a2ml`), the
+gitbot fleet (`gitbot-fleet.a2ml`), and `.git-private-farm` propagation
+(`git-private-farm.a2ml`), in addition to the methodology layer below.
 
 == Files
 
 [cols="1,3"]
 |===
 | File | Purpose
+
+| `hypatia.a2ml`
+| Hypatia scanner directives — ignore-file state, workflow pointer, accepted findings, prohibited actions
+
+| `gitbot-fleet.a2ml`
+| Gitbot-fleet roster and roles, branch policy, never-touch paths, per-bot allow/deny
+
+| `git-private-farm.a2ml`
+| Propagation to hyperpolymath/.git-private-farm — workflow, secret name, never-propagate list
 
 | `methodology.a2ml`
 | Default mode, invariants, ring ceiling, priority weights, convergent budget
@@ -32,7 +52,7 @@ Methodology-aware configuration for AI agents. Read by any AI agent
 == Relationship to Other Files
 
 * `AGENTIC.a2ml` says WHAT agents can do (permissions, gating)
-* `agent_instructions/` says HOW agents should work (methodology)
+* `bot_directives/` says HOW agents should work (methodology)
 * `bot_directives/` says what the gitbot-fleet does (fleet-specific)
 * `CLAUDE.md` says how Claude specifically should work (Claude-specific)
 

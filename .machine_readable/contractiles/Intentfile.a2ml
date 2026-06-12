@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: MPL-2.0
+# Intentfile (A2ML Canonical) — north-star contractile for januskey
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Paired runner: intend.ncl
+# Verb:          intend
+#
+# Semantics: North-star contractile. Declares BOTH concrete committed
+#            next-actions AND horizon aspirations the project wishes to
+#            become. Two sections share one file:
+#              [[intents]] — "we WILL do this; track progress"
+#                            status: declared → in_progress → done |
+#                                    deferred | retired
+#              [[wishes]]  — "we WISH this were true; revisit later"
+#                            status: declared → in_progress → achieved |
+#                                    abandoned
+#                            grouped by horizon: near / mid / far.
+#            Non-gating — this is a report, not a gate. See the `must`
+#            contractile for hard gates.
+#
+# Provenance: populated 2026-06-12 from contractiles/intend/Intentfile.a2ml
+# (purpose/anti-purpose/if-in-doubt) + READINESS.md promotion path +
+# threat-model.a2ml findings, replacing the rsr-template-repo stub.
+
+@abstract:
+North-star contractile for januskey: reversible file operations and
+passphrase-gated cryptographic key custody through Maximal Principle
+Reduction (MPR) — vulnerability elimination by construction rather than
+verification. Formal reversibility proofs are a target, not yet complete.
+@end
+
+## Purpose
+
+JanusKey is a file-operation utility suite (Rust workspace: reversible-core
++ januskey-cli) whose operations carry sufficient metadata for inversion —
+delete/modify/move/copy with undo, transactions with commit/rollback,
+content-addressed storage (SHA-256), a tamper-evident audit log, and
+passphrase-gated AEAD key custody. The Idris2 ABI layer (src/abi/) and Zig
+FFI (ffi/zig/) define the verified interface boundary.
+
+## Anti-Purpose
+
+This project is NOT:
+- A backup or sync system (recovery comes from operation metadata, not external state)
+- A general-purpose cryptography library (it consumes RustCrypto primitives)
+- A fork or wrapper around another tool
+- A monorepo
+- An MCP-exposed service yet (exposure is gated on human-approved threat model)
+
+## If In Doubt
+
+If you are unsure whether a change is in scope, ask.
+Sensitive areas: ABI definitions (src/abi/), key-custody and audit-log code,
+license headers, CI workflows, .machine_readable/threat-model.a2ml.
+
+## Committed Next-Actions
+
+### threat-model-signoff
+- description: Human sign-off of the MCP-exposure threat model (status is draft-pending-human-review since 2026-04-19)
+- probe: grep -q 'status\s*=\s*"draft-pending-human-review"' .machine_readable/threat-model.a2ml && echo pending
+- status: declared
+- notes: Maintainer-only action; blocks any januskey-mcp cartridge
+
+### fix-homerolled-hmac
+- description: Replace SHA256(key || data) attestation pattern with a real HMAC primitive (threat-model flag, 2026-04-19)
+- probe: cargo tree 2>/dev/null | grep -q hmac
+- status: declared
+- notes: Trustfile check no-homerolled-hmac enforces this before MCP exposure
+
+### crg-promotion-d-to-c
+- description: CRG grade promotion per READINESS.md path — wire Idris2 proof check in CI, complete per-directory annotation, real E2E with built binary, dogfood in one real workflow
+- probe: grep -q 'Current Grade' READINESS.md
+- status: in_progress
+- notes: unwrap()/expect() sweeps landed 2026-04 (166 sites); remaining items tracked in READINESS.md
+
+### real-fuzz-targets
+- description: Replace removed fuzz placeholder with real cargo-fuzz targets
+- probe: test -d tests/fuzz
+- status: declared
+- notes: READINESS.md category 11 is MISSING; fake placeholder was removed deliberately
+
+## Wishes
+
+### Near Horizon
+
+#### changelog-automation
+- description: Adopt changelog-reusable.yml so CHANGELOG.md stays in sync automatically
+- horizon: near
+- status: declared
+
+### Mid Horizon
+
+#### formal-reversibility-proofs
+- description: Complete the formal reversibility proofs backing the README claim (currently "proofs pending"); 30 Idris2 ABI proofs exist, the reversibility theorems do not yet
+- horizon: mid
+- status: in_progress
+
+#### mutation-testing
+- description: cargo-mutants configuration (READINESS category 10)
+- horizon: mid
+- status: declared
+
+### Far Horizon
+
+#### mcp-cartridge
+- description: januskey-mcp cartridge for boj-server, only after threat-model approval and the DO-NOT-EXPOSE list is enforced
+- horizon: far
+- status: declared

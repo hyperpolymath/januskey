@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MPL-2.0
+# gitbot-fleet.a2ml — directives for the hyperpolymath gitbot fleet in januskey
+
+[metadata]
+repo = "januskey"
+last-updated = "2026-06-12"
+owner = "hyperpolymath"
+
+[fleet]
+bots = ["rhodibot", "echidnabot", "sustainabot", "glambot", "seambot", "finishbot"]
+rhodibot = "git operations"
+echidnabot = "code quality"
+sustainabot = "dependency updates"
+glambot = "documentation"
+seambot = "integration"
+finishbot = "task completion"
+
+[branch-policy]
+working-branch-pattern = "claude/* | bots/* | chore/* | docs/* | cicd/* | dependabot/*"
+draft-PRs-only = true
+ci-green-before-merge = true
+never-touch = [
+  ".claude/CLAUDE.md",
+  "src/abi/",
+  "generated/idrisiser/",
+  ".machine_readable/threat-model.a2ml",
+  ".machine_readable/contractiles/Trustfile.a2ml",
+  "LICENSE",
+]
+never-touch-notes = "src/abi/ + generated/idrisiser/ are the Idris2 ABI proof surface (changes require proof re-verification); threat-model.a2ml awaits human sign-off; the Trustfile may never be widened by an agent (see its self-integrity rule)."
+
+[per-bot.sustainabot]
+allow = ["Cargo.toml", "Cargo.lock", ".github/workflows (SHA bumps via grouped dependabot PRs only)"]
+deny = ["crypto dependency major-version bumps without maintainer review"]
+notes = "Crypto crates (aes-gcm, sha2, argon2 and kin) are security-sensitive; bumps need human eyes."
+
+[per-bot.echidnabot]
+allow = ["clippy/rustfmt fixes", "test additions"]
+deny = ["weakening or deleting tests", "touching never-touch paths"]
+
+[per-bot.glambot]
+allow = ["docs/", "*.adoc", "*.md", "docs/wiki/"]
+deny = ["changing reversibility claims without the 'formal proofs pending' qualifier"]

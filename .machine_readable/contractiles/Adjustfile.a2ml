@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: MPL-2.0
+# Adjustfile — Drift-tolerance and accessibility contract for januskey
+# Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# Cumulative-drift catchment: tolerance bands + corrective actions.
+# Authority: advisory (Yard) — continue-with-warnings; auto_fix where deterministic.
+# Run with: adjust check
+# Fix with: adjust fix (applies deterministic patches; advisory otherwise)
+#
+# Provenance: populated 2026-06-12 from .machine_readable/ADJUST.contractile
+# (ADJUST = Accessibility & Digital Justice for Universal Software &
+# Technology, standard WCAG-2.2-AA; CLI/TUI + documentation invariants kept —
+# januskey is a CLI tool, so the visual/web invariants of the generic list
+# apply only if a UI is ever added) + repo-true drift items, replacing the
+# rsr-template-repo stub.
+
+@abstract:
+Drift tolerances and corrective actions for januskey. Unlike MUST (hard
+gate), ADJUST tracks cumulative drift against tolerance bands and proposes
+corrective actions. Advisory — it warns and trends, it does not block.
+Standard: WCAG-2.2-AA (CLI/TUI profile).
+@end
+
+## Accessibility (ADJUST invariants, CLI/TUI profile)
+
+### cli-output-not-colour-only
+- description: CLI output must not rely solely on colour (use symbols: [OK] [FAIL])
+- tolerance: 0 colour-only status outputs
+- corrective: Add symbol prefixes alongside colour
+- severity: advisory
+
+### cli-help-plain-text
+- description: All CLI commands support --help with plain-text output
+- tolerance: every jk subcommand has --help
+- corrective: Add missing help text via clap derive docs
+- severity: advisory
+
+### error-messages-plain-language
+- description: Error messages written in plain language, not jargon or codes alone; identify the field and describe the error
+- tolerance: 0 bare error codes surfaced to users
+- corrective: Wrap with context via error.rs types
+- severity: advisory
+
+### docs-clarity
+- description: Docs use clear language, short sentences, logical structure; code examples include comments explaining non-obvious steps; diagrams have text descriptions
+- tolerance: READMEs and wiki pages pass a plain-language read-through
+- corrective: Editorial pass on flagged pages
+- severity: advisory
+
+## Documentation Drift
+
+### readme-feature-matrix-accuracy
+- description: README feature claims must match tested reality (READINESS.md notes "Feature matrix vs README not audited"); reversibility claims must carry the "formal proofs pending" qualifier
+- tolerance: 0 absolutist claims contradicted by READINESS.md
+- corrective: Audit README Key Features against the test matrix
+- severity: advisory
+
+### changelog-currency
+- description: CHANGELOG.md should reflect merged PRs (seeded 2026-05-26, manual until changelog-reusable.yml is adopted)
+- tolerance: no merged feat/fix PR older than 30 days missing
+- corrective: Run git cliff with the canonical cliff.toml
+- severity: advisory
+
+### adoc-not-md
+- description: New prose docs should prefer AsciiDoc
+- tolerance: New prose docs are *.adoc (existing *.md grandfathered)
+- corrective: Author new docs as .adoc
+- severity: advisory
+
+## Structural Drift
+
+### spdx-header-consistency
+- description: All files have correct SPDX headers
+- tolerance: 0 files missing SPDX-License-Identifier
+- corrective: Add SPDX headers to files that need them
+- severity: advisory
+
+### panic-pattern-drift
+- description: No regression of the 2026-04 unwrap()/expect("TODO") sweeps in security-critical modules
+- tolerance: 0 new bare unwrap() in crates/*/src and src/januskey/src
+- corrective: Run `just assail` (panic-attacker pre-commit scan)
+- severity: advisory
+
+### no-broken-symlinks
+- description: No broken symbolic links in the tree
+- tolerance: 0 broken symlinks
+- corrective: Remove or repoint flagged links
+- severity: advisory
+
+### state-file-currency
+- description: 6a2/STATE.a2ml should be refreshed when a work-wave lands
+- tolerance: last-updated within 90 days of the latest non-dependabot commit
+- corrective: Refresh STATE.a2ml from git log
+- severity: advisory

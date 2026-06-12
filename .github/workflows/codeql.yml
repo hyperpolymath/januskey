@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0
+# SPDX-License-Identifier: MPL-2.0
 name: CodeQL Security Analysis
 
 on:
@@ -7,7 +7,7 @@ on:
   pull_request:
     branches: [main, master]
   schedule:
-    - cron: '0 6 * * 1'
+    - cron: '0 6 1 * *'   # monthly 1st 06:00 UTC
 
 # Estate guardrail: cancel superseded runs so re-pushes / rebased PR
 # updates do not pile up queued runs against the shared account-wide
@@ -23,6 +23,7 @@ permissions:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
@@ -30,7 +31,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - language: javascript-typescript
+          # januskey has no JavaScript/TypeScript source — the
+          # javascript-typescript extractor errors with "no source code seen"
+          # (exit 32, configuration error). CodeQL's GitHub Actions analysis
+          # scans the workflow YAML that does exist here, keeping this a
+          # meaningful security check (same fix as oblibeny + maa-framework).
+          - language: actions
             build-mode: none
 
     steps:

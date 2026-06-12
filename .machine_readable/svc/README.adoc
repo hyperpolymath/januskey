@@ -1,16 +1,10 @@
-= `.machine_readable/svc/` — Service components for januskey
-:toc:
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= `.machine_readable/svc/` — moved
 
-Service-layer components that sit alongside the contractile trident
-but are not themselves verbs. Per **ADR-001 (2026-04-18)**, K9 lives
-here rather than under `contractiles/` so the contractile directory
-stays a pure six-verb set (intend, trust, must, bust, adjust, dust).
+The K9 self-validation components formerly under `svc/k9/` (ADR-001,
+2026-04-18) now live at `.machine_readable/self-validating/`
+(estate standardization, 2026-06). This directory is retained as a
+pointer only.
 
-== Contents
-
-* `k9/` — K9 self-validating templates and validators.
-
-== Pointer
-
-For the verb contractiles themselves, see
-`.machine_readable/contractiles/`.
+For the verb contractiles, see `.machine_readable/contractiles/`.

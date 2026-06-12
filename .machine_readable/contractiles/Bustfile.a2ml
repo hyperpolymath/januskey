@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: MPL-2.0
+# Bustfile — Breakage and rollback contract for januskey
+# Verb: bust
+#
+# Provenance: flat-layout port (2026-06-12) of the former nested
+# .machine_readable/contractiles/bust/Bustfile.a2ml (a curly-brace
+# template inherited from a meta-repo; rewritten as TOML-A2ML). The
+# inherited submodule scenarios are recorded as not-applicable —
+# januskey has no .gitmodules. Repo-true rollback procedures added
+# from the repo's own discipline (Trustfile, threat model).
+
+[metadata]
+repo = "januskey"
+version = "1.1.0"
+format = "a2ml"
+last-updated = "2026-06-12"
+description = "Rollback procedures when something breaks"
+supersedes = ".machine_readable/contractiles/bust/Bustfile.a2ml + bust.ncl (nested, removed by estate flattening)"
+
+[scenarios.bad-merge-or-bump]
+symptom = "A merged PR breaks CI or introduces a regression"
+action = "git revert the merge commit on a branch; open a revert PR (reversible, low blast radius)"
+
+[scenarios.secret-or-key-material-leaked]
+symptom = "Credential, passphrase, or key-like file lands in history"
+action = "Hard-rotate the leaked secret immediately; git-filter-repo or BFG on the affected history; re-publication only after rotation completes. Trustfile no-key-material-in-tree exists to prevent this."
+
+[scenarios.ci-workflow-broken]
+symptom = "A reusable-workflow pin or wrapper conversion breaks a check"
+action = "Revert to the previous SHA pin (see PRs #46/#50 for the orphan-SHA precedent); never disable the check to go green"
+
+[scenarios.trust-widening-attempt]
+symptom = "A change flips @trust-level from minimal or weakens a severity:critical check"
+action = "Reject/revert unless the commit message contains the literal phrase 'human-approved trust widening' (Trustfile self-integrity rule)"
+
+[scenarios.inherited-not-applicable]
+status = "not-applicable"
+reason = "The prior nested Bustfile carried meta-repo submodule scenarios (bad-pointer-bump, missing-sha, orphan-after-local-commit). januskey has no submodules (.gitmodules absent); recorded here so the ported content is not silently lost."
+
+[escalation-ladder]
+step-1 = "revert the offending commit (reversible, low blast radius)"
+step-2 = "reset the local clone / re-fetch from origin (affects only local workspace)"
+step-3 = "force-push to main — PROHIBITED without explicit user confirmation (violates branch protection)"
+step-4 = "registry-level action (delete/archive the GitHub repo) — human-only action, never by AI"
+
+[backup-points]
+github-history = "GitHub serves as the durable backup for repository history"
+local-backup-tags = "Local backup tags (backup/pre-<operation>-<date>) retained on risky rewrites"
+operation-metadata = "januskey's own append-only operation log is the rollback source for jk operations (application-level, not repo-level)"
