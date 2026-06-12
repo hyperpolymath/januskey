@@ -36,6 +36,10 @@ struct Cli {
     #[arg(short = 'C', long, global = true)]
     dir: Option<PathBuf>,
 
+    /// Repository directory to operate on (alias of --dir; takes precedence)
+    #[arg(short = 'r', long, global = true)]
+    repo: Option<PathBuf>,
+
     /// Dry run mode (don't actually make changes)
     #[arg(long, global = true)]
     dry_run: bool,
@@ -47,8 +51,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize JanusKey in the current directory
-    Init,
+    /// Initialize JanusKey in a directory (defaults to the working directory)
+    Init {
+        /// Directory to initialize (created if it does not exist).
+        /// Overrides --dir / --repo when given.
+        path: Option<PathBuf>,
+    },
 
     /// Delete files (reversible)
     #[command(alias = "rm")]
@@ -99,6 +107,14 @@ enum Commands {
 
         /// New name
         new_name: PathBuf,
+    },
+
+    /// Obliterate a file: securely overwrite then remove it (NOT reversible).
+    /// Implements GDPR Article 17 "right to erasure".
+    Obliterate {
+        /// File(s) to obliterate
+        #[arg(required = true)]
+        paths: Vec<PathBuf>,
     },
 
     /// Undo the last operation(s)
@@ -156,14 +172,17 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Determine working directory
-    let working_dir = match cli.dir {
+    // Determine working directory. --repo takes precedence over --dir; both
+    // fall back to the current directory.
+    let working_dir = match cli.repo.or(cli.dir) {
         Some(dir) => dir,
         None => std::env::current_dir().context("Failed to get current directory")?,
     };
 
     match cli.command {
-        Commands::Init => cmd_init(&working_dir),
+        // `jk init <path>` targets the positional path when given; otherwise
+        // it initialises the working directory.
+        Commands::Init { path } => cmd_init(&path.unwrap_or(working_dir)),
         Commands::Delete { paths, recursive } => {
             cmd_delete(&working_dir, &paths, recursive, cli.dry_run, cli.yes)
         }
@@ -178,6 +197,9 @@ fn main() -> Result<()> {
         }
         Commands::Rename { old_name, new_name } => {
             cmd_move(&working_dir, &old_name.to_string_lossy(), &new_name, cli.dry_run)
+        }
+        Commands::Obliterate { paths } => {
+            cmd_obliterate(&working_dir, &paths, cli.dry_run, cli.yes)
         }
         Commands::Undo { count, id } => cmd_undo(&working_dir, count, id),
         Commands::Begin { name } => cmd_begin(&working_dir, name),
@@ -558,6 +580,86 @@ fn cmd_copy(dir: &PathBuf, source: &PathBuf, destination: &PathBuf, dry_run: boo
         dest_path.display()
     );
     println!("  Use {} to delete the copy", "jk undo".cyan());
+
+    Ok(())
+}
+
+fn cmd_obliterate(
+    dir: &PathBuf,
+    paths: &[PathBuf],
+    dry_run: bool,
+    auto_yes: bool,
+) -> Result<()> {
+    use januskey::obliteration::obliterate_file;
+
+    // Resolve each path against the working directory if it is relative.
+    let targets: Vec<PathBuf> = paths
+        .iter()
+        .map(|p| if p.is_absolute() { p.clone() } else { dir.join(p) })
+        .collect();
+
+    if dry_run {
+        println!("{} Dry run - would obliterate:", "[DRY RUN]".cyan());
+        for t in &targets {
+            println!("  - {}", t.display());
+        }
+        return Ok(());
+    }
+
+    // Obliteration is irreversible — confirm unless --yes was given. Refuse
+    // outright (rather than silently auto-confirming) when stdin is not a
+    // terminal and no --yes was supplied, so destructive erasure never runs
+    // unattended without explicit consent.
+    if !auto_yes {
+        use std::io::IsTerminal;
+        if !std::io::stdin().is_terminal() {
+            anyhow::bail!(
+                "refusing to obliterate without confirmation in non-interactive mode; \
+                 pass --yes/-y to confirm"
+            );
+        }
+        println!(
+            "{} Obliteration is {} — content will be unrecoverable:",
+            "⚠".yellow(),
+            "irreversible".red()
+        );
+        for t in &targets {
+            println!("  - {}", t.display());
+        }
+        if !Confirm::new()
+            .with_prompt("Continue?")
+            .default(false)
+            .interact()?
+        {
+            println!("{}", "Cancelled".red());
+            return Ok(());
+        }
+    }
+
+    let mut obliterated = 0;
+    for t in &targets {
+        match obliterate_file(t) {
+            Ok(proof) => {
+                obliterated += 1;
+                println!(
+                    "{} Obliterated {} ({} passes, proof {})",
+                    "✓".green(),
+                    t.display(),
+                    proof.overwrite_passes,
+                    &proof.id[..8]
+                );
+            }
+            Err(e) => {
+                eprintln!("{} Failed to obliterate {}: {}", "✗".red(), t.display(), e);
+            }
+        }
+    }
+
+    println!(
+        "{} Obliterated {} file(s) — erasure is permanent",
+        "✓".green(),
+        obliterated
+    );
 
     Ok(())
 }
