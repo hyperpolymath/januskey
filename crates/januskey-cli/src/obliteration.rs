@@ -318,6 +318,37 @@ fn secure_overwrite(path: &Path) -> Result<usize> {
     Ok(OVERWRITE_PASSES)
 }
 
+/// Obliterate an arbitrary file on disk (not necessarily in the content
+/// store): hash its current content, securely overwrite it with
+/// [`OVERWRITE_PASSES`] passes, remove it, and return a proof of erasure.
+///
+/// This is the GDPR Article 17 "right to erasure" primitive applied to a
+/// concrete filesystem path, used by the `jk obliterate <path>` command.
+/// Unlike [`ObliterationManager::obliterate`] it does not consult the content
+/// store, so it works on files the repository never ingested.
+///
+/// TODO(product): also scrub any content-store copies and prune the
+/// associated operation-log entries so no recoverable trace remains, and
+/// thread the resulting proof into the obliteration audit log.
+pub fn obliterate_file(path: &Path) -> Result<ObliterationProof> {
+    if !path.exists() {
+        return Err(JanusError::FileNotFound(format!(
+            "{} not found",
+            path.display()
+        )));
+    }
+
+    // Record what we are about to destroy (content hash, for the proof).
+    let content = fs::read(path)?;
+    let content_hash = ContentHash::from_bytes(&content);
+
+    // DoD 5220.22-M style multi-pass overwrite, then unlink.
+    let passes = secure_overwrite(path)?;
+    fs::remove_file(path)?;
+
+    Ok(ObliterationProof::generate(&content_hash, passes))
+}
+
 /// Verify that content no longer exists at a path
 pub fn verify_obliteration(path: &Path, original_hash: &ContentHash) -> Result<bool> {
     if !path.exists() {
