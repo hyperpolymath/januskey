@@ -27,6 +27,10 @@ Thumbs.db
 # Cargo.lock  # Keep for binaries
 **/target/
 
+# Zig
+.zig-cache/
+zig-out/
+
 # Elixir
 /cover/
 /doc/
