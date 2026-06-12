@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MPL-2.0
+# Dustfile — Cleanup, hygiene, and deprecation contract for januskey
+# Verb: dust
+#
+# Provenance: flat-layout port (2026-06-12) of the former nested
+# .machine_readable/contractiles/dust/Dustfile.a2ml (content preserved
+# verbatim below), extended with [metadata] and a deprecation register
+# per the estate flat-contractile convention. TOML-A2ML.
+
+[metadata]
+repo = "januskey"
+version = "1.1.0"
+format = "a2ml"
+last-updated = "2026-06-12"
+supersedes = ".machine_readable/contractiles/dust/Dustfile.a2ml (nested, removed by estate flattening)"
+
+[cleanup]
+stale-branch-policy = "delete-after-merge"
+artifact-retention = "90-days"
+cache-policy = "clear-on-release"
+
+[hygiene]
+linting = "required"
+formatting = "required"
+dead-code-removal = "encouraged"
+todo-tracking = "tracked-in-issues"
+
+[reversibility]
+backup-before-destructive = true
+rollback-mechanism = "git-revert"
+data-retention-policy = "preserve-30-days"
+
+# Deprecation register: features/files entering end-of-life. A feature in
+# DUST keeps its MUST constraints active until fully removed.
+[deprecations]
+status = "none-active"
+reason = "No januskey feature is currently deprecated. The 2026-06 estate flattening retired the nested contractile directories and the root *.contractile files; their content was ported into this flat set before removal (see each file's Provenance header)."
+
+[deprecations.retired-2026-06]
+nested-contractile-dirs = "contractiles/{bust,dust,trust}/ — content ported to flat files"
+root-contractile-files = "MUST/TRUST/INTENT/ADJUST.contractile — content ported to flat files"
+flake-nix = "flake.nix removed by estate wave; guix.scm is the primary package definition"

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MPL-2.0
+# git-private-farm.a2ml — propagation directives for januskey
+
+[metadata]
+repo = "januskey"
+last-updated = "2026-06-12"
+owner = "hyperpolymath"
+
+[propagation]
+enabled = true
+workflow = ".github/workflows/instant-sync.yml"
+target = "hyperpolymath/.git-private-farm"
+event-type = "propagate"
+secret = "FARM_DISPATCH_TOKEN"
+presence-gated = false
+presence-gated-notes = "The dispatch step runs unconditionally on push to main/master and on published releases; there is no `if:` secret-presence gate, so the step fails (rather than skips) where the secret is absent (e.g. forks)."
+triggers = ["push to main/master", "release published"]
+
+[never-propagate]
+items = ["secrets", "unmerged branches", "work-in-progress"]
+
+[on-token-rotation]
+command = "gh secret set FARM_DISPATCH_TOKEN --repo hyperpolymath/januskey"
+notes = "Name only — never store a value in this file."

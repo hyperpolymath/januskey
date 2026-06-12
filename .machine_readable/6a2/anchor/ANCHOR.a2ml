@@ -16,3 +16,10 @@ ssg:
 # Relationships
 parents:
   - "org.hyperpolymath.boj-server"
+
+# Realignments
+realignments:
+  - date: "2026-06-12"
+    what: "Governance checkpoint: estate-standardization-20260607 merged (flat contractiles, bot_directives rename, 6a2/anchor relocation, self-validating rename, GOVERNANCE/MAINTAINERS/CODEOWNERS, flake.nix removed); CodeQL cron monthly; STATE refreshed from git log since 2026-04-04; bot_directives trio added; Dust/Bust ported to flat contractiles; shared k9 template set adapted into self-validating/"
+    why: "Estate-wide standardization wave (estate branch supersedes the prior nested layout)"
+    evidence: "merge of origin/estate-standardization-20260607; cherry-pick of origin/cicd/codeql-cron-monthly; PRs #27-#53 summarized in 6a2/STATE.a2ml [recent-work.since-2026-04-04]"

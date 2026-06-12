@@ -10,7 +10,20 @@ Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 == Welcome to JanusKey
 
-JanusKey is a provably reversible file operations utility that achieves complete reversibility through architectural design rather than logging or backups. Unlike traditional backup systems that restore from external state, JanusKey operations carry sufficient information for perfect inversion—making data loss architecturally impossible.
+JanusKey is a reversible file operations utility (formal proofs pending) that pursues complete reversibility through architectural design rather than logging or backups. Unlike traditional backup systems that restore from external state, JanusKey operations carry sufficient information for inversion — the goal is to make data loss architecturally impossible. 30 Idris2 ABI proofs are landed; the reversibility theorems themselves are a target, not yet complete.
+
+=== Project Status (2026-06-12)
+
+Landed since 2026-04: estate standardization merged (flat contractiles,
+`bot_directives/`, `6a2/anchor/`, `self-validating/`, GOVERNANCE +
+MAINTAINERS + CODEOWNERS); license migrated PMPL-1.0-or-later → MPL-2.0
+(Cargo.toml aligned in #52); CI converted to SHA-pinned reusable-workflow
+wrappers (rust-ci #39, hypatia-scan #40/#46, mirror #42, secret-scanner #43,
+scorecard #44/#48) with cargo-audit + workflow-linter prevention workflows;
+CodeQL cron now monthly; CHANGELOG.md seeded (#45); MCP-exposure threat
+model drafted (status: draft-pending-human-review); Trustfile hardened to
+the crypto-minimal baseline; 166 `.expect("TODO: handle error")` sites
+cleared. CRG grade remains D (promotion path in READINESS.md).
 
 === Core Philosophy
 
@@ -27,7 +40,7 @@ JanusKey implements *Maximal Principle Reduction (MPR)*, a security methodology 
 | Structural reversibility guarantee
 
 | Trust in operational processes
-| Formal mathematical proofs
+| Formal mathematical proofs (in progress — Idris2 ABI proofs landed, reversibility theorems pending)
 
 | Recovery from external state
 | Recovery from operation metadata
@@ -64,11 +77,11 @@ JanusKey implements *Maximal Principle Reduction (MPR)*, a security methodology 
 | Practical usage examples and patterns
 |===
 
-=== Key Guarantees
+=== Key Guarantees (design targets — formal proofs pending)
 
-1. **100% Reversibility**: Every operation can be undone, always
+1. **Reversibility by design**: Every operation carries inversion metadata (formal proof of "always" is pending)
 2. **Instant Rollback**: Undo changes in milliseconds, not hours
-3. **Data Loss Impossible**: Not "unlikely"—architecturally impossible
+3. **Data loss impossible by construction**: the architectural goal the pending proofs are to establish
 4. **Complete Audit Trail**: Every change tracked automatically
 5. **Transaction Support**: Group operations, commit/rollback together
 6. **Content-Addressed Storage**: SHA256 hashing with deduplication

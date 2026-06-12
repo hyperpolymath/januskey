@@ -1,36 +1,65 @@
 # SPDX-License-Identifier: MPL-2.0
 # STATE.a2ml — Project state checkpoint
-# Updated 2026-04-04: CRG D→C blitz complete
+# Updated 2026-06-12: governance checkpoint (estate-standardization merge +
+# CI/license/metadata wave recorded). Previous update 2026-04-04 (CRG blitz).
 
 [metadata]
 project = "januskey"
 version = "1.0.0"
-last-updated = "2026-04-04"
+last-updated = "2026-06-12"
 status = "active"
 crg-grade = "D"
 
 [project-context]
 name = "januskey"
 completion-percentage = "60"
-phase = "Core tests complete, ready for API stability review"
+phase = "Core tests complete; 2026-04..06 wave was CI/governance/license hardening, not feature work; API stability review still pending"
 
 [recent-work]
-session-date = "2026-04-04"
-work = "CRG D→C blitz: added E2E, aspect/security, and concurrency tests"
+session-date = "2026-06-12"
+work = "Estate standardization merged (flat contractiles, bot_directives, 6a2/anchor, self-validating, GOVERNANCE/MAINTAINERS/CODEOWNERS, flake.nix removed); CodeQL cron weekly→monthly cherry-picked; governance checkpoint layer (STATE refresh, bot_directives trio, Dust/Bust flat port, k9 template set)"
+
+[recent-work.since-2026-04-04]
+ci-standardization = "Reusable-workflow wrappers: rust-ci (#39), hypatia-scan (#40, canonical sync #31/#32, workdir fix #29, repin #46), mirror (#42), secret-scanner (#43), scorecard (#44, job-level perms #48); cargo-audit + workflow-linter prevention workflows; concurrency-cancel guards (#34/#35); SHA repins (#27/#28/#33/#50); Dependabot security path + auto-merge restored; actions bumps (#36/#47/#53)"
+license = "PMPL-1.0-or-later → MPL-2.0 migration (a740439); Cargo.toml license aligned to LICENSE (#52)"
+security = "MCP-exposure threat model drafted (1411b0f, status draft-pending-human-review); Trustfile hardened to crypto-minimal baseline (21c7658); .expect(\"TODO: handle error\") sweep — 166 sites cleared (a0b0bdd); personal-gmail scrub (2bc817d)"
+proofs = "idrisiser Idris2 proof wrappers for the cryptographic core (07cd404); k9 Kennel guard for security invariants (c110c1c)"
+docs = "CHANGELOG.md seeded, Keep-a-Changelog (#45); tech-debt audit recorded (#41); M2 estate audit report (49b855b); CLAUDE.md ReScript→AffineScript flip (#49); CRG grade/badge recipes (ca10100)"
+structure = "contractiles: bust/ added + k9 → svc/ per ADR-001 2026-04-18 (4094646, 9f05e98); 6SCM → 6A2 metadata migration"
 
 [test-coverage]
-unit-tests = "24"
-p2p-property-tests = "6"
-e2e-integration-tests = "7"
-aspect-security-tests = "6"
-concurrency-tests = "5"
-total-tests = "56"
-benchmarks = "8"
-total-coverage = "64 verification points"
+# As assessed in READINESS.md (2026-04-03); no test-suite changes landed since.
+unit-tests = "36"
+p2p-property-tests = "8"
+e2e-integration-tests = "1 script (mostly skips without pre-built binary)"
+property-tests = "9"
+regression-tests = "5"
+idris2-proofs = "30"
+benchmarks = "5 Criterion groups"
+total = "67 tests + 5 benchmark groups + 30 Idris2 proofs (READINESS.md matrix)"
 
 [test-categories-complete]
+unit = true
 p2p = true
-e2e = true
-aspect-security = true
-concurrency = true
-benchmarks = true
+property = true
+regression = true
+contract = true
+smoke = true
+e2e = false
+fuzz = false
+mutation = false
+chaos = false
+compatibility = false
+
+[blockers]
+threat-model-signoff = "threat-model.a2ml status = draft-pending-human-review (since 2026-04-19); blocks any januskey-mcp cartridge"
+homerolled-hmac = "attestation.rs SHA256(key||data) pattern flagged by threat model; must be replaced with a real HMAC primitive before MCP exposure (Trustfile no-homerolled-hmac)"
+metadata-only-key-types = "Ed25519/X25519 enum entries lack real sign/DH implementations (threat-model flag)"
+claude-md-maintainer-edits = ".claude/CLAUDE.md is guardrail-blocked for agents: line 46 still says 'Julia/Rust/ReScript' (leftover from #49); package-management section still cites flake.nix, removed by the estate wave"
+idris2-in-ci = "just test-proofs requires the idris2 binary; proof check not yet wired as a CI gate (READINESS D→C promotion item)"
+
+[next-actions]
+crg-d-to-c = "READINESS.md promotion path: wire Idris2 proof check in CI, per-directory annotation, real E2E with built binary, dogfood in one real workflow"
+fuzz-targets = "Replace the removed fuzz placeholder with real cargo-fuzz targets (READINESS category 11)"
+changelog-automation = "Adopt changelog-reusable.yml so CHANGELOG.md stays current automatically"
+feature-matrix-audit = "Audit README Key Features against the test matrix (READINESS aspect 7 note)"
