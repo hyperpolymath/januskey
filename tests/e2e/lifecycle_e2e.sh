@@ -13,8 +13,11 @@ SKIP=0
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-check() { if eval "$2"; then echo "[PASS] $1"; ((PASS++)); else echo "[FAIL] $1"; ((FAIL++)); fi; }
-skip() { echo "[SKIP] $1"; ((SKIP++)); }
+# NB: use POSIX arithmetic assignment, not ((PASS++)) — under `set -e` a
+# post-increment whose old value is 0 returns exit status 1 and kills the
+# script after the very first check (matches tests/aspect/cross_cutting_test.sh).
+check() { if eval "$2"; then echo "[PASS] $1"; PASS=$((PASS+1)); else echo "[FAIL] $1"; FAIL=$((FAIL+1)); fi; }
+skip() { echo "[SKIP] $1"; SKIP=$((SKIP+1)); }
 
 echo "=== JanusKey E2E Lifecycle Test ==="
 
