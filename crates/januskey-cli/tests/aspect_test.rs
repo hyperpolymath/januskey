@@ -134,7 +134,7 @@ fn obliterated_key_record_marked_revoked() {
 
     // Verify key record reflects revocation
     let key_content =
-        fs::read_to_string(base.join(".jk/keys").join(format!("{}.json", key_id)))
+        ({ use std::io::Read; std::fs::File::open(base.join(".jk/keys").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }).join(format!("{}.json", key_id)))
             .expect("Read key record");
     assert!(
         key_content.contains("revoked"),

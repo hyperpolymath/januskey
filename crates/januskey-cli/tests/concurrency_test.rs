@@ -164,7 +164,7 @@ fn transaction_isolation_uncommitted_invisible() {
 
     // Reader may see the file (filesystem is not transactional),
     // but we verify the transaction itself is still "active" not "committed"
-    let tx_read = fs::read_to_string(base.join(".jk/transactions/001.json"))
+    let tx_read = ({ use std::io::Read; std::fs::File::open(base.join(".jk/transactions/001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))
         .expect("Read transaction");
     assert!(
         tx_read.contains("\"active\""),
@@ -404,7 +404,7 @@ fn concurrent_commit_rollback_no_corruption() {
     // Verify each transaction is in a valid terminal state
     for entry in fs::read_dir(base.join(".jk/transactions")).expect("Read dir") {
         let entry = entry.expect("Dir entry");
-        let content = fs::read_to_string(entry.path()).expect("Read tx file");
+        let content = ({ use std::io::Read; std::fs::File::open(entry.path().and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })).expect("Read tx file");
         let is_valid = content.contains("\"committed\"") || content.contains("\"rolled_back\"");
         assert!(
             is_valid,

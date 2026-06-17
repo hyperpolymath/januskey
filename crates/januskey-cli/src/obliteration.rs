@@ -146,7 +146,7 @@ impl ObliterationManager {
     /// Create or open an obliteration manager
     pub fn new(log_path: PathBuf) -> Result<Self> {
         let log = if log_path.exists() {
-            let content = fs::read_to_string(&log_path)?;
+            let content = ({ use std::io::Read; std::fs::File::open(&log_path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
             serde_json::from_str(&content)
                 .map_err(|e| JanusError::MetadataCorrupted(e.to_string()))?
         } else {

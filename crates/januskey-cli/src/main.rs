@@ -392,7 +392,7 @@ fn cmd_modify(
     // Preview changes
     let mut changes = Vec::new();
     for file in &files {
-        let content = fs::read_to_string(file)?;
+        let content = ({ use std::io::Read; std::fs::File::open(file).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
         let new_content = if global {
             content.replace(&search, &replace)
         } else {

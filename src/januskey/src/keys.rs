@@ -531,7 +531,7 @@ impl KeyManager {
 
     fn load_store_raw(&self) -> Result<KeyStoreData> {
         let path = self.store_path.join("keystore.jks");
-        let content = fs::read_to_string(&path)?;
+        let content = ({ use std::io::Read; std::fs::File::open(&path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
         let store: KeyStoreData = serde_json::from_str(&content)?;
         Ok(store)
     }
