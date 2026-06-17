@@ -81,13 +81,13 @@ fn full_key_lifecycle_single_key() {
     assert_eq!(retrieved, key_material, "Retrieved content must match original");
 
     // Step 5: Verify attestation references the key
-    let attest_read = fs::read_to_string(base.join(".jk/attestation/0001.json"))
+    let attest_read = ({ use std::io::Read; std::fs::File::open(base.join(".jk/attestation/0001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))
         .expect("Read attestation");
     assert!(attest_read.contains(key_id), "Attestation must contain key ID");
     assert!(attest_read.contains(&key_hash), "Attestation must contain content hash");
 
     // Verify key record exists
-    let key_read = fs::read_to_string(base.join(".jk/keys/001.json"))
+    let key_read = ({ use std::io::Read; std::fs::File::open(base.join(".jk/keys/001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))
         .expect("Read key record");
     assert!(key_read.contains(key_id), "Key record must contain ID");
 }
@@ -167,7 +167,7 @@ fn full_key_lifecycle_multi_key_transaction() {
 
     // Verify transaction is committed
     let tx_read =
-        fs::read_to_string(base.join(".jk/transactions/001.json")).expect("Read tx");
+        ({ use std::io::Read; std::fs::File::open(base.join(".jk/transactions/001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })).expect("Read tx");
     assert!(tx_read.contains("committed"), "Transaction must be committed");
 }
 
@@ -359,7 +359,7 @@ fn corrupted_attestation_entry_detected() {
         .expect("Write malformed entry");
 
     // Attempt to read and parse
-    let read_result = fs::read_to_string(base.join(".jk/attestation/0001.json"))
+    let read_result = ({ use std::io::Read; std::fs::File::open(base.join(".jk/attestation/0001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))
         .expect("Read file");
     let parse_result = serde_json::from_str::<serde_json::Value>(&read_result);
 

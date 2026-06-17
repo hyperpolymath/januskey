@@ -513,7 +513,7 @@ mod tests {
         executor.undo(&delete_meta.id).unwrap();
 
         assert!(test_file.exists());
-        assert_eq!(fs::read_to_string(&test_file).unwrap(), "hello world");
+        assert_eq!(({ use std::io::Read; std::fs::File::open(&test_file).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }).unwrap(), "hello world");
     }
 
     #[test]
@@ -533,13 +533,13 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(fs::read_to_string(&test_file).unwrap(), "modified content");
+        assert_eq!(({ use std::io::Read; std::fs::File::open(&test_file).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }).unwrap(), "modified content");
 
         // Undo the modify
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
         executor.undo(&modify_meta.id).unwrap();
 
-        assert_eq!(fs::read_to_string(&test_file).unwrap(), "original content");
+        assert_eq!(({ use std::io::Read; std::fs::File::open(&test_file).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }).unwrap(), "original content");
     }
 
     #[test]

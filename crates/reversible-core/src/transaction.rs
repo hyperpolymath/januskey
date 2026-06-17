@@ -121,7 +121,7 @@ impl TransactionManager {
     /// Create or open a transaction manager
     pub fn new(path: PathBuf) -> Result<Self> {
         let log = if path.exists() {
-            let content = fs::read_to_string(&path)?;
+            let content = ({ use std::io::Read; std::fs::File::open(&path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
             serde_json::from_str(&content)
                 .map_err(|e| ReversibleError::MetadataCorrupted(e.to_string()))?
         } else {

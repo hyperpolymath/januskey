@@ -61,7 +61,7 @@ impl Config {
     pub fn load(dir: &std::path::Path) -> Self {
         let config_path = dir.join(".januskey").join("config.json");
         if config_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&config_path) {
+            if let Ok(content) = ({ use std::io::Read; std::fs::File::open(&config_path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }) {
                 if let Ok(config) = serde_json::from_str(&content) {
                     return config;
                 }
