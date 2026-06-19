@@ -15,14 +15,9 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub enum FileOperation {
     /// Delete a file (reversible: restore from stored content)
-    Delete {
-        path: PathBuf,
-    },
+    Delete { path: PathBuf },
     /// Modify a file (reversible: restore original content)
-    Modify {
-        path: PathBuf,
-        new_content: Vec<u8>,
-    },
+    Modify { path: PathBuf, new_content: Vec<u8> },
     /// Move/rename a file (reversible: move back)
     Move {
         source: PathBuf,
@@ -35,15 +30,9 @@ pub enum FileOperation {
     },
     /// Change permissions (reversible: restore original perms)
     #[cfg(unix)]
-    Chmod {
-        path: PathBuf,
-        new_mode: u32,
-    },
+    Chmod { path: PathBuf, new_mode: u32 },
     /// Create a new file (reversible: delete)
-    Create {
-        path: PathBuf,
-        content: Vec<u8>,
-    },
+    Create { path: PathBuf, content: Vec<u8> },
 }
 
 impl FileOperation {
@@ -82,10 +71,7 @@ pub struct OperationExecutor<'a> {
 }
 
 impl<'a> OperationExecutor<'a> {
-    pub fn new(
-        content_store: &'a ContentStore,
-        metadata_store: &'a mut MetadataStore,
-    ) -> Self {
+    pub fn new(content_store: &'a ContentStore, metadata_store: &'a mut MetadataStore) -> Self {
         Self {
             content_store,
             metadata_store,
@@ -102,15 +88,15 @@ impl<'a> OperationExecutor<'a> {
     pub fn execute(&mut self, operation: FileOperation) -> Result<OperationMetadata> {
         match operation {
             FileOperation::Delete { path } => self.execute_delete(&path),
-            FileOperation::Modify { path, new_content } => {
-                self.execute_modify(&path, &new_content)
-            }
-            FileOperation::Move { source, destination } => {
-                self.execute_move(&source, &destination)
-            }
-            FileOperation::Copy { source, destination } => {
-                self.execute_copy(&source, &destination)
-            }
+            FileOperation::Modify { path, new_content } => self.execute_modify(&path, &new_content),
+            FileOperation::Move {
+                source,
+                destination,
+            } => self.execute_move(&source, &destination),
+            FileOperation::Copy {
+                source,
+                destination,
+            } => self.execute_copy(&source, &destination),
             #[cfg(unix)]
             FileOperation::Chmod { path, new_mode } => self.execute_chmod(&path, new_mode),
             FileOperation::Create { path, content } => self.execute_create(&path, &content),
@@ -342,7 +328,8 @@ impl<'a> OperationExecutor<'a> {
         };
 
         // Mark original operation as undone
-        self.metadata_store.mark_undone(operation_id, &undo_metadata.id)?;
+        self.metadata_store
+            .mark_undone(operation_id, &undo_metadata.id)?;
 
         Ok(undo_metadata)
     }
@@ -425,10 +412,9 @@ impl<'a> OperationExecutor<'a> {
     /// Undo chmod: restore original permissions
     #[cfg(unix)]
     fn undo_chmod(&mut self, original: &OperationMetadata) -> Result<OperationMetadata> {
-        let file_meta = original
-            .original_metadata
-            .as_ref()
-            .ok_or_else(|| JanusError::MetadataCorrupted("Missing original metadata".to_string()))?;
+        let file_meta = original.original_metadata.as_ref().ok_or_else(|| {
+            JanusError::MetadataCorrupted("Missing original metadata".to_string())
+        })?;
 
         let chmod_op = FileOperation::Chmod {
             path: original.path.clone(),
@@ -483,10 +469,8 @@ mod tests {
 
     fn setup() -> (TempDir, ContentStore, MetadataStore) {
         let tmp = TempDir::new().unwrap();
-        let content_store =
-            ContentStore::new(tmp.path().join("content"), false).unwrap();
-        let metadata_store =
-            MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        let content_store = ContentStore::new(tmp.path().join("content"), false).unwrap();
+        let metadata_store = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
         (tmp, content_store, metadata_store)
     }
 
@@ -513,7 +497,18 @@ mod tests {
         executor.undo(&delete_meta.id).unwrap();
 
         assert!(test_file.exists());
-        assert_eq!(({ use std::io::Read; std::fs::File::open(&test_file).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }).unwrap(), "hello world");
+        assert_eq!(
+            ({
+                use std::io::Read;
+                std::fs::File::open(&test_file).and_then(|mut f| {
+                    let mut buf = String::new();
+                    f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                    Ok(buf)
+                })
+            })
+            .unwrap(),
+            "hello world"
+        );
     }
 
     #[test]
@@ -533,13 +528,35 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(({ use std::io::Read; std::fs::File::open(&test_file).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }).unwrap(), "modified content");
+        assert_eq!(
+            ({
+                use std::io::Read;
+                std::fs::File::open(&test_file).and_then(|mut f| {
+                    let mut buf = String::new();
+                    f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                    Ok(buf)
+                })
+            })
+            .unwrap(),
+            "modified content"
+        );
 
         // Undo the modify
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
         executor.undo(&modify_meta.id).unwrap();
 
-        assert_eq!(({ use std::io::Read; std::fs::File::open(&test_file).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }).unwrap(), "original content");
+        assert_eq!(
+            ({
+                use std::io::Read;
+                std::fs::File::open(&test_file).and_then(|mut f| {
+                    let mut buf = String::new();
+                    f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                    Ok(buf)
+                })
+            })
+            .unwrap(),
+            "original content"
+        );
     }
 
     #[test]

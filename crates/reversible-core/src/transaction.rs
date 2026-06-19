@@ -9,7 +9,7 @@
 // lives in januskey-cli, not here. This module provides only the data
 // types and persistence — no filesystem side effects.
 
-use crate::error::{ReversibleError, Result};
+use crate::error::{Result, ReversibleError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -121,7 +121,14 @@ impl TransactionManager {
     /// Create or open a transaction manager
     pub fn new(path: PathBuf) -> Result<Self> {
         let log = if path.exists() {
-            let content = ({ use std::io::Read; std::fs::File::open(&path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
+            let content = ({
+                use std::io::Read;
+                std::fs::File::open(&path).and_then(|mut f| {
+                    let mut buf = String::new();
+                    f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                    Ok(buf)
+                })
+            })?;
             serde_json::from_str(&content)
                 .map_err(|e| ReversibleError::MetadataCorrupted(e.to_string()))?
         } else {
@@ -154,7 +161,11 @@ impl TransactionManager {
         self.save()?;
 
         // SAFETY: We just pushed a transaction above, so last() is guaranteed Some
-        Ok(self.log.transactions.last().expect("transaction was just pushed"))
+        Ok(self
+            .log
+            .transactions
+            .last()
+            .expect("transaction was just pushed"))
     }
 
     /// Get current active transaction
@@ -168,10 +179,7 @@ impl TransactionManager {
     /// Get mutable active transaction
     pub fn active_mut(&mut self) -> Option<&mut Transaction> {
         let active_id = self.log.active_transaction_id.clone()?;
-        self.log
-            .transactions
-            .iter_mut()
-            .find(|t| t.id == active_id)
+        self.log.transactions.iter_mut().find(|t| t.id == active_id)
     }
 
     /// Add operation to active transaction
@@ -288,15 +296,22 @@ mod tests {
     fn test_transaction_lifecycle() {
         let tmp = TempDir::new().expect("failed to create temp dir");
         let path = tmp.path().join("transactions.json");
-        let mut manager = TransactionManager::new(path).expect("failed to create transaction manager");
+        let mut manager =
+            TransactionManager::new(path).expect("failed to create transaction manager");
 
         // Begin
-        manager.begin(Some("test".to_string())).expect("failed to begin transaction");
+        manager
+            .begin(Some("test".to_string()))
+            .expect("failed to begin transaction");
         assert!(manager.has_active());
 
         // Add operations
-        manager.add_operation("op-1".to_string()).expect("failed to add operation op-1");
-        manager.add_operation("op-2".to_string()).expect("failed to add operation op-2");
+        manager
+            .add_operation("op-1".to_string())
+            .expect("failed to add operation op-1");
+        manager
+            .add_operation("op-2".to_string())
+            .expect("failed to add operation op-2");
 
         // Commit
         let tx = manager.commit().expect("failed to commit transaction");
@@ -309,9 +324,12 @@ mod tests {
     fn test_cannot_begin_while_active() {
         let tmp = TempDir::new().expect("failed to create temp dir");
         let path = tmp.path().join("transactions.json");
-        let mut manager = TransactionManager::new(path).expect("failed to create transaction manager");
+        let mut manager =
+            TransactionManager::new(path).expect("failed to create transaction manager");
 
-        manager.begin(None).expect("failed to begin first transaction");
+        manager
+            .begin(None)
+            .expect("failed to begin first transaction");
         assert!(manager.begin(None).is_err());
     }
 }

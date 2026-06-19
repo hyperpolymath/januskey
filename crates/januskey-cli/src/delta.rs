@@ -260,7 +260,11 @@ impl Delta {
         }
 
         // Preserve original line endings
-        let line_ending = if original_str.contains("\r\n") { "\r\n" } else { "\n" };
+        let line_ending = if original_str.contains("\r\n") {
+            "\r\n"
+        } else {
+            "\n"
+        };
         let result = result_lines.join(line_ending);
 
         // Add final newline if original had one
@@ -435,7 +439,12 @@ fn find_block(original: &[u8], start: usize, block: &[u8]) -> Option<usize> {
 }
 
 /// Find how much content before the next matching block
-fn find_next_match(original: &[u8], orig_start: usize, new_content: &[u8], block_size: usize) -> Option<usize> {
+fn find_next_match(
+    original: &[u8],
+    orig_start: usize,
+    new_content: &[u8],
+    block_size: usize,
+) -> Option<usize> {
     for i in 1..new_content.len() {
         let remaining = &new_content[i..];
         if remaining.len() >= block_size {
@@ -495,8 +504,10 @@ mod tests {
 
     #[test]
     fn test_delta_roundtrip() {
-        let original = b"Original content here\nWith multiple lines\nAnd some more text\n".repeat(50);
-        let new = b"Modified content here\nWith multiple lines\nAnd some different text\n".repeat(50);
+        let original =
+            b"Original content here\nWith multiple lines\nAnd some more text\n".repeat(50);
+        let new =
+            b"Modified content here\nWith multiple lines\nAnd some different text\n".repeat(50);
 
         let delta = Delta::compute(&original, &new);
         let restored = delta.apply(&original).unwrap();

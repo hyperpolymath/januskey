@@ -5,7 +5,7 @@
 // Content-Addressed Storage with SHA256 hashing
 // Provides deduplication and integrity verification
 
-use crate::error::{ReversibleError, Result};
+use crate::error::{Result, ReversibleError};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;

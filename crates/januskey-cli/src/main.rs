@@ -189,15 +189,20 @@ fn main() -> Result<()> {
         Commands::Modify { pattern, paths } => {
             cmd_modify(&working_dir, &pattern, &paths, cli.dry_run, cli.yes)
         }
-        Commands::Move { source, destination } => {
-            cmd_move(&working_dir, &source, &destination, cli.dry_run)
-        }
-        Commands::Copy { source, destination } => {
-            cmd_copy(&working_dir, &source, &destination, cli.dry_run)
-        }
-        Commands::Rename { old_name, new_name } => {
-            cmd_move(&working_dir, &old_name.to_string_lossy(), &new_name, cli.dry_run)
-        }
+        Commands::Move {
+            source,
+            destination,
+        } => cmd_move(&working_dir, &source, &destination, cli.dry_run),
+        Commands::Copy {
+            source,
+            destination,
+        } => cmd_copy(&working_dir, &source, &destination, cli.dry_run),
+        Commands::Rename { old_name, new_name } => cmd_move(
+            &working_dir,
+            &old_name.to_string_lossy(),
+            &new_name,
+            cli.dry_run,
+        ),
         Commands::Obliterate { paths } => {
             cmd_obliterate(&working_dir, &paths, cli.dry_run, cli.yes)
         }
@@ -223,11 +228,7 @@ fn cmd_init(dir: &PathBuf) -> Result<()> {
     }
 
     JanusKey::init(dir).context("Failed to initialize JanusKey")?;
-    println!(
-        "{} JanusKey initialized in {}",
-        "✓".green(),
-        dir.display()
-    );
+    println!("{} JanusKey initialized in {}", "✓".green(), dir.display());
     println!("  Metadata stored in: {}/.januskey/", dir.display());
     println!("\n  You can now use reversible file operations:");
     println!("    jk delete <files>    - Delete files (reversible)");
@@ -332,7 +333,10 @@ fn cmd_delete(
                 deleted_count += 1;
                 if let Some(ref pb) = progress {
                     pb.inc(1);
-                    pb.set_message(format!("{}", path.file_name().unwrap_or_default().to_string_lossy()));
+                    pb.set_message(format!(
+                        "{}",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ));
                 }
                 // Record in transaction if active
                 if transaction_id.is_some() {
@@ -349,11 +353,7 @@ fn cmd_delete(
         pb.finish_and_clear();
     }
 
-    println!(
-        "{} Deleted {} file(s)",
-        "✓".green(),
-        deleted_count
-    );
+    println!("{} Deleted {} file(s)", "✓".green(), deleted_count);
     println!("  Use {} to restore", "jk undo".cyan());
 
     Ok(())
@@ -392,7 +392,14 @@ fn cmd_modify(
     // Preview changes
     let mut changes = Vec::new();
     for file in &files {
-        let content = ({ use std::io::Read; std::fs::File::open(file).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
+        let content = ({
+            use std::io::Read;
+            std::fs::File::open(file).and_then(|mut f| {
+                let mut buf = String::new();
+                f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                Ok(buf)
+            })
+        })?;
         let new_content = if global {
             content.replace(&search, &replace)
         } else {
@@ -418,11 +425,7 @@ fn cmd_modify(
 
     // Confirm
     if changes.len() > 5 && !auto_yes {
-        println!(
-            "{} This will modify {} files",
-            "⚠".yellow(),
-            changes.len()
-        );
+        println!("{} This will modify {} files", "⚠".yellow(), changes.len());
         if !Confirm::new()
             .with_prompt("Continue?")
             .default(false)
@@ -584,18 +587,19 @@ fn cmd_copy(dir: &PathBuf, source: &PathBuf, destination: &PathBuf, dry_run: boo
     Ok(())
 }
 
-fn cmd_obliterate(
-    dir: &PathBuf,
-    paths: &[PathBuf],
-    dry_run: bool,
-    auto_yes: bool,
-) -> Result<()> {
+fn cmd_obliterate(dir: &PathBuf, paths: &[PathBuf], dry_run: bool, auto_yes: bool) -> Result<()> {
     use januskey::obliteration::obliterate_file;
 
     // Resolve each path against the working directory if it is relative.
     let targets: Vec<PathBuf> = paths
         .iter()
-        .map(|p| if p.is_absolute() { p.clone() } else { dir.join(p) })
+        .map(|p| {
+            if p.is_absolute() {
+                p.clone()
+            } else {
+                dir.join(p)
+            }
+        })
         .collect();
 
     if dry_run {
@@ -679,7 +683,12 @@ fn cmd_undo(dir: &PathBuf, count: usize, id: Option<String>) -> Result<()> {
         );
     } else {
         // Undo last N operations
-        let ops_to_undo: Vec<_> = jk.metadata_store.last_n(count).into_iter().cloned().collect();
+        let ops_to_undo: Vec<_> = jk
+            .metadata_store
+            .last_n(count)
+            .into_iter()
+            .cloned()
+            .collect();
 
         if ops_to_undo.is_empty() {
             println!("{} Nothing to undo", "!".yellow());
@@ -723,7 +732,11 @@ fn cmd_begin(dir: &PathBuf, name: Option<String>) -> Result<()> {
         "✓".green(),
         display_name.cyan()
     );
-    println!("  Run operations, then use {} or {}", "jk commit".cyan(), "jk rollback".cyan());
+    println!(
+        "  Run operations, then use {} or {}",
+        "jk commit".cyan(),
+        "jk rollback".cyan()
+    );
 
     Ok(())
 }
@@ -755,8 +768,7 @@ fn cmd_rollback(dir: &PathBuf) -> Result<()> {
 
     // Undo operations in reverse order (Theorem 3.4: Sequential Reversibility)
     for op_id in active_tx.operation_ids.iter().rev() {
-        let mut executor =
-            OperationExecutor::new(&jk.content_store, &mut jk.metadata_store);
+        let mut executor = OperationExecutor::new(&jk.content_store, &mut jk.metadata_store);
         executor.undo(op_id)?;
     }
 
@@ -783,13 +795,19 @@ fn cmd_preview(dir: &PathBuf) -> Result<()> {
 
     let preview = TransactionPreview::from_transaction(tx, &jk.metadata_store);
 
-    let name = preview.transaction_name.unwrap_or_else(|| tx.id[..8].to_string());
+    let name = preview
+        .transaction_name
+        .unwrap_or_else(|| tx.id[..8].to_string());
     println!("{} Transaction: {}", "📋".to_string(), name.cyan());
     println!("Operations pending: {}", preview.operations.len());
     println!();
 
     for op in &preview.operations {
-        let arrow = if op.secondary_path.is_some() { " → " } else { "" };
+        let arrow = if op.secondary_path.is_some() {
+            " → "
+        } else {
+            ""
+        };
         let secondary = op
             .secondary_path
             .as_ref()
@@ -837,7 +855,12 @@ fn cmd_history(dir: &PathBuf, limit: usize, filter: Option<String>) -> Result<()
             .take(limit)
             .collect()
     } else {
-        jk.metadata_store.operations().iter().rev().take(limit).collect()
+        jk.metadata_store
+            .operations()
+            .iter()
+            .rev()
+            .take(limit)
+            .collect()
     };
 
     if ops.is_empty() {
@@ -897,11 +920,7 @@ fn cmd_status(dir: &PathBuf) -> Result<()> {
     if let Some(tx) = jk.transaction_manager.active() {
         let name = tx.name.clone().unwrap_or_else(|| tx.id[..8].to_string());
         println!();
-        println!(
-            "{} Active transaction: {}",
-            "📝".to_string(),
-            name.cyan()
-        );
+        println!("{} Active transaction: {}", "📝".to_string(), name.cyan());
         println!("  Started: {}", tx.started_at.format("%Y-%m-%d %H:%M:%S"));
         println!("  Operations: {}", tx.operation_ids.len());
     } else {

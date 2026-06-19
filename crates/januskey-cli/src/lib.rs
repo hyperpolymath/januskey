@@ -24,15 +24,13 @@ pub mod operations;
 pub use reversible_core::content_store::{self, ContentHash, ContentStore};
 /// Error module — re-exports reversible-core error types with JanusKey naming
 pub mod error {
-    pub use reversible_core::error::ReversibleError as JanusError;
     pub use reversible_core::error::Result;
+    pub use reversible_core::error::ReversibleError as JanusError;
 }
 pub use error::{JanusError, Result};
 pub use reversible_core::manifest::{self, ManifestEmitter};
 pub use reversible_core::metadata::{self, MetadataStore, OperationMetadata, OperationType};
-pub use reversible_core::transaction::{
-    self, Transaction, TransactionManager, TransactionPreview,
-};
+pub use reversible_core::transaction::{self, Transaction, TransactionManager, TransactionPreview};
 pub use reversible_core::ReversibleExecutor;
 
 pub use attestation::{AuditEntry, AuditEventType, AuditLog, IntegrityReport, KeyEventDetails};
@@ -78,7 +76,14 @@ impl Config {
     pub fn load(dir: &std::path::Path) -> Self {
         let config_path = dir.join(".januskey").join("config.json");
         if config_path.exists() {
-            if let Ok(content) = ({ use std::io::Read; std::fs::File::open(&config_path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }) {
+            if let Ok(content) = ({
+                use std::io::Read;
+                std::fs::File::open(&config_path).and_then(|mut f| {
+                    let mut buf = String::new();
+                    f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                    Ok(buf)
+                })
+            }) {
                 if let Ok(config) = serde_json::from_str(&content) {
                     return config;
                 }

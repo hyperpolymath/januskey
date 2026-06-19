@@ -269,7 +269,11 @@ impl AuditLog {
     }
 
     /// Log key retrieval
-    pub fn log_key_retrieved(&self, key_id: Uuid, fingerprint: &str) -> std::io::Result<AuditEntry> {
+    pub fn log_key_retrieved(
+        &self,
+        key_id: Uuid,
+        fingerprint: &str,
+    ) -> std::io::Result<AuditEntry> {
         let details = KeyEventDetails {
             key_id,
             fingerprint: fingerprint.to_string(),
@@ -301,11 +305,7 @@ impl AuditLog {
             rotated_to: None,
             rotated_from: Some(old_key_id),
         };
-        let reason = format!(
-            "Rotated from key {} ({})",
-            old_key_id,
-            old_fingerprint
-        );
+        let reason = format!("Rotated from key {} ({})", old_key_id, old_fingerprint);
         self.log_event(AuditEventType::KeyRotated, Some(details), Some(reason))
     }
 
@@ -426,10 +426,7 @@ impl AuditLog {
             valid: true,
             total_entries: entries.len(),
             first_invalid_index: None,
-            message: format!(
-                "Audit log integrity verified: {} entries",
-                entries.len()
-            ),
+            message: format!("Audit log integrity verified: {} entries", entries.len()),
         })
     }
 
@@ -538,14 +535,21 @@ mod tests {
         let key_id = Uuid::new_v4();
         let new_key_id = Uuid::new_v4();
 
-        log.log_key_generated(key_id, "abc", KeyAlgorithm::Aes256Gcm, KeyPurpose::Encryption)
-            .expect("failed to log key generation");
+        log.log_key_generated(
+            key_id,
+            "abc",
+            KeyAlgorithm::Aes256Gcm,
+            KeyPurpose::Encryption,
+        )
+        .expect("failed to log key generation");
         log.log_key_rotated(key_id, "abc", new_key_id, "def")
             .expect("failed to log key rotation");
         log.log_key_revoked(key_id, "abc", Some("rotated"))
             .expect("failed to log key revocation");
 
-        let history = log.get_key_history(key_id).expect("failed to get key history");
+        let history = log
+            .get_key_history(key_id)
+            .expect("failed to get key history");
         assert_eq!(history.len(), 3);
     }
 }

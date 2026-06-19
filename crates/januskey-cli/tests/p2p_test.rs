@@ -101,7 +101,15 @@ fn key_operation_creates_attestation_entry() {
     std::fs::write(attest_path.join("0001.json"), &entry).unwrap();
 
     // Verify attestation references the key
-    let read_back = ({ use std::io::Read; std::fs::File::open(attest_path.join("0001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })).unwrap();
+    let read_back = ({
+        use std::io::Read;
+        std::fs::File::open(attest_path.join("0001.json")).and_then(|mut f| {
+            let mut buf = String::new();
+            f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+            Ok(buf)
+        })
+    })
+    .unwrap();
     assert!(
         read_back.contains(key_id),
         "Attestation must reference key ID"
@@ -132,7 +140,17 @@ fn attestation_chain_integrity() {
 
     // Verify chain: each entry's content hashes to the next's prev_hash
     let entries: Vec<String> = (0..3)
-        .map(|i| ({ use std::io::Read; std::fs::File::open(attest_path.join(format!("{:04}.json", i).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))).unwrap())
+        .map(|i| {
+            ({
+                use std::io::Read;
+                std::fs::File::open(attest_path.join(format!("{:04}.json", i))).and_then(|mut f| {
+                    let mut buf = String::new();
+                    f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                    Ok(buf)
+                })
+            })
+            .unwrap()
+        })
         .collect();
 
     for i in 1..entries.len() {
