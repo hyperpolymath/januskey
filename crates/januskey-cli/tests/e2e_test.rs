@@ -73,22 +73,44 @@ fn full_key_lifecycle_single_key() {
         chrono_timestamp(),
         key_hash
     );
-    fs::write(base.join(".jk/attestation/0001.json"), &attest_entry)
-        .expect("Write attestation");
+    fs::write(base.join(".jk/attestation/0001.json"), &attest_entry).expect("Write attestation");
 
     // Step 4: Retrieve - verify content matches
     let retrieved = fs::read(&content_path).expect("Read content");
-    assert_eq!(retrieved, key_material, "Retrieved content must match original");
+    assert_eq!(
+        retrieved, key_material,
+        "Retrieved content must match original"
+    );
 
     // Step 5: Verify attestation references the key
-    let attest_read = ({ use std::io::Read; std::fs::File::open(base.join(".jk/attestation/0001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))
-        .expect("Read attestation");
-    assert!(attest_read.contains(key_id), "Attestation must contain key ID");
-    assert!(attest_read.contains(&key_hash), "Attestation must contain content hash");
+    let attest_read = ({
+        use std::io::Read;
+        std::fs::File::open(base.join(".jk/attestation/0001.json")).and_then(|mut f| {
+            let mut buf = String::new();
+            f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+            Ok(buf)
+        })
+    })
+    .expect("Read attestation");
+    assert!(
+        attest_read.contains(key_id),
+        "Attestation must contain key ID"
+    );
+    assert!(
+        attest_read.contains(&key_hash),
+        "Attestation must contain content hash"
+    );
 
     // Verify key record exists
-    let key_read = ({ use std::io::Read; std::fs::File::open(base.join(".jk/keys/001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))
-        .expect("Read key record");
+    let key_read = ({
+        use std::io::Read;
+        std::fs::File::open(base.join(".jk/keys/001.json")).and_then(|mut f| {
+            let mut buf = String::new();
+            f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+            Ok(buf)
+        })
+    })
+    .expect("Read key record");
     assert!(key_read.contains(key_id), "Key record must contain ID");
 }
 
@@ -101,8 +123,7 @@ fn full_key_lifecycle_multi_key_transaction() {
     // Start transaction
     let tx_id = "tx-001";
     let tx_record = r#"{"id":"tx-001","state":"active","ops":[]}"#;
-    fs::write(base.join(".jk/transactions/001.json"), tx_record)
-        .expect("Write transaction");
+    fs::write(base.join(".jk/transactions/001.json"), tx_record).expect("Write transaction");
 
     // Generate 3 keys within transaction
     let keys: Vec<(&str, &[u8])> = vec![
@@ -162,13 +183,22 @@ fn full_key_lifecycle_multi_key_transaction() {
 
     // Commit transaction
     let commit_record = r#"{"id":"tx-001","state":"committed","ops":["op-0","op-1","op-2"]}"#;
-    fs::write(base.join(".jk/transactions/001.json"), commit_record)
-        .expect("Commit transaction");
+    fs::write(base.join(".jk/transactions/001.json"), commit_record).expect("Commit transaction");
 
     // Verify transaction is committed
-    let tx_read =
-        ({ use std::io::Read; std::fs::File::open(base.join(".jk/transactions/001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })).expect("Read tx");
-    assert!(tx_read.contains("committed"), "Transaction must be committed");
+    let tx_read = ({
+        use std::io::Read;
+        std::fs::File::open(base.join(".jk/transactions/001.json")).and_then(|mut f| {
+            let mut buf = String::new();
+            f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+            Ok(buf)
+        })
+    })
+    .expect("Read tx");
+    assert!(
+        tx_read.contains("committed"),
+        "Transaction must be committed"
+    );
 }
 
 #[test]
@@ -200,34 +230,33 @@ fn delta_chain_full_history() {
         r#"{{"from":"{}","to":"{}","delta_type":"full_rewrite","seq":1}}"#,
         v1_hash, v2_hash
     );
-    fs::write(base.join(".jk/metadata/delta-01.json"), &delta_1_to_2)
-        .expect("Write delta 1→2");
+    fs::write(base.join(".jk/metadata/delta-01.json"), &delta_1_to_2).expect("Write delta 1→2");
 
     let delta_2_to_3 = format!(
         r#"{{"from":"{}","to":"{}","delta_type":"full_rewrite","seq":2}}"#,
         v2_hash, v3_hash
     );
-    fs::write(base.join(".jk/metadata/delta-02.json"), &delta_2_to_3)
-        .expect("Write delta 2→3");
+    fs::write(base.join(".jk/metadata/delta-02.json"), &delta_2_to_3).expect("Write delta 2→3");
 
     // Verify chain is intact: can read all versions
-    let read_v1 = fs::read(&base.join(".jk/content").join(&v1_hash))
-        .expect("Read v1");
+    let read_v1 = fs::read(&base.join(".jk/content").join(&v1_hash)).expect("Read v1");
     assert_eq!(read_v1, v1, "Version 1 must be recoverable");
 
-    let read_v2 = fs::read(&base.join(".jk/content").join(&v2_hash))
-        .expect("Read v2");
+    let read_v2 = fs::read(&base.join(".jk/content").join(&v2_hash)).expect("Read v2");
     assert_eq!(read_v2, v2, "Version 2 must be recoverable");
 
-    let read_v3 = fs::read(&base.join(".jk/content").join(&v3_hash))
-        .expect("Read v3");
+    let read_v3 = fs::read(&base.join(".jk/content").join(&v3_hash)).expect("Read v3");
     assert_eq!(read_v3, v3, "Version 3 must be recoverable");
 
     // Verify chain links are recorded
     let delta_files: Vec<_> = fs::read_dir(base.join(".jk/metadata"))
         .expect("Read metadata")
         .filter_map(Result::ok)
-        .filter(|e| e.file_name().to_str().map_or(false, |n| n.starts_with("delta")))
+        .filter(|e| {
+            e.file_name()
+                .to_str()
+                .map_or(false, |n| n.starts_with("delta"))
+        })
         .collect();
     assert_eq!(delta_files.len(), 2, "Delta chain must have 2 links");
 }
@@ -248,10 +277,7 @@ fn content_store_write_verify_read_delete() {
 
     // Write
     fs::write(&store_path, content).expect("Write content");
-    assert!(
-        store_path.exists(),
-        "Content must exist after write"
-    );
+    assert!(store_path.exists(), "Content must exist after write");
 
     // Verify hash (read back and re-hash)
     let read_back = fs::read(&store_path).expect("Read content");
@@ -263,7 +289,10 @@ fn content_store_write_verify_read_delete() {
 
     // Read again
     let read_again = fs::read(&store_path).expect("Read content again");
-    assert_eq!(read_again, content, "Multiple reads must return same content");
+    assert_eq!(
+        read_again, content,
+        "Multiple reads must return same content"
+    );
 
     // Delete (simulate obliteration by removing file)
     fs::remove_file(&store_path).expect("Delete file");
@@ -274,10 +303,7 @@ fn content_store_write_verify_read_delete() {
 
     // Verify truly gone (attempt read fails)
     let read_deleted = fs::read(&store_path);
-    assert!(
-        read_deleted.is_err(),
-        "Reading deleted content must fail"
-    );
+    assert!(read_deleted.is_err(), "Reading deleted content must fail");
 }
 
 #[test]
@@ -292,17 +318,11 @@ fn content_store_deduplication_multiple_keys() {
     let store_path = base.join(".jk/content").join(&shared_hash);
 
     // Key 1 references shared content
-    let key1 = format!(
-        r#"{{"id":"key-1","hash":"{}"}}"#,
-        shared_hash
-    );
+    let key1 = format!(r#"{{"id":"key-1","hash":"{}"}}"#, shared_hash);
     fs::write(base.join(".jk/keys/001.json"), &key1).expect("Write key1");
 
     // Key 2 references same shared content
-    let key2 = format!(
-        r#"{{"id":"key-2","hash":"{}"}}"#,
-        shared_hash
-    );
+    let key2 = format!(r#"{{"id":"key-2","hash":"{}"}}"#, shared_hash);
     fs::write(base.join(".jk/keys/002.json"), &key2).expect("Write key2");
 
     // Content is stored only once
@@ -341,10 +361,7 @@ fn retrieve_nonexistent_key_fails() {
     let store_path = base.join(".jk/content").join(nonexistent_hash);
 
     let result = fs::read(&store_path);
-    assert!(
-        result.is_err(),
-        "Reading nonexistent key must fail"
-    );
+    assert!(result.is_err(), "Reading nonexistent key must fail");
 }
 
 #[test]
@@ -355,12 +372,18 @@ fn corrupted_attestation_entry_detected() {
 
     // Write malformed attestation
     let bad_entry = r#"{"invalid json"#;
-    fs::write(base.join(".jk/attestation/0001.json"), bad_entry)
-        .expect("Write malformed entry");
+    fs::write(base.join(".jk/attestation/0001.json"), bad_entry).expect("Write malformed entry");
 
     // Attempt to read and parse
-    let read_result = ({ use std::io::Read; std::fs::File::open(base.join(".jk/attestation/0001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))
-        .expect("Read file");
+    let read_result = ({
+        use std::io::Read;
+        std::fs::File::open(base.join(".jk/attestation/0001.json")).and_then(|mut f| {
+            let mut buf = String::new();
+            f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+            Ok(buf)
+        })
+    })
+    .expect("Read file");
     let parse_result = serde_json::from_str::<serde_json::Value>(&read_result);
 
     assert!(

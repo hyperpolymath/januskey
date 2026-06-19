@@ -24,11 +24,9 @@ pub mod metadata;
 pub mod transaction;
 
 pub use content_store::{ContentHash, ContentStore};
-pub use error::{ReversibleError, Result};
+pub use error::{Result, ReversibleError};
 pub use manifest::ManifestEmitter;
-pub use metadata::{
-    FileMetadata, MetadataStore, OperationLog, OperationMetadata, OperationType,
-};
+pub use metadata::{FileMetadata, MetadataStore, OperationLog, OperationMetadata, OperationType};
 pub use transaction::{
     OperationPreview, Transaction, TransactionLog, TransactionManager, TransactionPreview,
     TransactionState,

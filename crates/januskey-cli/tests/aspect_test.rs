@@ -40,8 +40,11 @@ fn create_test_key(base: &PathBuf, key_id: &str, material: &[u8]) -> String {
         r#"{{"id":"{}","hash":"{}","state":"active"}}"#,
         key_id, hash
     );
-    fs::write(base.join(".jk/keys").join(format!("{}.json", key_id)), &key_record)
-        .expect("Write key record");
+    fs::write(
+        base.join(".jk/keys").join(format!("{}.json", key_id)),
+        &key_record,
+    )
+    .expect("Write key record");
 
     hash
 }
@@ -100,8 +103,7 @@ fn obliterated_key_truly_unrecoverable() {
     );
 
     // Attempt to read from any disk location fails
-    let dir_entries = fs::read_dir(base.join(".jk/content"))
-        .expect("Read dir");
+    let dir_entries = fs::read_dir(base.join(".jk/content")).expect("Read dir");
     let content_files: Vec<_> = dir_entries.filter_map(Result::ok).collect();
     assert_eq!(
         content_files.len(),
@@ -127,15 +129,29 @@ fn obliterated_key_record_marked_revoked() {
     // Mark the key record as revoked
     let revoked_record = format!(
         r#"{{"id":"{}","hash":"{}","state":"revoked","revoked_at":{},"obliteration_proof":"proof-{}"}}"#,
-        key_id, hash, chrono_timestamp(), key_id
+        key_id,
+        hash,
+        chrono_timestamp(),
+        key_id
     );
-    fs::write(base.join(".jk/keys").join(format!("{}.json", key_id)), &revoked_record)
-        .expect("Write revoked record");
+    fs::write(
+        base.join(".jk/keys").join(format!("{}.json", key_id)),
+        &revoked_record,
+    )
+    .expect("Write revoked record");
 
     // Verify key record reflects revocation
-    let key_content =
-        ({ use std::io::Read; std::fs::File::open(base.join(".jk/keys").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }).join(format!("{}.json", key_id)))
-            .expect("Read key record");
+    let key_content = ({
+        use std::io::Read;
+        std::fs::File::open(base.join(".jk/keys").join(format!("{}.json", key_id))).and_then(
+            |mut f| {
+                let mut buf = String::new();
+                f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                Ok(buf)
+            },
+        )
+    })
+    .expect("Read key record");
     assert!(
         key_content.contains("revoked"),
         "Key record must be marked revoked"
@@ -232,27 +248,29 @@ fn obliteration_proof_generated_and_stored() {
                 "storage_cleared":true,
                 "commitment":"proof-commitment-hash"
             }}"#,
-        proof_id, key_id, hash, chrono_timestamp()
+        proof_id,
+        key_id,
+        hash,
+        chrono_timestamp()
     );
 
     // Store proof
     fs::write(
-        base.join(".jk/obliteration").join(format!("{}.json", proof_id)),
+        base.join(".jk/obliteration")
+            .join(format!("{}.json", proof_id)),
         &proof,
     )
     .expect("Write proof");
 
     // Verify proof exists and is valid JSON
     let proof_content = fs::read_to_string(
-        base.join(".jk/obliteration").join(format!("{}.json", proof_id)),
+        base.join(".jk/obliteration")
+            .join(format!("{}.json", proof_id)),
     )
     .expect("Read proof");
 
     let parsed = serde_json::from_str::<serde_json::Value>(&proof_content);
-    assert!(
-        parsed.is_ok(),
-        "Obliteration proof must be valid JSON"
-    );
+    assert!(parsed.is_ok(), "Obliteration proof must be valid JSON");
 
     let proof_obj = parsed.unwrap();
     assert_eq!(
@@ -305,10 +323,7 @@ fn obliteration_under_concurrent_access_no_leak() {
     _read_handle.join().expect("Thread join");
 
     // Post-obliteration: no trace remains
-    assert!(
-        !content_path.exists(),
-        "Content must be completely removed"
-    );
+    assert!(!content_path.exists(), "Content must be completely removed");
 
     // Verify key cannot be accessed
     let post_attempt = fs::read(&content_path);
@@ -341,24 +356,12 @@ fn multiple_keys_obliterated_independently() {
     fs::remove_file(&path3).expect("Delete key 3");
 
     // Verify: key 1 and 3 are gone
-    assert!(
-        !path1.exists(),
-        "Key 1 must be obliterated"
-    );
-    assert!(
-        !path3.exists(),
-        "Key 3 must be obliterated"
-    );
+    assert!(!path1.exists(), "Key 1 must be obliterated");
+    assert!(!path3.exists(), "Key 3 must be obliterated");
 
     // Verify: key 2 is still present
-    assert!(
-        path2.exists(),
-        "Key 2 must remain intact"
-    );
+    assert!(path2.exists(), "Key 2 must remain intact");
 
     let read2 = fs::read(&path2).expect("Read key 2");
-    assert_eq!(
-        read2, key2_material,
-        "Key 2 content must be unchanged"
-    );
+    assert_eq!(read2, key2_material, "Key 2 content must be unchanged");
 }

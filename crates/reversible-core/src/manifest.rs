@@ -123,14 +123,10 @@ mod tests {
     #[test]
     fn test_generate_manifest() {
         let tmp = TempDir::new().unwrap();
-        let mut store =
-            MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        let mut store = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
 
-        let op = OperationMetadata::new(
-            OperationType::Delete,
-            PathBuf::from("/test/file.txt"),
-        )
-        .with_content_hash(ContentHash::from_bytes(b"file content"));
+        let op = OperationMetadata::new(OperationType::Delete, PathBuf::from("/test/file.txt"))
+            .with_content_hash(ContentHash::from_bytes(b"file content"));
 
         store.append(op).unwrap();
 
@@ -147,8 +143,7 @@ mod tests {
     #[test]
     fn test_empty_manifest() {
         let tmp = TempDir::new().unwrap();
-        let store =
-            MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        let store = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
 
         let manifest = ManifestEmitter::generate("test", &store);
         assert!(manifest.contains("@manifest"));
@@ -158,13 +153,9 @@ mod tests {
     #[test]
     fn test_merkle_root_deterministic() {
         let tmp = TempDir::new().unwrap();
-        let mut store =
-            MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        let mut store = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
 
-        let op = OperationMetadata::new(
-            OperationType::Create,
-            PathBuf::from("/a.txt"),
-        );
+        let op = OperationMetadata::new(OperationType::Create, PathBuf::from("/a.txt"));
         store.append(op).unwrap();
 
         let m1 = ManifestEmitter::generate("test", &store);

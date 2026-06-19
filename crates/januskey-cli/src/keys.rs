@@ -340,7 +340,9 @@ impl KeyManager {
         self.save_store(&store)?;
 
         // Log key generation
-        let _ = self.audit_log.log_key_generated(id, &fingerprint, algorithm, purpose);
+        let _ = self
+            .audit_log
+            .log_key_generated(id, &fingerprint, algorithm, purpose);
 
         Ok(id)
     }
@@ -388,7 +390,9 @@ impl KeyManager {
         }
 
         // Log key retrieval
-        let _ = self.audit_log.log_key_retrieved(id, &wrapped.metadata.fingerprint);
+        let _ = self
+            .audit_log
+            .log_key_retrieved(id, &wrapped.metadata.fingerprint);
 
         unwrap_key(kek, &wrapped)
     }
@@ -445,7 +449,9 @@ impl KeyManager {
         self.save_store(&store)?;
 
         // Log rotation event
-        let _ = self.audit_log.log_key_rotated(id, &old_fingerprint, new_id, &fingerprint);
+        let _ = self
+            .audit_log
+            .log_key_rotated(id, &old_fingerprint, new_id, &fingerprint);
 
         Ok(new_id)
     }
@@ -501,7 +507,9 @@ impl KeyManager {
         self.save_store(&store)?;
 
         // Log revocation with reason
-        let _ = self.audit_log.log_key_revoked(id, &fingerprint, Some(reason));
+        let _ = self
+            .audit_log
+            .log_key_revoked(id, &fingerprint, Some(reason));
 
         Ok(())
     }
@@ -531,7 +539,14 @@ impl KeyManager {
 
     fn load_store_raw(&self) -> Result<KeyStoreData> {
         let path = self.store_path.join("keystore.jks");
-        let content = ({ use std::io::Read; std::fs::File::open(&path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
+        let content = ({
+            use std::io::Read;
+            std::fs::File::open(&path).and_then(|mut f| {
+                let mut buf = String::new();
+                f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                Ok(buf)
+            })
+        })?;
         let store: KeyStoreData = serde_json::from_str(&content)?;
         Ok(store)
     }
@@ -641,7 +656,8 @@ mod tests {
         let mut km = KeyManager::new(tmp.path());
 
         assert!(!km.is_initialized());
-        km.init("test-passphrase").expect("failed to init key manager");
+        km.init("test-passphrase")
+            .expect("failed to init key manager");
         assert!(km.is_initialized());
     }
 
@@ -650,7 +666,8 @@ mod tests {
         let tmp = TempDir::new().expect("failed to create temp dir");
         let mut km = KeyManager::new(tmp.path());
 
-        km.init("test-passphrase").expect("failed to init key manager");
+        km.init("test-passphrase")
+            .expect("failed to init key manager");
 
         let id = km
             .generate(
@@ -676,7 +693,8 @@ mod tests {
         let tmp = TempDir::new().expect("failed to create temp dir");
         let mut km = KeyManager::new(tmp.path());
 
-        km.init("test-passphrase").expect("failed to init key manager");
+        km.init("test-passphrase")
+            .expect("failed to init key manager");
 
         let old_id = km
             .generate(KeyAlgorithm::Aes256Gcm, KeyPurpose::Encryption, None, None)
@@ -697,7 +715,8 @@ mod tests {
         let tmp = TempDir::new().expect("failed to create temp dir");
         let mut km = KeyManager::new(tmp.path());
 
-        km.init("correct-passphrase").expect("failed to init key manager");
+        km.init("correct-passphrase")
+            .expect("failed to init key manager");
 
         // Generate a key so we have something to verify against
         km.generate(KeyAlgorithm::Aes256Gcm, KeyPurpose::Encryption, None, None)

@@ -6,7 +6,7 @@
 // Implements the formal model from the JanusKey white paper
 
 use crate::content_store::ContentHash;
-use crate::error::{ReversibleError, Result};
+use crate::error::{Result, ReversibleError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -256,7 +256,14 @@ impl MetadataStore {
     /// Create or open a metadata store
     pub fn new(path: PathBuf) -> Result<Self> {
         let log = if path.exists() {
-            let content = ({ use std::io::Read; std::fs::File::open(&path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
+            let content = ({
+                use std::io::Read;
+                std::fs::File::open(&path).and_then(|mut f| {
+                    let mut buf = String::new();
+                    f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                    Ok(buf)
+                })
+            })?;
             serde_json::from_str(&content)
                 .map_err(|e| ReversibleError::MetadataCorrupted(e.to_string()))?
         } else {
@@ -378,8 +385,7 @@ mod tests {
 
     #[test]
     fn test_operation_metadata_creation() {
-        let meta =
-            OperationMetadata::new(OperationType::Delete, PathBuf::from("/test/file.txt"));
+        let meta = OperationMetadata::new(OperationType::Delete, PathBuf::from("/test/file.txt"));
         assert!(!meta.id.is_empty());
         assert_eq!(meta.op_type, OperationType::Delete);
         assert!(!meta.undone);
@@ -400,8 +406,7 @@ mod tests {
 
         let mut store = MetadataStore::new(path.clone()).unwrap();
 
-        let meta =
-            OperationMetadata::new(OperationType::Delete, PathBuf::from("/test.txt"));
+        let meta = OperationMetadata::new(OperationType::Delete, PathBuf::from("/test.txt"));
         let id = meta.id.clone();
         store.append(meta).unwrap();
 

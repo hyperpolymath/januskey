@@ -19,30 +19,37 @@ fn retrieve_nonexistent_hash_returns_error() {
 
     // Must return Err, not panic
     let result = store.retrieve(&fake_hash);
-    assert!(result.is_err(), "Retrieving non-existent hash must return Err");
+    assert!(
+        result.is_err(),
+        "Retrieving non-existent hash must return Err"
+    );
 }
 
 /// Regression: committing with no active transaction must return Err, not panic.
 #[test]
 fn commit_without_active_transaction_returns_error() {
     let tmp = TempDir::new().unwrap();
-    let mut manager =
-        TransactionManager::new(tmp.path().join("transactions.json")).unwrap();
+    let mut manager = TransactionManager::new(tmp.path().join("transactions.json")).unwrap();
 
     // No begin() called — commit must fail gracefully
     let result = manager.commit();
-    assert!(result.is_err(), "Commit without active transaction must return Err");
+    assert!(
+        result.is_err(),
+        "Commit without active transaction must return Err"
+    );
 }
 
 /// Regression: rollback with no active transaction must return Err, not panic.
 #[test]
 fn rollback_without_active_transaction_returns_error() {
     let tmp = TempDir::new().unwrap();
-    let mut manager =
-        TransactionManager::new(tmp.path().join("transactions.json")).unwrap();
+    let mut manager = TransactionManager::new(tmp.path().join("transactions.json")).unwrap();
 
     let result = manager.mark_rolled_back();
-    assert!(result.is_err(), "Rollback without active transaction must return Err");
+    assert!(
+        result.is_err(),
+        "Rollback without active transaction must return Err"
+    );
 }
 
 /// Regression: content store with empty bytes must not panic.
@@ -60,5 +67,8 @@ fn store_empty_content() {
 #[test]
 fn content_hash_verify_mismatch() {
     let hash = ContentHash::from_bytes(b"original");
-    assert!(!hash.verify(b"tampered"), "Mismatched content must return false");
+    assert!(
+        !hash.verify(b"tampered"),
+        "Mismatched content must return false"
+    );
 }

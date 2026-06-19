@@ -63,21 +63,15 @@ fn concurrent_key_operations_no_deadlock() {
                 .expect(&format!("Write failed for {}", key_id));
 
             // Record key
-            let key_record = format!(
-                r#"{{"id":"{}","hash":"{}","thread":{}}}"#,
-                key_id, hash, i
-            );
+            let key_record = format!(r#"{{"id":"{}","hash":"{}","thread":{}}}"#, key_id, hash, i);
             fs::write(
-                base_clone
-                    .join(".jk/keys")
-                    .join(format!("{}.json", key_id)),
+                base_clone.join(".jk/keys").join(format!("{}.json", key_id)),
                 &key_record,
             )
             .expect(&format!("Key record failed for {}", key_id));
 
             // Read back immediately
-            let read_back = fs::read(&content_path)
-                .expect(&format!("Read failed for {}", key_id));
+            let read_back = fs::read(&content_path).expect(&format!("Read failed for {}", key_id));
             assert_eq!(
                 read_back,
                 material.as_bytes(),
@@ -122,8 +116,7 @@ fn transaction_isolation_uncommitted_invisible() {
     // Start transaction in main thread
     let tx_id = "tx-isolation-001";
     let tx_record = r#"{"id":"tx-isolation-001","state":"active"}"#;
-    fs::write(base.join(".jk/transactions/001.json"), tx_record)
-        .expect("Write transaction");
+    fs::write(base.join(".jk/transactions/001.json"), tx_record).expect("Write transaction");
 
     // Spawn reader thread
     let base_clone = Arc::clone(&base);
@@ -164,8 +157,15 @@ fn transaction_isolation_uncommitted_invisible() {
 
     // Reader may see the file (filesystem is not transactional),
     // but we verify the transaction itself is still "active" not "committed"
-    let tx_read = ({ use std::io::Read; std::fs::File::open(base.join(".jk/transactions/001.json").and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) }))
-        .expect("Read transaction");
+    let tx_read = ({
+        use std::io::Read;
+        std::fs::File::open(base.join(".jk/transactions/001.json")).and_then(|mut f| {
+            let mut buf = String::new();
+            f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+            Ok(buf)
+        })
+    })
+    .expect("Read transaction");
     assert!(
         tx_read.contains("\"active\""),
         "Transaction must remain active while uncommitted"
@@ -187,10 +187,7 @@ fn concurrent_transactions_isolated() {
             let tx_id = format!("tx-{:02}", tx_idx);
 
             // Begin transaction
-            let tx_record = format!(
-                r#"{{"id":"{}","state":"active"}}"#,
-                tx_id
-            );
+            let tx_record = format!(r#"{{"id":"{}","state":"active"}}"#, tx_id);
             fs::write(
                 base_clone
                     .join(".jk/transactions")
@@ -201,10 +198,7 @@ fn concurrent_transactions_isolated() {
 
             // Perform operations within transaction
             for op_idx in 0..3 {
-                let op_record = format!(
-                    r#"{{"tx":"{}","op":"copy","seq":{}}}"#,
-                    tx_id, op_idx
-                );
+                let op_record = format!(r#"{{"tx":"{}","op":"copy","seq":{}}}"#, tx_id, op_idx);
                 fs::write(
                     base_clone
                         .join(".jk/operations")
@@ -215,10 +209,7 @@ fn concurrent_transactions_isolated() {
             }
 
             // Commit
-            let commit_record = format!(
-                r#"{{"id":"{}","state":"committed"}}"#,
-                tx_id
-            );
+            let commit_record = format!(r#"{{"id":"{}","state":"committed"}}"#, tx_id);
             fs::write(
                 base_clone
                     .join(".jk/transactions")
@@ -235,11 +226,7 @@ fn concurrent_transactions_isolated() {
     // Wait for all transactions
     for (i, handle) in handles.into_iter().enumerate() {
         let result = handle.join().expect("Thread panicked");
-        assert_eq!(
-            result, i,
-            "Transaction {} should complete successfully",
-            i
-        );
+        assert_eq!(result, i, "Transaction {} should complete successfully", i);
     }
 
     // Verify all transactions exist and are committed
@@ -338,10 +325,7 @@ fn concurrent_commit_rollback_no_corruption() {
             let tx_id = format!("tx-race-{:02}", i);
 
             // Begin
-            let tx_record = format!(
-                r#"{{"id":"{}","state":"active"}}"#,
-                tx_id
-            );
+            let tx_record = format!(r#"{{"id":"{}","state":"active"}}"#, tx_id);
             fs::write(
                 base_clone
                     .join(".jk/transactions")
@@ -352,10 +336,7 @@ fn concurrent_commit_rollback_no_corruption() {
 
             // Add operations
             for op in 0..5 {
-                let op_record = format!(
-                    r#"{{"tx":"{}","op":"copy","seq":{}}}"#,
-                    tx_id, op
-                );
+                let op_record = format!(r#"{{"tx":"{}","op":"copy","seq":{}}}"#, tx_id, op);
                 fs::write(
                     base_clone
                         .join(".jk/operations")
@@ -366,11 +347,12 @@ fn concurrent_commit_rollback_no_corruption() {
             }
 
             // Randomly commit or rollback
-            let action = if i % 2 == 0 { "committed" } else { "rolled_back" };
-            let final_record = format!(
-                r#"{{"id":"{}","state":"{}"}}"#,
-                tx_id, action
-            );
+            let action = if i % 2 == 0 {
+                "committed"
+            } else {
+                "rolled_back"
+            };
+            let final_record = format!(r#"{{"id":"{}","state":"{}"}}"#, tx_id, action);
             fs::write(
                 base_clone
                     .join(".jk/transactions")
@@ -404,7 +386,15 @@ fn concurrent_commit_rollback_no_corruption() {
     // Verify each transaction is in a valid terminal state
     for entry in fs::read_dir(base.join(".jk/transactions")).expect("Read dir") {
         let entry = entry.expect("Dir entry");
-        let content = ({ use std::io::Read; std::fs::File::open(entry.path().and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })).expect("Read tx file");
+        let content = ({
+            use std::io::Read;
+            std::fs::File::open(entry.path()).and_then(|mut f| {
+                let mut buf = String::new();
+                f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                Ok(buf)
+            })
+        })
+        .expect("Read tx file");
         let is_valid = content.contains("\"committed\"") || content.contains("\"rolled_back\"");
         assert!(
             is_valid,

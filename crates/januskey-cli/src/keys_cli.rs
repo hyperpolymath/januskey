@@ -201,7 +201,10 @@ fn cmd_init(km: &mut KeyManager, _no_recovery: bool) -> Result<(), Box<dyn std::
     println!();
     println!("{}", "✓ Key store initialized successfully".green());
     println!();
-    println!("Location: {}/.januskey/keys/", std::env::current_dir()?.display());
+    println!(
+        "Location: {}/.januskey/keys/",
+        std::env::current_dir()?.display()
+    );
     println!();
     println!("{}", "Next steps:".cyan());
     println!("  • Generate a key:  jk-keys generate --type aes256 --purpose encryption");
@@ -217,12 +220,17 @@ fn cmd_list(km: &mut KeyManager, active_only: bool) -> Result<(), Box<dyn std::e
     let keys = km.list()?;
 
     if keys.is_empty() {
-        println!("{}", "No keys in store. Generate one with: jk-keys generate".yellow());
+        println!(
+            "{}",
+            "No keys in store. Generate one with: jk-keys generate".yellow()
+        );
         return Ok(());
     }
 
     let filtered: Vec<_> = if active_only {
-        keys.into_iter().filter(|k| k.state == KeyState::Active).collect()
+        keys.into_iter()
+            .filter(|k| k.state == KeyState::Active)
+            .collect()
     } else {
         keys
     };
@@ -273,7 +281,13 @@ fn cmd_generate(
         "aes256" | "aes-256" | "aes256gcm" => KeyAlgorithm::Aes256Gcm,
         "ed25519" => KeyAlgorithm::Ed25519,
         "x25519" => KeyAlgorithm::X25519,
-        _ => return Err(format!("Unknown key type: {}. Use: aes256, ed25519, x25519", key_type).into()),
+        _ => {
+            return Err(format!(
+                "Unknown key type: {}. Use: aes256, ed25519, x25519",
+                key_type
+            )
+            .into())
+        }
     };
 
     let key_purpose = match purpose.to_lowercase().as_str() {
@@ -281,7 +295,13 @@ fn cmd_generate(
         "signing" | "sign" => KeyPurpose::Signing,
         "keywrap" | "key-wrap" | "wrap" => KeyPurpose::KeyWrap,
         "recovery" => KeyPurpose::Recovery,
-        _ => return Err(format!("Unknown purpose: {}. Use: encryption, signing, keywrap, recovery", purpose).into()),
+        _ => {
+            return Err(format!(
+                "Unknown purpose: {}. Use: encryption, signing, keywrap, recovery",
+                purpose
+            )
+            .into())
+        }
     };
 
     println!("{}", "Generating key...".cyan());
@@ -318,7 +338,10 @@ fn cmd_show(km: &mut KeyManager, key_id: Uuid) -> Result<(), Box<dyn std::error:
     println!("  Purpose:     {}", meta.purpose);
     println!("  State:       {}", format_state(meta.state));
     println!("  Fingerprint: {}", meta.fingerprint.cyan());
-    println!("  Created:     {}", meta.created_at.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!(
+        "  Created:     {}",
+        meta.created_at.format("%Y-%m-%d %H:%M:%S UTC")
+    );
 
     if let Some(exp) = meta.expires_at {
         let now = chrono::Utc::now();
@@ -327,7 +350,11 @@ fn cmd_show(km: &mut KeyManager, key_id: Uuid) -> Result<(), Box<dyn std::error:
         } else {
             "".normal()
         };
-        println!("  Expires:     {}{}", exp.format("%Y-%m-%d %H:%M:%S UTC"), status);
+        println!(
+            "  Expires:     {}{}",
+            exp.format("%Y-%m-%d %H:%M:%S UTC"),
+            status
+        );
     }
 
     if let Some(rot) = meta.rotation_of {
@@ -470,9 +497,7 @@ fn unlock_store(km: &mut KeyManager) -> Result<(), Box<dyn std::error::Error>> {
         return Err("Key store not initialized. Run 'jk-keys init' first.".into());
     }
 
-    let passphrase = Password::new()
-        .with_prompt("Enter passphrase")
-        .interact()?;
+    let passphrase = Password::new().with_prompt("Enter passphrase").interact()?;
 
     km.unlock(&passphrase)?;
     Ok(())
@@ -563,18 +588,29 @@ fn cmd_audit_history(km: &mut KeyManager, key_id: Uuid) -> Result<(), Box<dyn st
     let entries = km.audit_log().get_key_history(key_id)?;
 
     if entries.is_empty() {
-        println!("{}", format!("No audit entries found for key {}", key_id).yellow());
+        println!(
+            "{}",
+            format!("No audit entries found for key {}", key_id).yellow()
+        );
         return Ok(());
     }
 
-    println!("{}", format!("Audit History for Key: {}", key_id).cyan().bold());
+    println!(
+        "{}",
+        format!("Audit History for Key: {}", key_id).cyan().bold()
+    );
     println!();
 
     for entry in entries {
         let timestamp = entry.timestamp.format("%Y-%m-%d %H:%M:%S UTC");
         let event_str = format_event_type(entry.event_type);
 
-        println!("{} {} by {}", timestamp.to_string().dimmed(), event_str, entry.actor);
+        println!(
+            "{} {} by {}",
+            timestamp.to_string().dimmed(),
+            event_str,
+            entry.actor
+        );
 
         if let Some(ref kd) = entry.key_details {
             println!("  Fingerprint: {}", kd.fingerprint.cyan());
@@ -622,19 +658,27 @@ fn cmd_audit_verify(km: &mut KeyManager) -> Result<(), Box<dyn std::error::Error
         println!();
         println!(
             "{}",
-            "WARNING: The audit log may have been tampered with!".yellow().bold()
+            "WARNING: The audit log may have been tampered with!"
+                .yellow()
+                .bold()
         );
     }
 
     Ok(())
 }
 
-fn cmd_audit_export(km: &mut KeyManager, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_audit_export(
+    km: &mut KeyManager,
+    output: &PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
     unlock_store(km)?;
 
     if output.exists() {
         let confirm = Confirm::new()
-            .with_prompt(format!("File {} already exists. Overwrite?", output.display()))
+            .with_prompt(format!(
+                "File {} already exists. Overwrite?",
+                output.display()
+            ))
             .default(false)
             .interact()?;
 

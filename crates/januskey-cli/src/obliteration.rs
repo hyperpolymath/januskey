@@ -146,7 +146,14 @@ impl ObliterationManager {
     /// Create or open an obliteration manager
     pub fn new(log_path: PathBuf) -> Result<Self> {
         let log = if log_path.exists() {
-            let content = ({ use std::io::Read; std::fs::File::open(&log_path).and_then(|mut f| { let mut buf = String::new(); f.take(10 * 1024 * 1024).read_to_string(&mut buf)?; Ok(buf) }) })?;
+            let content = ({
+                use std::io::Read;
+                std::fs::File::open(&log_path).and_then(|mut f| {
+                    let mut buf = String::new();
+                    f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+                    Ok(buf)
+                })
+            })?;
             serde_json::from_str(&content)
                 .map_err(|e| JanusError::MetadataCorrupted(e.to_string()))?
         } else {
@@ -415,9 +422,8 @@ mod tests {
         let tmp = TempDir::new().expect("failed to create temp dir");
         let content_store = ContentStore::new(tmp.path().join("content"), false)
             .expect("failed to create content store");
-        let obliteration_manager =
-            ObliterationManager::new(tmp.path().join("obliterations.json"))
-                .expect("failed to create obliteration manager");
+        let obliteration_manager = ObliterationManager::new(tmp.path().join("obliterations.json"))
+            .expect("failed to create obliteration manager");
         (tmp, content_store, obliteration_manager)
     }
 
@@ -446,7 +452,9 @@ mod tests {
 
         // Store some content
         let content = b"sensitive data to be obliterated";
-        let hash = content_store.store(content).expect("failed to store content");
+        let hash = content_store
+            .store(content)
+            .expect("failed to store content");
 
         // Verify it exists
         assert!(content_store.exists(&hash));
@@ -475,18 +483,20 @@ mod tests {
 
         // Store and obliterate content
         let content = b"data to obliterate";
-        let hash = content_store.store(content).expect("failed to store content");
+        let hash = content_store
+            .store(content)
+            .expect("failed to store content");
         let record = obliteration_manager
             .obliterate(&content_store, &hash, None, None)
             .expect("failed to obliterate content");
 
         // Reopen manager and verify log
-        let obliteration_manager2 =
-            ObliterationManager::new(tmp.path().join("obliterations.json"))
-                .expect("failed to reopen obliteration manager");
+        let obliteration_manager2 = ObliterationManager::new(tmp.path().join("obliterations.json"))
+            .expect("failed to reopen obliteration manager");
         assert_eq!(obliteration_manager2.count(), 1);
 
-        let retrieved = obliteration_manager2.get(&record.id)
+        let retrieved = obliteration_manager2
+            .get(&record.id)
             .expect("failed to retrieve obliteration record");
         assert_eq!(retrieved.content_hash, hash);
     }
@@ -517,7 +527,8 @@ mod tests {
         let hashes: Vec<ContentHash> = (0..5)
             .map(|i| {
                 let content = format!("content {}", i);
-                content_store.store(content.as_bytes())
+                content_store
+                    .store(content.as_bytes())
                     .expect("failed to store batch content")
             })
             .collect();
