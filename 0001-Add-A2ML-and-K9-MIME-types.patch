@@ -93,7 +93,7 @@ index 0000000..c8d5922
 --- /dev/null
 +++ b/tests/mime-detection/test.a2ml
 @@ -0,0 +1,6 @@
-+# SPDX-License-Identifier: CC0-1.0
++# SPDX-License-Identifier: MPL-2.0
 +# test.a2ml — A2ML test file for MIME type detection
 +
 +[metadata]
@@ -106,7 +106,7 @@ index 0000000..c49b316
 +++ b/tests/mime-detection/test.k9
 @@ -0,0 +1,9 @@
 +K9!
-+# SPDX-License-Identifier: CC0-1.0
++# SPDX-License-Identifier: MPL-2.0
 +# test.k9 — K9 test file for MIME type detection
 +
 +---
@@ -121,7 +121,7 @@ index 0000000..52164f5
 +++ b/tests/mime-detection/test.k9.ncl
 @@ -0,0 +1,9 @@
 +K9!
-+# SPDX-License-Identifier: CC0-1.0
++# SPDX-License-Identifier: MPL-2.0
 +# test.k9.ncl — K9 Nickel test file for MIME type detection
 +{
 +  pedigree = {
