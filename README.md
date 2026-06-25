@@ -1,0 +1,177 @@
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+SPDX-FileCopyrightText: 2025-2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+-->
+
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL_2.0-blue.svg)](https://opensource.org/licenses/MPL-2.0)
+[![Palimpsest](https://img.shields.io/badge/Philosophy-Palimpsest-indigo.svg)](https://github.com/hyperpolymath/palimpsest-license)
+
+Jonathan D.A. Jewell \<[j.d.a.jewell@open.ac](j.d.a.jewell@open.ac).uk\>
+:toc: macro :icons: font :source-highlighter: rouge :experimental:
+:url-github: <https://github.com/hyperpolymath/januskey> :url-gitlab:
+<https://gitlab.com/hyperpolymath/januskey> :url-bitbucket:
+<https://bitbucket.org/hyperpolymath/januskey> :url-codeberg:
+<https://codeberg.org/hyperpolymath/januskey>
+
+**Reversible File Operations (formal proofs pending) Through Maximal
+Principle Reduction**
+
+[![RSR Certified](https://img.shields.io/badge/RSR-Certified-gold)](https://github.com/hyperpolymath/rhodium-standard-repositories)
+
+<div id="toc">
+
+</div>
+
+# Overview
+
+JanusKey is a file operation utility suite that pursues complete
+reversibility through architectural design rather than logging or
+backups. Unlike traditional backup systems that restore from external
+state, JanusKey operations carry sufficient information for inversion —
+the goal is to make data loss architecturally impossible (formal proofs
+pending).
+
+## Key Features
+
+- **Reversible by design** - Every operation carries inversion metadata
+  (formal proofs pending)
+
+- **Instant Rollback** - Undo changes in milliseconds
+
+- **Data loss impossible by construction** - the architectural goal the
+  pending proofs are to establish
+
+- **Complete Audit Trail** - Every change tracked automatically
+
+- **Transaction Support** - Group operations, commit/rollback together
+
+- **Content-Addressed Storage** - SHA256 hashing with deduplication
+
+# Quick Start
+
+```bash
+# Build from source (requires Rust)
+cd src/januskey
+cargo build --release
+
+# Initialize JanusKey in your project
+jk init
+
+# Delete files (reversible)
+jk delete *.log
+
+# Undo the delete
+jk undo
+
+# Transactions for batch operations
+jk begin
+jk delete temp*.txt
+jk modify "s/DEBUG/INFO/g" config.yaml
+jk preview   # Review changes
+jk commit    # Or: jk rollback
+```
+
+# Commands
+
+| Command | Description |
+|----|----|
+| `jk` `init` | Initialize JanusKey in current directory |
+| `jk` `delete` `<files>` | Delete files (reversible) |
+| `jk` `modify` `<pattern>` `<files>` | Modify files with sed-like syntax |
+| `jk` `move` `<src>` `<dst>` | Move/rename files |
+| `jk` `copy` `<src>` `<dst>` | Copy files |
+| `jk` `undo` `[--count` `N]` | Undo last operation(s) |
+| `jk` `begin` `[name]` | Start a transaction |
+| `jk` `commit` | Commit current transaction |
+| `jk` `rollback` | Rollback current transaction |
+| `jk` `preview` | Preview pending changes |
+| `jk` `history` | Show operation history |
+| `jk` `status` | Show current status |
+
+# Architecture
+
+JanusKey implements **Maximal Principle Reduction (MPR)**, a security
+methodology where vulnerability elimination occurs by construction
+rather than verification.
+
+    +----------------------------+
+    |       JanusKey CLI         |  <-- jk delete, jk modify, jk move
+    +----------------------------+
+    |      Operation Layer       |  <-- Generates inverse metadata
+    +----------------------------+
+    |    Transaction Manager     |  <-- Groups ops, commit/rollback
+    +----------------------------+
+    |      Metadata Store        |  <-- Append-only operation log
+    +----------------------------+
+    | Content-Addressed Storage  |  <-- SHA256, deduplication
+    +----------------------------+
+
+## Reversibility Guarantee
+
+Every operation stores sufficient metadata for perfect inversion:
+
+- **Delete**: Stores full content + metadata for restoration
+
+- **Modify**: Stores original content hash for rollback
+
+- **Move**: Stores original path for unmove
+
+- **Copy**: Destination path for deletion
+
+# Installation
+
+## From Source (Rust)
+
+```bash
+# Clone the repository
+git clone {url-github}
+cd januskey/src/januskey
+
+# Build release binary
+cargo build --release
+
+# Install to PATH
+cargo install --path .
+```
+
+# Mirrors
+
+| Platform         | URL             |
+|------------------|-----------------|
+| GitHub (primary) | {url-github}    |
+| GitLab           | {url-gitlab}    |
+| Bitbucket        | {url-bitbucket} |
+| Codeberg         | {url-codeberg}  |
+
+# License
+
+This project is licensed under the Mozilla Public License, v. 2.0. See
+the `LICENSE` file for details.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+# Contributing
+
+See <a href="CONTRIBUTING.md" class="md">CONTRIBUTING</a>.
+
+# Research
+
+JanusKey is based on research into reversible computing (formal proofs
+are a target, not yet complete) and Maximal Principle Reduction. See the
+white paper in `docs/` for formal proofs and theoretical foundations.
+
+# Metadata
+
+- Domain: software-development
+
+- Framework: RSR (Rhodium Standard Repository)
+
+- Language: Rust
+
+- Dublin Core: <a href=".well-known/dc.xml"
+  class="well-known/dc xml">.well-known/dc.xml</a>
+
+# Architecture
+
+See <a href="TOPOLOGY.md" class="md">TOPOLOGY</a> for a visual
+architecture map and completion dashboard.
