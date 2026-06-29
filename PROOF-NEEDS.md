@@ -6,10 +6,20 @@ Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 ## Current State
 
-- **src/abi/*.idr**: NO
-- **Dangerous patterns**: 225 `unwrap()` calls across Rust codebase
+_Re-verified 2026-06-29 (idris2 0.8.0)._
+
+- **src/abi/*.idr**: PRESENT but **placeholder** — `src/abi/Proofs.idr` typechecks, but its
+  theorems are trivial/tautological (e.g. `memoryDefeatsGPU : So (65536 >= 65536)`,
+  `timeCostMonotonic : So (a >= b) -> So (a >= b)` returns its own hypothesis). NOT the
+  security proofs listed below.
+- **generated/idrisiser/idris2/Januskey/Verified/*.idr**: **DO NOT typecheck** —
+  `idris2 --check` fails ("Expected a capitalised identifier, got: key") because the
+  generated module names are lowercase. Despite the `Verified/` name, nothing there is
+  currently verified.
+- **Dangerous patterns**: **265** `unwrap()` calls across the Rust codebase.
 - **LOC**: ~12,200 (Rust)
-- **ABI layer**: Missing
+- **ABI layer**: present (`src/abi/{Types,Foreign,Layout,Proofs}.idr`) but carries no
+  load-bearing security proof yet — the real obligations below are still open.
 
 ## What Needs Proving
 
