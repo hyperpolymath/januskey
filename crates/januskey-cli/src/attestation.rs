@@ -6,6 +6,7 @@
 // Tamper-evident logging with cryptographic attestations
 
 use chrono::{DateTime, Utc};
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -118,6 +119,10 @@ pub struct AuditLog {
 }
 
 impl AuditLog {
+    /// Domain-separation / version label bound into every attestation MAC.
+    /// Bumping this string invalidates prior attestations by construction.
+    const ATTESTATION_SCHEME: &'static str = "januskey.attestation.HMAC-SHA256.v1";
+
     /// Create audit log manager for a directory
     pub fn new(root: &Path) -> Self {
         let log_path = root.join(".januskey").join("keys").join("audit.log");
@@ -179,16 +184,43 @@ impl AuditLog {
             .unwrap_or_else(|| "0".repeat(64)))
     }
 
-    /// Compute HMAC-SHA256 attestation
-    fn compute_attestation(&self, data: &str, previous_hash: &str) -> String {
-        let key = self.attestation_key.unwrap_or([0u8; 32]);
+    /// Compute the attestation MAC for a log entry.
+    ///
+    /// Uses a real HMAC-SHA256 (RFC 2104) via the `hmac` crate, keyed on the
+    /// store-derived attestation key. This replaces the former homerolled
+    /// `SHA256(key || data || previous_hash)` construction, which was not a
+    /// MAC (length-extension–exposed and banned by the Trustfile
+    /// `no-homerolled-hmac` invariant).
+    ///
+    /// The scheme label is bound into the MAC as a domain separator; it
+    /// versions the construction, so entries written under the old homerolled
+    /// scheme will not verify under this one (an intentional, alpha-stage
+    /// breaking change — see the module changelog / STATE.a2ml).
+    ///
+    /// Errors if no attestation key is set: an unkeyed attestation is
+    /// forgeable and must never be silently produced (the previous
+    /// `unwrap_or([0u8; 32])` all-zero-key fallback did exactly that).
+    fn compute_attestation(
+        &self,
+        data: &str,
+        previous_hash: &str,
+    ) -> std::io::Result<String> {
+        let key = self.attestation_key.ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "attestation key not set; refusing to produce an unkeyed \
+                 (forgeable) attestation — call init()/set_attestation_key() first",
+            )
+        })?;
 
-        // Simple HMAC-SHA256: H(key || data || previous_hash)
-        let mut hasher = Sha256::new();
-        hasher.update(&key);
-        hasher.update(data.as_bytes());
-        hasher.update(previous_hash.as_bytes());
-        hex::encode(hasher.finalize())
+        let mut mac = <Hmac<Sha256>>::new_from_slice(&key)
+            .expect("HMAC accepts keys of any length");
+        mac.update(Self::ATTESTATION_SCHEME.as_bytes());
+        mac.update(b"\x00");
+        mac.update(data.as_bytes());
+        mac.update(b"\x00");
+        mac.update(previous_hash.as_bytes());
+        Ok(hex::encode(mac.finalize().into_bytes()))
     }
 
     /// Log an event
@@ -211,7 +243,7 @@ impl AuditLog {
             event_type,
             actor
         );
-        let attestation = self.compute_attestation(&attestation_data, &previous_hash);
+        let attestation = self.compute_attestation(&attestation_data, &previous_hash)?;
 
         let entry = AuditEntry {
             event_id,
@@ -408,7 +440,7 @@ impl AuditLog {
                 entry.actor
             );
             let expected_attestation =
-                self.compute_attestation(&attestation_data, &entry.previous_hash);
+                self.compute_attestation(&attestation_data, &entry.previous_hash)?;
 
             if entry.attestation != expected_attestation {
                 return Ok(IntegrityReport {
@@ -551,5 +583,50 @@ mod tests {
             .get_key_history(key_id)
             .expect("failed to get key history");
         assert_eq!(history.len(), 3);
+    }
+
+    #[test]
+    fn test_attestation_refused_without_key() {
+        // An AuditLog with no attestation key must refuse to produce an
+        // attestation rather than silently sign with an all-zero key
+        // (the former unwrap_or([0u8; 32]) forgery hazard).
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let log = AuditLog::new(tmp.path()); // note: no init()/set_attestation_key()
+
+        let err = log
+            .log_store_init()
+            .expect_err("logging without a key must fail");
+        assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    }
+
+    #[test]
+    fn test_attestation_is_genuinely_keyed() {
+        // Verifying with the wrong key must fail. A plain unkeyed hash would
+        // still "verify" here; only a real keyed MAC catches this, proving the
+        // attestation is HMAC-keyed and not the old homerolled concatenation.
+        let tmp = TempDir::new().expect("failed to create temp dir");
+
+        {
+            let mut log = AuditLog::new(tmp.path());
+            log.init([7u8; 32]).expect("init");
+            log.log_store_init().expect("log");
+            log.log_key_generated(
+                Uuid::new_v4(),
+                "fp",
+                KeyAlgorithm::Aes256Gcm,
+                KeyPurpose::Encryption,
+            )
+            .expect("log");
+            assert!(log.verify_integrity().expect("verify").valid);
+        }
+
+        // Re-open the same log with a DIFFERENT attestation key.
+        let mut wrong = AuditLog::new(tmp.path());
+        wrong.set_attestation_key([9u8; 32]);
+        let report = wrong.verify_integrity().expect("verify");
+        assert!(
+            !report.valid,
+            "verification must fail under a different key (keyed MAC)"
+        );
     }
 }

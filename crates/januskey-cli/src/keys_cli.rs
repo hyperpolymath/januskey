@@ -279,14 +279,22 @@ fn cmd_generate(
 
     let algorithm = match key_type.to_lowercase().as_str() {
         "aes256" | "aes-256" | "aes256gcm" => KeyAlgorithm::Aes256Gcm,
-        "ed25519" => KeyAlgorithm::Ed25519,
-        "x25519" => KeyAlgorithm::X25519,
-        _ => {
+        // Ed25519/X25519 are NOT implemented: SecretKey::generate() only
+        // produces 32 random bytes and ignores the algorithm, so generating
+        // one would yield a random blob merely labelled "Ed25519"/"X25519",
+        // not a real keypair. Refuse rather than advertise a capability that
+        // does not exist. (Re-enable once dalek-backed signing/DH lands.)
+        "ed25519" | "x25519" => {
             return Err(format!(
-                "Unknown key type: {}. Use: aes256, ed25519, x25519",
-                key_type
+                "Key type '{}' is not implemented yet: JanusKey has no \
+                 asymmetric key generation (only AES-256-GCM symmetric keys). \
+                 Refusing to generate a random blob mislabelled as {}.",
+                key_type, key_type
             )
             .into())
+        }
+        _ => {
+            return Err(format!("Unknown key type: {}. Use: aes256", key_type).into())
         }
     };
 
