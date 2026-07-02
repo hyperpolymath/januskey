@@ -2,15 +2,27 @@
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // SPDX-FileCopyrightText: 2025 Jonathan D.A. Jewell
 
-= JanusKey Testing Report
+= JanusKey Testing Report (ARCHIVED — 2025-12-29)
 :toc: auto
 :icons: font
 :source-highlighter: rouge
 :date: 2025-12-29
 
+[WARNING]
+====
+*This report is a stale snapshot from 2025-12-29 and is retained for
+history only.* It predates the 2026-04 readiness assessment, which graded
+the project *D (Alpha, Unstable)*. Its "all tests passed / robust and
+functional" framing overstates the current state (homerolled attestation
+MAC, unimplemented asymmetric crypto, no fuzz/mutation/chaos testing).
+
+*For the current, authoritative test status see `READINESS.md` and
+`.machine_readable/6a2/STATE.a2ml`.*
+====
+
 == Executive Summary
 
-This report documents the comprehensive testing of the JanusKey project, a reversible file operations system with cryptographic key management. All tests passed successfully, demonstrating a robust and functional implementation.
+This report documents the testing of the JanusKey project as of 2025-12-29, a reversible file operations system with cryptographic key management. The tests recorded here passed at that time; see the archival warning above for why this no longer reflects project status.
 
 |===
 | Metric | Result
