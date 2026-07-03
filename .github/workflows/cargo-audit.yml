@@ -38,7 +38,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: audit
-    if: failure()
+    # Only file a tracking issue on push/schedule runs. On pull_request events
+    # GITHUB_TOKEN is forced read-only, so `gh issue create` 403s; guarding here
+    # keeps PR runs green (the audit job itself still gates the PR).
+    if: failure() && github.event_name != 'pull_request'
     permissions:
       issues: write
     steps:

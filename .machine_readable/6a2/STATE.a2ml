@@ -53,8 +53,8 @@ compatibility = false
 
 [blockers]
 threat-model-signoff = "threat-model.a2ml status = draft-pending-human-review (since 2026-04-19); blocks any januskey-mcp cartridge"
-homerolled-hmac = "attestation.rs SHA256(key||data) pattern flagged by threat model; must be replaced with a real HMAC primitive before MCP exposure (Trustfile no-homerolled-hmac)"
-metadata-only-key-types = "Ed25519/X25519 enum entries lack real sign/DH implementations (threat-model flag)"
+homerolled-hmac = "RESOLVED: attestation.rs now uses a real HMAC-SHA256 (hmac crate, RFC 2104) with a versioned domain separator, and hard-errors instead of the unwrap_or([0u8;32]) unkeyed fallback. Regression tests: test_attestation_refused_without_key, test_attestation_is_genuinely_keyed. Satisfies Trustfile no-homerolled-hmac."
+metadata-only-key-types = "PARTIALLY MITIGATED: Ed25519/X25519 key generation is now refused at the CLI (was silently producing 32 random bytes mislabelled as an asymmetric key); enum variants retained only for backward-compatible deserialization. Real dalek-backed sign/DH still unimplemented."
 claude-md-maintainer-edits = ".claude/CLAUDE.md is guardrail-blocked for agents: line 46 still says 'Julia/Rust/ReScript' (leftover from #49); package-management section still cites flake.nix, removed by the estate wave"
 idris2-in-ci = "just test-proofs requires the idris2 binary; proof check not yet wired as a CI gate (READINESS D→C promotion item)"
 

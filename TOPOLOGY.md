@@ -3,7 +3,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 -->
 <!-- TOPOLOGY.md — Project architecture map and completion dashboard -->
-<!-- Last updated: 2026-02-19 -->
+<!-- Last updated: 2026-07-02 (completion dashboard reconciled to STATE.a2ml / READINESS.md) -->
 
 # JanusKey — Project Topology
 
@@ -53,27 +53,43 @@ Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 ## Completion Dashboard
 
+> **Source of truth:** `.machine_readable/6a2/STATE.a2ml` (completion 60%,
+> CRG grade **D**) and `READINESS.md` (Grade **D — Alpha, Unstable**). This
+> dashboard is a human-readable summary of those files; if they disagree,
+> they win. Percentages below are qualitative, not measured coverage.
+
 ```
 COMPONENT                          STATUS              NOTES
 ─────────────────────────────────  ──────────────────  ─────────────────────────────────
 CORE ENGINE (RUST)
-  Operation Layer                   ██████████ 100%    Delete/Modify/Move stable
-  Inverse Metadata Gen              ██████████ 100%    Perfect inversion verified
-  Transaction Manager               ██████████ 100%    Begin/Commit/Rollback active
-  Content-Addressed Storage         ██████████ 100%    SHA256 deduplication verified
+  Operation Layer                   ████████░░  ~85%   Delete/Modify/Move implemented; unit-tested
+  Inverse Metadata Gen              ████████░░  ~80%   execute∘undo roundtrip property-tested (proptest)
+  Transaction Manager               ████████░░  ~80%   Begin/Commit/Rollback tested via P2P suite
+  Content-Addressed Storage         ████████░░  ~85%   Real SHA256 content store + dedup
+
+SECURITY (honest)
+  Attestation / audit chain         ███░░░░░░░  ~30%   Homerolled SHA256(key||data||prev) MAC +
+                                                        zero-key fallback — flagged by threat model
+                                                        (STATE.a2ml homerolled-hmac); needs real HMAC
+  Asymmetric crypto                 █░░░░░░░░░  ~10%   Ed25519/X25519 are enum labels, not implemented
+  Secure obliteration               ████░░░░░░  ~40%   Best-effort; NOT guaranteed on SSD/CoW (threat-
+                                                        model dependent — see obliteration caveat)
 
 INTERFACES & RESEARCH
-  CLI Interface (jk)                ██████████ 100%    Full command set verified
-  MPR Methodology                   ██████████ 100%    Security by construction proven
-  Testing Report (SCM)              ██████████ 100%    Audit trail validated
+  CLI Interface (jk)                ████████░░  ~85%   Full command set; no user testing yet
+  MPR Methodology                   ████░░░░░░  ~40%   Design documented; FORMAL PROOFS PENDING
+                                                        (30 Idris2 proofs unchecked in CI; not linked
+                                                        to the Rust)
+  Testing (READINESS matrix)        ██████░░░░  ~60%   67 tests + 5 benches; missing fuzz, mutation,
+                                                        chaos, compatibility (Grade D)
 
 REPO INFRASTRUCTURE
-  Justfile Automation               ██████████ 100%    Standard build/lint tasks
-  .machine_readable/                ██████████ 100%    STATE tracking active
-  0-AI-MANIFEST.a2ml                ██████████ 100%    AI entry point verified
+  Justfile Automation               █████████░  ~90%   Build/lint/test recipes present
+  .machine_readable/                █████████░  ~90%   STATE tracking active
+  0-AI-MANIFEST.a2ml                █████████░  ~90%   AI entry point present
 
 ─────────────────────────────────────────────────────────────────────────────
-OVERALL:                            ██████████ 100%    v1.0 Production Ready
+OVERALL:                            ██████░░░░  ~60%   Grade D — Alpha, Unstable (not v1.0)
 ```
 
 ## Key Dependencies

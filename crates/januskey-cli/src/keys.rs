@@ -63,8 +63,15 @@ const KEY_LENGTH: usize = 32;
 /// Key algorithm types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KeyAlgorithm {
+    /// AES-256-GCM symmetric key — the only algorithm actually implemented.
     Aes256Gcm,
+    /// Reserved / NOT IMPLEMENTED. No Ed25519 keypair is generated; key
+    /// generation for this variant is refused at the CLI. Retained so
+    /// historical serialized metadata/audit entries still deserialize.
     Ed25519,
+    /// Reserved / NOT IMPLEMENTED. No X25519 keypair is generated; key
+    /// generation for this variant is refused at the CLI. Retained so
+    /// historical serialized metadata/audit entries still deserialize.
     X25519,
 }
 
