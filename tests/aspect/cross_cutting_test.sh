@@ -51,7 +51,7 @@ check "No unsafe in reversible-core" "! grep -rh 'unsafe' '${JK_DIR}/crates/reve
 
 # --- Documentation ---
 echo "--- Documentation ---"
-check "README.adoc exists" "[ -f '${JK_DIR}/README.adoc' ]"
+check "README exists" "[ -f '${JK_DIR}/README.md' ] || [ -f '${JK_DIR}/README.adoc' ]"
 check "SECURITY.md exists" "[ -f '${JK_DIR}/SECURITY.md' ]"
 check "ARCHITECTURE.md exists" "[ -f '${JK_DIR}/ARCHITECTURE.md' ]"
 check "PROOF-NEEDS.md exists" "[ -f '${JK_DIR}/PROOF-NEEDS.md' ]"
