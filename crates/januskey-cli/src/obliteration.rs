@@ -5,10 +5,22 @@
 // RMO: Obliterative Wipe Primitive
 // Implements GDPR Article 17 "Right to Erasure" with formal obliteration proofs
 //
-// The RMO primitive guarantees:
-// 1. Content is cryptographically unrecoverable after obliteration
-// 2. A proof of non-existence is generated
-// 3. The fact of obliteration is logged (without content)
+// The RMO primitive provides:
+// 1. A best-effort DoD 5220.22-M-style multi-pass overwrite of the file's
+//    bytes at its current path (0x00 / 0xFF / random), then removal
+// 2. A cryptographic proof-of-obliteration commitment (SHA256 of the prior
+//    content hash + nonce + timestamp)
+// 3. A logged record of the obliteration (without content)
+//
+// THREAT-MODEL CAVEAT (do not overstate): overwrite-in-place does NOT
+// guarantee physical erasure on copy-on-write / journaling filesystems or
+// flash media (Btrfs, XFS, ZFS, and any SSD behind an FTL with
+// wear-levelling): the controller may write the new passes to different
+// physical blocks and leave the originals readable. The "unrecoverable"
+// guarantee holds only against logical/path-based recovery on overwrite-in-
+// place media; on modern storage it is best-effort. See
+// .machine_readable/threat-model.a2ml [primitives.secure-delete]. For a hard
+// guarantee, obliterate the key material (encrypt-then-shred), not the bytes.
 
 use crate::content_store::{ContentHash, ContentStore};
 use crate::error::{JanusError, Result};

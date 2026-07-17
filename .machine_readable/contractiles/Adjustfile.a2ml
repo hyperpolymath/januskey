@@ -77,7 +77,7 @@ Standard: WCAG-2.2-AA (CLI/TUI profile).
 
 ### panic-pattern-drift
 - description: No regression of the 2026-04 unwrap()/expect("TODO") sweeps in security-critical modules
-- tolerance: 0 new bare unwrap() in crates/*/src and src/januskey/src
+- tolerance: 0 new bare unwrap() in crates/*/src
 - corrective: Run `just assail` (panic-attacker pre-commit scan)
 - severity: advisory
 

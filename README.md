@@ -38,8 +38,11 @@ pending).
 
 - **Instant Rollback** - Undo changes in milliseconds
 
-- **Data loss impossible by construction** - the architectural goal the
-  pending proofs are to establish
+- **Data loss resistant by construction** - reversibility is the
+  architectural goal the pending proofs are to establish. (Note: *secure
+  obliteration* is the deliberate exception and is best-effort only —
+  overwrite-in-place cannot guarantee physical erasure on SSD/CoW/journaling
+  media; see the threat model.)
 
 - **Complete Audit Trail** - Every change tracked automatically
 
@@ -51,8 +54,7 @@ pending).
 
 ```bash
 # Build from source (requires Rust)
-cd src/januskey
-cargo build --release
+cargo build --workspace --release
 
 # Initialize JanusKey in your project
 jk init
@@ -125,10 +127,10 @@ Every operation stores sufficient metadata for perfect inversion:
 ```bash
 # Clone the repository
 git clone {url-github}
-cd januskey/src/januskey
+cd januskey
 
 # Build release binary
-cargo build --release
+cargo build --workspace --release
 
 # Install to PATH
 cargo install --path .

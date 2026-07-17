@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: MPL-2.0
--- Type signatures for januskey KEK derivation (src/januskey/src/keys.rs)
+-- Type signatures for januskey KEK derivation (crates/januskey-cli/src/keys.rs)
 -- Format: name : Type (idrisiser type-sig format)
 
 derive_kek : String -> Bytes 16 -> Result SecretKey KeyError
