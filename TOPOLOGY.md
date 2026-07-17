@@ -57,6 +57,9 @@ Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 > CRG grade **D**) and `READINESS.md` (Grade **D — Alpha, Unstable**). This
 > dashboard is a human-readable summary of those files; if they disagree,
 > they win. Percentages below are qualitative, not measured coverage.
+> This agreement is now **machine-enforced**: `just check-dashboard`
+> (crate `crates/dashboard-check`, CI job `Dashboard Check`) fails the build
+> if the `OVERALL` percentage or grade here drifts from STATE.a2ml.
 
 ```
 COMPONENT                          STATUS              NOTES

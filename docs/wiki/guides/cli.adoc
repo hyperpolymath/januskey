@@ -17,7 +17,7 @@ The `jk` command-line interface provides access to all JanusKey operations. This
 [source,bash]
 ----
 # Build from source
-cd src/januskey
+cd crates/januskey-cli
 cargo build --release
 
 # Install to PATH

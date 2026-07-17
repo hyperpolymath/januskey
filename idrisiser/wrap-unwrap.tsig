@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: MPL-2.0
--- Type signatures for januskey AES-256-GCM wrap/unwrap (src/januskey/src/keys.rs)
+-- Type signatures for januskey AES-256-GCM wrap/unwrap (crates/januskey-cli/src/keys.rs)
 -- Format: name : Type (idrisiser type-sig format)
 
 wrap_key : SecretKey -> Bytes 32 -> KeyMetadata -> Result WrappedKey KeyError

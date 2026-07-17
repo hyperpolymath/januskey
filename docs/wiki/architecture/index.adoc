@@ -44,7 +44,7 @@ JanusKey follows a layered architecture that separates concerns and enables the 
 
 === CLI Layer
 
-Location: `src/januskey/src/main.rs`
+Location: `crates/januskey-cli/src/main.rs`
 
 The CLI provides the user interface for JanusKey operations:
 
@@ -80,7 +80,7 @@ See: link:../guides/cli.adoc[CLI Guide]
 
 === Operation Layer
 
-Location: `src/januskey/src/operations.rs`
+Location: `crates/januskey-cli/src/operations.rs`
 
 Defines all reversible file operations and their execution logic.
 
@@ -127,7 +127,7 @@ See: link:../operations/index.adoc[Operations Reference]
 
 === Transaction Manager
 
-Location: `src/januskey/src/transaction.rs`
+Location: `crates/januskey-cli/src/transaction.rs`
 
 Provides transaction support for grouping operations.
 
@@ -154,7 +154,7 @@ See: link:../guides/transactions.adoc[Transaction Guide]
 
 === Content Store
 
-Location: `src/januskey/src/content_store.rs`
+Location: `crates/januskey-cli/src/content_store.rs`
 
 Content-addressed storage with SHA256 hashing and optional compression.
 
@@ -188,7 +188,7 @@ See: link:content-store.adoc[Content Store Details]
 
 === Metadata Store
 
-Location: `src/januskey/src/metadata.rs`
+Location: `crates/januskey-cli/src/metadata.rs`
 
 Append-only operation log in JSON format.
 

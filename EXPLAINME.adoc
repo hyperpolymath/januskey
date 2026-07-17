@@ -10,19 +10,19 @@ The README makes claims. This file backs them up.
 
 === Claim 1: "100% Reversible - Every operation can be undone, always"
 
-**How it works:** JanusKey implements architectural reversibility by storing inverted operations alongside each mutation. The delete operation, implemented in `src/januskey/src/obliteration.rs`, calculates and stores a full restoration record before removing file content. The `delta.rs` module generates inverse metadata that sufficient to reconstruct the pre-operation state. Every operation in the transaction layer (`src/januskey/src/metadata.rs`) maintains a "prior state" record, enabling perfect reversal through the `undo` pathway.
+**How it works:** JanusKey implements architectural reversibility by storing inverted operations alongside each mutation. The delete operation, implemented in `crates/januskey-cli/src/obliteration.rs`, calculates and stores a full restoration record before removing file content. The `delta.rs` module generates inverse metadata that sufficient to reconstruct the pre-operation state. Every operation in the transaction layer (`crates/januskey-cli/src/metadata.rs`) maintains a "prior state" record, enabling perfect reversal through the `undo` pathway.
 
 **Caveat:** Reversibility is strong only when the operation log remains intact. If `.jk/` metadata store is corrupted or lost, recovery becomes impossible. The system trades **write amplification** (each operation doubles metadata I/O) for guaranteed recoverability.
 
-**Evidence:** `src/januskey/src/lib.rs` (public API) delegates to `obliteration.rs` and `delta.rs` for operation logic; see `Reversible` trait (if present) or reversibility-proof comments in `attestation.rs`.
+**Evidence:** `crates/januskey-cli/src/lib.rs` (public API) delegates to `obliteration.rs` and `delta.rs` for operation logic; see `Reversible` trait (if present) or reversibility-proof comments in `attestation.rs`.
 
 === Claim 2: "Complete Audit Trail - Every change tracked automatically"
 
-**How it works:** The metadata store (`src/januskey/src/metadata.rs`) maintains an append-only operation log. The `attestation.rs` module calculates cryptographic commitments (SHA256 hashes) of each operation, creating a tamper-evident chain. Content-addressed storage (`src/januskey/src/content_store.rs`) ensures deduplication by content hash, preventing duplicate storage while maintaining full history.
+**How it works:** The metadata store (`crates/januskey-cli/src/metadata.rs`) maintains an append-only operation log. The `attestation.rs` module calculates cryptographic commitments (SHA256 hashes) of each operation, creating a tamper-evident chain. Content-addressed storage (`crates/januskey-cli/src/content_store.rs`) ensures deduplication by content hash, preventing duplicate storage while maintaining full history.
 
 **Caveat:** The audit trail is only as trustworthy as the append-only mechanism. If the log is truncated or rewritten on-disk, the chain breaks. For forensic-grade auditing, integrate with an external append-only store (database, blockchain).
 
-**Evidence:** `src/januskey/src/metadata.rs` defines the log structure; `attestation.rs` computes cryptographic bindings; `content_store.rs` handles SHA256 hashing.
+**Evidence:** `crates/januskey-cli/src/metadata.rs` defines the log structure; `attestation.rs` computes cryptographic bindings; `content_store.rs` handles SHA256 hashing.
 
 == Technology Choices
 
@@ -41,15 +41,15 @@ The README makes claims. This file backs them up.
 |===
 | Path | Purpose
 
-| `src/januskey/src/main.rs` | CLI entry point, command dispatch (delete, modify, move, copy, undo, begin, commit, rollback, preview)
-| `src/januskey/src/lib.rs` | Public API: init, delete, modify, move, copy, undo, transaction logic
-| `src/januskey/src/obliteration.rs` | Delete operation with restoration metadata
-| `src/januskey/src/delta.rs` | Computes inverse operations (modify undo, move undo, copy undo)
-| `src/januskey/src/metadata.rs` | Append-only operation log, transaction tracking, rollback state
-| `src/januskey/src/content_store.rs` | SHA256 content hashing, deduplication, storage management
-| `src/januskey/src/attestation.rs` | Cryptographic commitments, audit trail, tamper detection
-| `src/januskey/src/keys.rs` | Cryptographic key management (if key-based reversibility)
-| `src/januskey/src/error.rs` | Error types and propagation
+| `crates/januskey-cli/src/main.rs` | CLI entry point, command dispatch (delete, modify, move, copy, undo, begin, commit, rollback, preview)
+| `crates/januskey-cli/src/lib.rs` | Public API: init, delete, modify, move, copy, undo, transaction logic
+| `crates/januskey-cli/src/obliteration.rs` | Delete operation with restoration metadata
+| `crates/januskey-cli/src/delta.rs` | Computes inverse operations (modify undo, move undo, copy undo)
+| `crates/januskey-cli/src/metadata.rs` | Append-only operation log, transaction tracking, rollback state
+| `crates/januskey-cli/src/content_store.rs` | SHA256 content hashing, deduplication, storage management
+| `crates/januskey-cli/src/attestation.rs` | Cryptographic commitments, audit trail, tamper detection
+| `crates/januskey-cli/src/keys.rs` | Cryptographic key management (if key-based reversibility)
+| `crates/januskey-cli/src/error.rs` | Error types and propagation
 |===
 
 == Dogfooted Across The Account

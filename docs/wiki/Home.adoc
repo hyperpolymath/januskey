@@ -100,7 +100,7 @@ The "Key" represents the cryptographic foundation (SHA256 content addressing) th
 [source,bash]
 ----
 # Build from source
-cd src/januskey
+cd crates/januskey-cli
 cargo build --release
 
 # Initialize in a directory

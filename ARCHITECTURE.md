@@ -42,8 +42,6 @@ januskey/
 │       ├── delta           — Differential operations
 │       ├── main            — jk CLI binary
 │       └── keys_cli        — jk-keys CLI binary
-│
-└── src/januskey/           ← LEGACY (pre-extraction, superseded by crates/)
 ```
 
 ## reversible-core: The Shared Foundation

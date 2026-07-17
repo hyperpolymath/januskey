@@ -219,7 +219,7 @@ jobs:
 
       - name: Install JanusKey
         run: |
-          cd src/januskey
+          cd crates/januskey-cli
           cargo install --path .
 
       - name: Initialize JanusKey

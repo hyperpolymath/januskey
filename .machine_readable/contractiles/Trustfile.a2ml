@@ -117,8 +117,6 @@ unjustified, it has no place here. Trust never overrides MUST.
     # OR the file does not exist. Fails while the home-rolled pattern is present.
     if [ -f crates/januskey-cli/src/attestation.rs ]; then \
       ! grep -qE 'Sha256::new\(\).*update.*key.*update.*data' crates/januskey-cli/src/attestation.rs; \
-    elif [ -f src/januskey/src/attestation.rs ]; then \
-      ! grep -qE 'Sha256::new\(\).*update.*key.*update.*data' src/januskey/src/attestation.rs; \
     else true; fi
 - severity: critical
 
@@ -129,7 +127,7 @@ unjustified, it has no place here. Trust never overrides MUST.
     # Passes if ed25519-dalek or x25519-dalek is a real dependency, OR if
     # Ed25519 / X25519 are not listed in any KeyAlgorithm enum.
     cargo tree 2>/dev/null | grep -qE '(ed25519-dalek|x25519-dalek)' || \
-      ! grep -rqE '(Ed25519|X25519)' crates/januskey-cli/src/ src/januskey/src/ 2>/dev/null
+      ! grep -rqE '(Ed25519|X25519)' crates/januskey-cli/src/ 2>/dev/null
 
 ## Secrets-hygiene (memory rule: SOPS at-rest / Rokur runtime / RGTV LLM-broker)
 

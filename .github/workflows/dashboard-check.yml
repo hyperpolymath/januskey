@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# dashboard-check.yml — fail the build when a hand-maintained status dashboard
+# (TOPOLOGY.md / READINESS.md) diverges from the machine-readable STATE.a2ml.
+# Structural defence against the "dashboards that lie" failure mode.
+name: Dashboard Check
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard-check:
+    name: STATE vs dashboard reconciliation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+
+      - name: Reconcile dashboards against STATE.a2ml
+        run: cargo run -q -p dashboard-check -- --check .
