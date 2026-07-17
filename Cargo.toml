@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 
 [workspace]
-members = ["crates/reversible-core", "crates/januskey-cli"]
+members = ["crates/reversible-core", "crates/januskey-cli", "crates/dashboard-check"]
 resolver = "2"
 
 [workspace.package]

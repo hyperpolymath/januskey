@@ -31,6 +31,10 @@ fmt:
 lint:
     cargo clippy --workspace -- -D warnings
 
+# Fail if a hand-maintained dashboard diverges from STATE.a2ml (source of truth)
+check-dashboard:
+    cargo run -q -p dashboard-check -- --check .
+
 # Run benchmarks
 bench:
     cargo bench --workspace
