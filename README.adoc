@@ -1,0 +1,183 @@
+// SPDX-License-Identifier: MPL-2.0
+= JanusKey — Reversible File Operations
+:toc: preamble
+:toc-title: Contents
+:icons: font
+:doctype: article
+
+image:https://img.shields.io/badge/OpenSSF-BestPractices-green[link="https://www.bestpractices.dev/projects/XXXX"]
+
+A Rust CLI for file operations that carry their own inversion metadata. Undo deletes, modifications, and moves in milliseconds without external backups. Formal proofs of complete reversibility are pending.
+
+== Overview
+
+JanusKey is a file operation utility suite that pursues complete reversibility through architectural design. Unlike traditional backup systems that restore from external state, JanusKey operations carry sufficient information for inversion—the goal is to make data loss architecturally impossible.
+
+Every `jk delete`, `jk modify`, or `jk move` stores the inverse operation in an append-only log backed by content-addressed storage (SHA-256). Rolling back is a metadata lookup, not a filesystem search or a tape restore.
+
+[CAUTION]
+====
+**Formal proofs of complete reversibility are pending.** The engineering mechanism (inversion metadata) is implemented in Rust. The mathematical guarantee that this construction makes data loss impossible under all allowed operations has not yet been mechanically verified. See link:EXPLAINME.adoc#_reversibility_guarantee[EXPLAINME §Reversibility guarantee].
+====
+
+== What is standard and what is ours
+
+[cols="1,2,2", options="header"]
+|===
+| Concept | Status | Home
+
+| Content-addressed storage (SHA-256)
+| Standard (Git, IPFS, Nix)
+| Storage layer
+
+| Append-only operation log
+| Standard (event sourcing, WAL)
+| Metadata store
+
+| Transactional commit/rollback
+| Standard (databases)
+| Transaction manager
+
+| CLI for reversible file operations
+| Standard (various undo/trash utilities)
+| `jk` command suite
+
+| Inversion metadata attached to every operation
+| **Novel packaging** (operations carry their own inverse)
+| Operation layer
+
+| Maximal Principle Reduction (MPR)
+| **Novel vocabulary** for "secure by construction"
+| Design philosophy
+|===
+
+== The reversibility mechanism
+
+Every operation stores sufficient metadata for inversion:
+
+[cols="1,2", options="header"]
+|===
+| Operation | Inversion metadata stored
+
+| Delete
+| Full file content + metadata in content-addressed storage
+
+| Modify
+| Original content hash + location in content store
+
+| Move
+| Original path
+
+| Copy
+| Destination path
+|===
+
+Rollback is an lookup-then-execute operation against the append-only log, bounded by metadata retrieval time (milliseconds), not filesystem scan time.
+
+== The secure obliteration exception
+
+Reversibility is the default. Secure obliteration (`jk shred`) is the deliberate, explicit exception. It is best-effort only:
+
+* Overwrite-in-place cannot guarantee physical erasure on SSDs (wear leveling), CoW filesystems (ZFS, Btrfs), or journaling filesystems.
+* The threat model for `shred` assumes spinning-rust physical media. On modern media, physical destruction is the only guaranteed obliteration.
+
+== Commands
+
+[cols="1,2", options="header"]
+|===
+| Command | Description
+
+| `jk init`
+| Initialize JanusKey in current directory
+
+| `jk delete <files>`
+| Delete files (reversible)
+
+| `jk modify <pattern> <files>`
+| Modify files with sed-like syntax
+
+| `jk move <src> <dst>`
+| Move/rename files
+
+| `jk copy <src> <dst>`
+| Copy files
+
+| `jk undo [--count N]`
+| Undo last operation(s)
+
+| `jk begin [name]`
+| Start a transaction
+
+| `jk commit`
+| Commit current transaction
+
+| `jk rollback`
+| Rollback current transaction
+
+| `jk preview`
+| Preview pending changes
+
+| `jk history`
+| Show operation history
+
+| `jk status`
+| Show current status
+|===
+
+== Architecture
+
+┌────────────────────────────┐
+│       JanusKey CLI         │  jk delete, jk modify, jk move
+├────────────────────────────┤
+│      Operation Layer       │  Generates inverse metadata
+├────────────────────────────┤
+│    Transaction Manager     │  Groups ops, commit/rollback
+├────────────────────────────┤
+│      Metadata Store        │  Append-only operation log
+├────────────────────────────┤
+│ Content-Addressed Storage  │  SHA-256, deduplication
+└────────────────────────────┘
+
+== Known scope boundaries
+
+[CAUTION]
+====
+**Formal proofs are pending.** The claim "data loss is architecturally impossible" is an engineering intent supported by the inversion-metadata mechanism. It is not yet a mechanically verified theorem. The `src/abi/` and `idrisiser/` directories suggest Idris 2 specification targets, but these are not yet discharging the reversibility guarantee.
+====
+
+[CAUTION]
+====
+**Secure obliteration is best-effort.** `jk shred` cannot guarantee physical erasure on SSD, CoW, or journaling filesystems. This is a physical constraint, not a software bug.
+====
+
+[CAUTION]
+====
+**MPR is design vocabulary, not a verified method.** Maximal Principle Reduction describes the design philosophy of eliminating vulnerability by construction (no irreversible code path exists). It is not a formal method with mechanical tooling in this repo.
+====
+
+== Build
+
+[source,bash]
+----
+# Build from source (requires Rust)
+cargo build --workspace --release
+
+# Initialize
+jk init
+
+# Run tests
+cargo test --workspace
+----
+
+== Documentation
+
+* link:EXPLAINME.adoc[EXPLAINME] — claim-by-claim receipts and known gaps
+* link:Glossary.adoc[Glossary] — terminology reference
+* `ARCHITECTURE.md` — architecture map and completion dashboard
+* `ROADMAP.adoc` — development roadmap
+
+== License
+
+SPDX-License-Identifier: MPL-2.0 — see link:LICENSE[LICENSE].
+
+Prose documentation is licensed under CC-BY-SA-4.0; see `LICENSES/`.
