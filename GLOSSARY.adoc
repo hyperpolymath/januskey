@@ -1,0 +1,65 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= JanusKey — Glossary
+:toc: preamble
+:toc-title: Contents
+:icons: font
+:doctype: article
+
+Cross-reference glossary for link:README.adoc[README.adoc], link:EXPLAINME.adoc[EXPLAINME.adoc], and the JanusKey wiki.
+
+== Core concepts
+
+[[inversion-metadata]]
+Inversion metadata::
+  The metadata attached to every JanusKey operation, containing sufficient information to reverse that operation. Delete stores content; modify stores original hash; move stores original path; copy stores destination path.
+  *Classification:* **project-specific** (packaging).
+
+[[reversibility-guarantee]]
+Reversibility guarantee::
+  The claim that no JanusKey operation (except `shred`) destroys the information required for inversion. Currently an engineering guarantee (implemented in Rust), not a formal theorem (mechanically verified proof pending).
+  *Classification:* **project-specific** (claim).
+
+[[mpr]]
+Maximal Principle Reduction (MPR)::
+  A security methodology where vulnerability elimination occurs by construction rather than verification. In JanusKey: the irreversible-deletion vulnerability is eliminated because no such code path exists (except `shred`). Project-specific vocabulary for the standard principle "secure by construction."
+  *Classification:* **project-specific** (vocabulary).
+
+== Architecture
+
+[[content-addressed-storage]]
+Content-addressed storage (CAS)::
+  Storage indexed by SHA-256 hash of content. Provides deduplication and content integrity. Standard in Git, IPFS, Nix.
+  *Classification:* **standard**.
+
+[[append-only-log]]
+Append-only log::
+  The metadata store recording the sequence of JanusKey operations. Never mutated in place; new operations are appended. Enables history traversal and rollback.
+  *Classification:* **standard** (event sourcing).
+
+[[transaction-manager]]
+Transaction manager::
+  Groups operations into atomic units with commit/rollback semantics. If any operation in a transaction fails, the entire transaction rolls back.
+  *Classification:* **standard**.
+
+== Exceptions
+
+[[secure-obliteration]]
+Secure obliteration (`jk shred`)::
+  The deliberate exception to reversibility. Attempts overwrite-in-place to destroy file contents. Best-effort only: cannot guarantee physical erasure on SSD (wear leveling), CoW (ZFS, Btrfs), or journaling filesystems. Physical destruction is the only guaranteed obliteration on modern media.
+  *Classification:* **project-specific** (operation).
+
+== Pronunciation guide
+
+[cols="1,2", options="header"]
+|===
+| Written | Spoken
+
+| JanusKey
+| "janus-key" (after the two-faced Roman god of transitions)
+
+| MPR
+| "em-pee-are"
+
+| jk
+| "jay-kay"
+|===
