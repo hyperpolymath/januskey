@@ -1,15 +1,8 @@
-<!--
-SPDX-License-Identifier: CC-BY-SA-4.0
-Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
--->
-<!-- TOPOLOGY.md — Project architecture map and completion dashboard -->
-<!-- Last updated: 2026-07-02 (completion dashboard reconciled to STATE.a2ml / READINESS.md) -->
+== JanusKey — Project Topology
 
-# JanusKey — Project Topology
+=== System Architecture
 
-## System Architecture
-
-```
+....
                         ┌─────────────────────────────────────────┐
                         │              OPERATOR / CLI             │
                         │        (jk delete, jk modify, jk undo)  │
@@ -49,19 +42,21 @@ Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
                         │  Justfile / Cargo   .machine_readable/  │
                         │  MAAF Integration   0-AI-MANIFEST.a2ml  │
                         └─────────────────────────────────────────┘
-```
+....
 
-## Completion Dashboard
+=== Completion Dashboard
 
-> **Source of truth:** `.machine_readable/6a2/STATE.a2ml` (completion 60%,
-> CRG grade **D**) and `READINESS.md` (Grade **D — Alpha, Unstable**). This
-> dashboard is a human-readable summary of those files; if they disagree,
-> they win. Percentages below are qualitative, not measured coverage.
-> This agreement is now **machine-enforced**: `just check-dashboard`
-> (crate `crates/dashboard-check`, CI job `Dashboard Check`) fails the build
-> if the `OVERALL` percentage or grade here drifts from STATE.a2ml.
+____
+*Source of truth:* `+.machine_readable/6a2/STATE.a2ml+` (completion 60%,
+CRG grade *D*) and `+READINESS.md+` (Grade *D — Alpha, Unstable*). This
+dashboard is a human-readable summary of those files; if they disagree,
+they win. Percentages below are qualitative, not measured coverage. This
+agreement is now *machine-enforced*: `+just check-dashboard+` (crate
+`+crates/dashboard-check+`, CI job `+Dashboard Check+`) fails the build
+if the `+OVERALL+` percentage or grade here drifts from STATE.a2ml.
+____
 
-```
+....
 COMPONENT                          STATUS              NOTES
 ─────────────────────────────────  ──────────────────  ─────────────────────────────────
 CORE ENGINE (RUST)
@@ -93,25 +88,26 @@ REPO INFRASTRUCTURE
 
 ─────────────────────────────────────────────────────────────────────────────
 OVERALL:                            ██████░░░░  ~60%   Grade D — Alpha, Unstable (not v1.0)
-```
+....
 
-## Key Dependencies
+=== Key Dependencies
 
-```
+....
 jk command ──────► Inverse Meta ──────► Transaction Mgr ──────► Commit
      │                 │                   │                    │
      ▼                 ▼                   ▼                    ▼
 Source File ─────► SHA256 Store ─────► Metadata Log ───────► Rollback
-```
+....
 
-## Update Protocol
+=== Update Protocol
 
 This file is maintained by both humans and AI agents. When updating:
 
-1. **After completing a component**: Change its bar and percentage
-2. **After adding a component**: Add a new row in the appropriate section
-3. **After architectural changes**: Update the ASCII diagram
-4. **Date**: Update the `Last updated` comment at the top of this file
+[arabic]
+. *After completing a component*: Change its bar and percentage
+. *After adding a component*: Add a new row in the appropriate section
+. *After architectural changes*: Update the ASCII diagram
+. *Date*: Update the `+Last updated+` comment at the top of this file
 
-Progress bars use: `█` (filled) and `░` (empty), 10 characters wide.
-Percentages: 0%, 10%, 20%, ... 100% (in 10% increments).
+Progress bars use: `+█+` (filled) and `+░+` (empty), 10 characters wide.
+Percentages: 0%, 10%, 20%, … 100% (in 10% increments).
