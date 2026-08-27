@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
+# This workflow is managed by gh actions-lock.
 # JanusKey E2E + P2P + Aspect + Bench + Panic-Attack CI
 name: E2E + Aspect + Bench + Security
 
@@ -16,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2.9.2
       - name: Build
         run: cargo build --release
       - name: Unit + P2P tests
@@ -33,9 +34,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2.9.2
       - name: Run benchmarks
         run: cargo bench -- --output-format bencher 2>/dev/null || echo "Benchmarks completed"
 
@@ -44,9 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2.9.2
       - name: Build release
         run: cargo build --release
       - name: Run E2E tests
@@ -57,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
       - name: Run aspect tests
         run: bash tests/aspect/cross_cutting_test.sh
 
@@ -66,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
       - name: Install Zig
         run: |
           wget -q https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz
@@ -83,8 +84,8 @@ jobs:
     timeout-minutes: 15
     if: github.event_name == 'push'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
       - name: Install panic-attack
         run: cargo install --git https://github.com/hyperpolymath/panic-attacker.git 2>/dev/null || echo "panic-attack unavailable"
       - name: Run assail scan
