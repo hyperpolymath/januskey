@@ -12,6 +12,7 @@ on:
       - '.github/workflows/**'
 
 permissions: read-all
+  actions: read
 
 jobs:
   lint-workflows:
