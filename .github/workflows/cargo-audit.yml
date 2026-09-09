@@ -1,3 +1,4 @@
+# This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
 # This workflow is managed by gh actions-lock.
 # Prevention workflow - audits Rust dependencies for vulnerabilities
@@ -17,7 +18,6 @@ on:
     - cron: '0 6 * * 1'  # Weekly on Monday
 
 permissions: read-all
-  actions: read
 
 jobs:
   audit:

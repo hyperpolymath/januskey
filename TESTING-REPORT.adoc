@@ -17,7 +17,7 @@ functional" framing overstates the current state (homerolled attestation
 MAC, unimplemented asymmetric crypto, no fuzz/mutation/chaos testing).
 
 *For the current, authoritative test status see `READINESS.md` and
-`.machine_readable/6a2/STATE.a2ml`.*
+`.machine_readable/descriptiles/STATE.a2ml`.*
 ====
 
 == Executive Summary

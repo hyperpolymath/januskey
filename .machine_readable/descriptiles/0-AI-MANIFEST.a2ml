@@ -1,8 +1,8 @@
-# AI Manifest for 6a2 Directory
+# AI Manifest for the descriptiles Directory
 
 ## Purpose
 
-This manifest declares the AI-assistant context for the 6a2 machine-readable metadata directory.
+This manifest declares the AI-assistant context for the descriptiles machine-readable metadata directory.
 
 ## Canonical Locations
 
@@ -28,4 +28,3 @@ When multiple agents may write to A2ML files concurrently:
 3. Write updated file with new [provenance] metadata
 4. Release by removing lock file
 5. On conflict: re-read and retry if git-sha-at-read does not match HEAD
-

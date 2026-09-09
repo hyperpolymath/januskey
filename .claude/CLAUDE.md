@@ -29,7 +29,7 @@ project metadata, including:
 | **Bash/POSIX Shell** | Scripts, automation | Keep minimal |
 | **JavaScript** | Only where AffineScript cannot | MCP protocol glue, Bun APIs |
 | **Nickel** | Configuration language | For complex configs |
-| **Guile Scheme** | State/meta files | The repository's canonical machine-readable metadata tree |
+| **Guile Scheme** | State/meta files | `.machine_readable/descriptiles/` |
 | **Julia** | Batch scripts, data processing | Per RSR |
 | **OCaml** | AffineScript compiler | Language-specific |
 | **Ada** | Safety-critical systems | Where required |
@@ -45,7 +45,7 @@ project metadata, including:
 | npm | Bun |
 | pnpm/yarn | Bun |
 | Go | Rust |
-| Python | Rust/AffineScript |
+| Python | Julia/Rust/AffineScript |
 | Java/Kotlin | Rust/Gossamer/Dioxus |
 | Swift | Gossamer/Dioxus |
 | React Native | Gossamer/Dioxus |
@@ -66,7 +66,7 @@ Both are FOSS with independent governance (no Big Tech).
 2. **Use `package.json` + `bun.lock` for JS runtime deps** - Bun is npm-compatible; a manifest is REQUIRED
 3. **`bun install --production` for production deps** - resolved from `package.json`, pinned via `bun.lock`
 4. **No Go code** - Use Rust instead
-5. **No Python anywhere** - Use Rust for systems and AffineScript for apps
+5. **No Python anywhere** - Use Julia for data/batch, Rust for systems, and AffineScript for apps
 6. **No Kotlin/Swift for mobile** - Use Gossamer or Dioxus
 
 ### Package Management

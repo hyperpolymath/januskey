@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-# A2ML 6a2 Directory
+# A2ML descriptiles Directory
 
 This directory contains the 6 core A2ML machine-readable metadata files for this repository.
 
@@ -27,4 +27,3 @@ Source .scm files should be removed after successful transpilation.
 
 - [A2ML Repository Template](https://github.com/hyperpolymath/standards/blob/main/A2ML-REPO-TEMPLATE.adoc)
 - [6A2 Format Family](https://github.com/hyperpolymath/standards#a2ml-format-family-7-formats)
-

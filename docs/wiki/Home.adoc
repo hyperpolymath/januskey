@@ -15,7 +15,7 @@ JanusKey is a reversible file operations utility (formal proofs pending) that pu
 === Project Status (2026-06-12)
 
 Landed since 2026-04: estate standardization merged (flat contractiles,
-`bot_directives/`, `6a2/anchor/`, `self-validating/`, GOVERNANCE +
+`bot_directives/`, `descriptiles/anchor/`, `self-validating/`, GOVERNANCE +
 MAINTAINERS + CODEOWNERS); license migrated PMPL-1.0-or-later → MPL-2.0
 (Cargo.toml aligned in #52); CI converted to SHA-pinned reusable-workflow
 wrappers (rust-ci #39, hypatia-scan #40/#46, mirror #42, secret-scanner #43,
