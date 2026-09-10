@@ -63,13 +63,13 @@ trust level: even maximal-trust agents cannot violate MUST constraints.
 - severity: critical
 
 ### six-directory-present
-- description: descriptiles directory exists with required files
-- run: test -d .machine_readable/descriptiles && test -f .machine_readable/descriptiles/META.a2ml && test -f .machine_readable/descriptiles/ECOSYSTEM.a2ml && test -f .machine_readable/descriptiles/STATE.a2ml && test -f .machine_readable/descriptiles/PLAYBOOK.a2ml && test -f .machine_readable/descriptiles/AGENTIC.a2ml && test -f .machine_readable/descriptiles/NEUROSYM.a2ml
+- description: 6a2 directory exists with required files
+- run: test -d .machine_readable/6a2 && test -f .machine_readable/6a2/META.a2ml && test -f .machine_readable/6a2/ECOSYSTEM.a2ml && test -f .machine_readable/6a2/STATE.a2ml && test -f .machine_readable/6a2/PLAYBOOK.a2ml && test -f .machine_readable/6a2/AGENTIC.a2ml && test -f .machine_readable/6a2/NEUROSYM.a2ml
 - severity: critical
 
 ### anchor-directory
-- description: anchor directory exists in descriptiles
-- run: test -d .machine_readable/descriptiles/anchor && test -f .machine_readable/descriptiles/anchor/ANCHOR.a2ml
+- description: anchor directory exists in 6a2 (renamed from anchors/ in the estate wave)
+- run: test -d .machine_readable/6a2/anchor && test -f .machine_readable/6a2/anchor/ANCHOR.a2ml
 - severity: warning
 
 ### self-validating-structure

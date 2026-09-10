@@ -88,7 +88,7 @@ Standard: WCAG-2.2-AA (CLI/TUI profile).
 - severity: advisory
 
 ### state-file-currency
-- description: descriptiles/STATE.a2ml should be refreshed when a work-wave lands
+- description: 6a2/STATE.a2ml should be refreshed when a work-wave lands
 - tolerance: last-updated within 90 days of the latest non-dependabot commit
 - corrective: Refresh STATE.a2ml from git log
 - severity: advisory

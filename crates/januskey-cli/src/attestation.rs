@@ -200,7 +200,11 @@ impl AuditLog {
     /// Errors if no attestation key is set: an unkeyed attestation is
     /// forgeable and must never be silently produced (the previous
     /// `unwrap_or([0u8; 32])` all-zero-key fallback did exactly that).
-    fn compute_attestation(&self, data: &str, previous_hash: &str) -> std::io::Result<String> {
+    fn compute_attestation(
+        &self,
+        data: &str,
+        previous_hash: &str,
+    ) -> std::io::Result<String> {
         let key = self.attestation_key.ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::PermissionDenied,
@@ -209,8 +213,8 @@ impl AuditLog {
             )
         })?;
 
-        let mut mac =
-            <Hmac<Sha256>>::new_from_slice(&key).expect("HMAC accepts keys of any length");
+        let mut mac = <Hmac<Sha256>>::new_from_slice(&key)
+            .expect("HMAC accepts keys of any length");
         mac.update(Self::ATTESTATION_SCHEME.as_bytes());
         mac.update(b"\x00");
         mac.update(data.as_bytes());

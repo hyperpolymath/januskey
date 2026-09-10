@@ -47,7 +47,7 @@
 === Completion Dashboard
 
 ____
-*Source of truth:* `+.machine_readable/descriptiles/STATE.a2ml+` (completion 60%,
+*Source of truth:* `+.machine_readable/6a2/STATE.a2ml+` (completion 60%,
 CRG grade *D*) and `+READINESS.md+` (Grade *D — Alpha, Unstable*). This
 dashboard is a human-readable summary of those files; if they disagree,
 they win. Percentages below are qualitative, not measured coverage. This

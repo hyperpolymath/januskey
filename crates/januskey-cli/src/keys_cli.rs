@@ -293,7 +293,9 @@ fn cmd_generate(
             )
             .into())
         }
-        _ => return Err(format!("Unknown key type: {}. Use: aes256", key_type).into()),
+        _ => {
+            return Err(format!("Unknown key type: {}. Use: aes256", key_type).into())
+        }
     };
 
     let key_purpose = match purpose.to_lowercase().as_str() {

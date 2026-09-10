@@ -54,13 +54,10 @@ fn extract_state(toml_src: &str) -> Result<StateFacts, String> {
         .and_then(|v| v.as_str().map(str::to_string))
         .or_else(|| get("crg-compliance", "tier").and_then(|v| v.as_str().map(str::to_string)));
 
-    let last_updated = get("metadata", "last-updated").and_then(|v| v.as_str().map(str::to_string));
+    let last_updated = get("metadata", "last-updated")
+        .and_then(|v| v.as_str().map(str::to_string));
 
-    Ok(StateFacts {
-        completion,
-        grade,
-        last_updated,
-    })
+    Ok(StateFacts { completion, grade, last_updated })
 }
 
 /// Coerce a TOML value (string `"60"` or integer `60`) into a percentage.
@@ -109,10 +106,7 @@ fn extract_grade_after_token(text: &str, token: &str) -> Option<String> {
     for line in text.lines() {
         if let Some(idx) = line.find(token) {
             let rest = line[idx + token.len()..].trim_start();
-            let g: String = rest
-                .chars()
-                .take_while(|c| c.is_ascii_alphabetic())
-                .collect();
+            let g: String = rest.chars().take_while(|c| c.is_ascii_alphabetic()).collect();
             if !g.is_empty() {
                 return Some(g);
             }
@@ -136,16 +130,16 @@ fn extract_last_updated(topology: &str) -> Option<String> {
         .chars()
         .take_while(|c| c.is_ascii_digit() || *c == '-')
         .collect();
-    if date.len() >= 8 {
-        Some(date)
-    } else {
-        None
-    }
+    if date.len() >= 8 { Some(date) } else { None }
 }
 
 /// Compare STATE against the dashboards; return a list of human-readable
 /// mismatch messages (empty = all good). Pure so it is unit-testable.
-fn reconcile(state: &StateFacts, topology: Option<&str>, readiness: Option<&str>) -> Vec<String> {
+fn reconcile(
+    state: &StateFacts,
+    topology: Option<&str>,
+    readiness: Option<&str>,
+) -> Vec<String> {
     let mut problems = Vec::new();
 
     if let (Some(pct), Some(topo)) = (state.completion, topology) {
@@ -208,7 +202,7 @@ fn main() -> ExitCode {
         root = PathBuf::from(arg);
     }
 
-    let state_path = root.join(".machine_readable/descriptiles/STATE.a2ml");
+    let state_path = root.join(".machine_readable/6a2/STATE.a2ml");
     let state_src = match read_opt(&state_path) {
         Some(s) => s,
         None => {
@@ -237,10 +231,7 @@ fn main() -> ExitCode {
         );
         ExitCode::SUCCESS
     } else {
-        eprintln!(
-            "dashboard-check: {} divergence(s) from STATE.a2ml (the source of truth):",
-            problems.len()
-        );
+        eprintln!("dashboard-check: {} divergence(s) from STATE.a2ml (the source of truth):", problems.len());
         for p in &problems {
             eprintln!("  ✗ {p}");
         }
@@ -296,25 +287,16 @@ OVERALL:                            ██████░░░░  ~60%   Grade
     #[test]
     fn extracts_dashboard_signals() {
         assert_eq!(extract_overall_pct(TOPOLOGY_60_D), Some(60));
-        assert_eq!(
-            extract_grade_after_token(TOPOLOGY_60_D, "Grade ").as_deref(),
-            Some("D")
-        );
+        assert_eq!(extract_grade_after_token(TOPOLOGY_60_D, "Grade ").as_deref(), Some("D"));
         assert_eq!(extract_grade_readiness(READINESS_D).as_deref(), Some("D"));
-        assert_eq!(
-            extract_last_updated(TOPOLOGY_60_D).as_deref(),
-            Some("2026-07-02")
-        );
+        assert_eq!(extract_last_updated(TOPOLOGY_60_D).as_deref(), Some("2026-07-02"));
     }
 
     #[test]
     fn passes_when_aligned() {
         let s = extract_state(STATE_60_D).unwrap();
         let problems = reconcile(&s, Some(TOPOLOGY_60_D), Some(READINESS_D));
-        assert!(
-            problems.is_empty(),
-            "expected no problems, got {problems:?}"
-        );
+        assert!(problems.is_empty(), "expected no problems, got {problems:?}");
     }
 
     #[test]
@@ -331,10 +313,7 @@ OVERALL:                            ██████░░░░  ~60%   Grade
         let s = extract_state(STATE_60_D).unwrap();
         let bad_topology = "OVERALL: ~60% Grade A — Production Ready\n";
         let problems = reconcile(&s, Some(bad_topology), None);
-        assert!(
-            problems.iter().any(|p| p.contains("grade mismatch")),
-            "{problems:?}"
-        );
+        assert!(problems.iter().any(|p| p.contains("grade mismatch")), "{problems:?}");
     }
 
     #[test]
@@ -358,9 +337,6 @@ OVERALL:                            ██████░░░░  ~60%   Grade
 OVERALL: ~60% Grade D
 ";
         let problems = reconcile(&s, Some(stale), None);
-        assert!(
-            problems.iter().any(|p| p.contains("staleness")),
-            "{problems:?}"
-        );
+        assert!(problems.iter().any(|p| p.contains("staleness")), "{problems:?}");
     }
 }
