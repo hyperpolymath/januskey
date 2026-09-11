@@ -8,6 +8,7 @@ updates:
       actions:
         patterns:
           - "*"
+    open-pull-requests-limit: 2
   
   - package-ecosystem: "cargo"
     directory: "/"
@@ -24,8 +25,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
   
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
