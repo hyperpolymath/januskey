@@ -4,14 +4,18 @@
 
 == Current Status
 
-Initial development phase.
+Active maintenance of the Rust proof-of-concept. The core reversibility
+mechanism, project documentation, and CI/CD configuration are present; formal
+proofs, comprehensive tests, and production readiness remain pending. The
+current CI workflow health requires follow-up before it can support a passing
+CI claim.
 
 == Milestones
 
 === v0.1.0 - Foundation
-* [ ] Core functionality
-* [ ] Basic documentation
-* [ ] CI/CD pipeline
+* [x] Core reversibility mechanism
+* [x] Basic documentation
+* [x] CI/CD configuration
 
 === v1.0.0 - Stable Release
 * [ ] Full feature set
