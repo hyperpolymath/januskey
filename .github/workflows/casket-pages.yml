@@ -23,10 +23,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v7
 
       - name: Checkout casket-ssg
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v7
         with:
           repository: hyperpolymath/casket-ssg
           path: .casket-ssg
@@ -117,4 +117,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5.0.0
+        uses: actions/deploy-pages@v5.0.1

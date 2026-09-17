@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@v1
       - uses: Swatinem/rust-cache@v2.9.2
       - name: Build
@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@v1
       - uses: Swatinem/rust-cache@v2.9.2
       - name: Run benchmarks
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@v1
       - uses: Swatinem/rust-cache@v2.9.2
       - name: Build release
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
       - name: Run aspect tests
         run: bash tests/aspect/cross_cutting_test.sh
 
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
       - name: Install Zig
         run: |
           wget -q https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz
@@ -84,7 +84,7 @@ jobs:
     timeout-minutes: 15
     if: github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@v1
       - name: Install panic-attack
         run: cargo install --git https://github.com/hyperpolymath/panic-attacker.git 2>/dev/null || echo "panic-attack unavailable"
