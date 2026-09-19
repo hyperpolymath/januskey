@@ -126,4 +126,4 @@ JanusKey is dual-licensed under MIT OR MPL-2.0.
 
 === Contributing
 
-See link:../CONTRIBUTING.adoc[CONTRIBUTING.adoc] for guidelines.
+See link:../../.github/CONTRIBUTING.md[../../.github/CONTRIBUTING.md] for guidelines.
