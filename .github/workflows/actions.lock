@@ -119,7 +119,7 @@ dependencies:
         repo_id: 1275649586
     'hyperpolymath/cicd-suite@main':
         ref: 'main'
-        commit: 'sha1-b25f613c860823372a7ff2cb75c23f3606bee81f'
+        commit: 'sha1-5a10b72e574ef63855fafd4568a4c178657f3294'
         owner_id: 6759885
         repo_id: 1326697643
         uses:
