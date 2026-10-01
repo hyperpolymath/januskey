@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
-title: "januskey"
+title: "JanusKey"
 abstract: "Rust CLI for reversible file operations. Every delete, modify, and move carries inversion metadata, enabling instant rollback without external backups. Uses content-addressed storage (SHA-256) and an append-only operation log. Formal proofs of the complete reversibility guarantee are pending."
 authors:
   - family-names: "Jewell"
