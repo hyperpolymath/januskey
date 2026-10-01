@@ -119,3 +119,20 @@ Footer: issue reference, e.g. Closes #123
 \[optional body\]
 
 \[optional footer\]
+
+### Signed commits
+
+Every commit that reaches the default branch must be signed; a ruleset refuses
+unsigned pushes. Estate policy:
+[SIGNING-POLICY](https://github.com/hyperpolymath/standards/blob/main/docs/SIGNING-POLICY.adoc).
+
+- **People and interactive agents** sign with an SSH key registered on GitHub
+  as a *signing* key (`gpg.format=ssh`, `user.signingkey=<key>.pub`,
+  `commit.gpgsign=true`). The committer email must be verified on that account.
+- **Apps, bots and workflows** never `git push` local commits. They write
+  through the API (`createCommitOnBranch` or the estate `signed-push` action)
+  so that GitHub signs each commit.
+- Merge PRs with **squash**. GitHub signs the squash commit that reaches the
+  default branch, so an unsigned commit on the PR branch does not block this
+  merge.
+  Rebase-merge replays commits unsigned and is disabled.
