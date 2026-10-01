@@ -132,7 +132,7 @@ unsigned pushes. Estate policy:
 - **Apps, bots and workflows** never `git push` local commits. They write
   through the API (`createCommitOnBranch` or the estate `signed-push` action)
   so that GitHub signs each commit.
-- Merge PRs with **squash**. The ruleset checks every commit on the PR branch,
-  not just the result, so one unsigned commit blocks the merge. Re-create such a
-  branch with signed commits (`git cherry-pick -S`) and open a new PR.
+- Merge PRs with **squash**. GitHub signs the squash commit that reaches the
+  default branch, so an unsigned commit on the PR branch does not block this
+  merge.
   Rebase-merge replays commits unsigned and is disabled.
