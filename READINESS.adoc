@@ -8,7 +8,7 @@ standards/testing-and-benchmarking/TESTING-TAXONOMY.adoc v1.0
 
 === CRG Grade: D (Alpha — Unstable)
 
-*Justification:* 119 tests pass (`cargo test --workspace --locked -- --list`); the
+*Justification:* 119 tests declared (`cargo test --workspace --locked -- --list`; rust-ci runs them); the
 Idris2 ABI does not typecheck, so 0 proofs are checked (#145); benchmarks exist (5 Criterion groups). But: no
 fuzz testing, no mutation testing, 225 unwrap() calls, E2E mostly skips,
 benchmarks measured fake crypto until this session. RSR compliance
@@ -64,7 +64,7 @@ handling
 (requires idris2 binary)
 |===
 
-*Total passing:* 119 tests + 5 benchmark groups; 0 Idris2 proofs checked (#145) *Total
+*Total declared:* 119 tests + 5 benchmark groups; 0 Idris2 proofs checked (#145) *Total
 missing:* Fuzz, mutation, chaos, compatibility
 
 === Aspect Matrix
