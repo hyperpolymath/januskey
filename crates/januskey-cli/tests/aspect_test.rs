@@ -9,7 +9,7 @@
 //   - Overwrite patterns applied correctly (3-pass DoD 5220.22-M)
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use tempfile::TempDir;
 
 /// Helper: Create temp directory
@@ -18,7 +18,7 @@ fn test_dir() -> TempDir {
 }
 
 /// Helper: Create jk directories
-fn setup_jk_dirs(base: &PathBuf) -> std::io::Result<()> {
+fn setup_jk_dirs(base: &Path) -> std::io::Result<()> {
     fs::create_dir_all(base.join(".jk/content"))?;
     fs::create_dir_all(base.join(".jk/obliteration"))?;
     fs::create_dir_all(base.join(".jk/keys"))?;
@@ -26,7 +26,7 @@ fn setup_jk_dirs(base: &PathBuf) -> std::io::Result<()> {
 }
 
 /// Helper: Create a test key file and record
-fn create_test_key(base: &PathBuf, key_id: &str, material: &[u8]) -> String {
+fn create_test_key(base: &Path, key_id: &str, material: &[u8]) -> String {
     use sha2::{Digest, Sha256};
 
     let mut hasher = Sha256::new();
@@ -143,13 +143,11 @@ fn obliterated_key_record_marked_revoked() {
     // Verify key record reflects revocation
     let key_content = ({
         use std::io::Read;
-        std::fs::File::open(base.join(".jk/keys").join(format!("{}.json", key_id))).and_then(
-            |mut f| {
-                let mut buf = String::new();
-                f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
-                Ok(buf)
-            },
-        )
+        std::fs::File::open(base.join(".jk/keys").join(format!("{}.json", key_id))).and_then(|f| {
+            let mut buf = String::new();
+            f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
+            Ok(buf)
+        })
     })
     .expect("Read key record");
     assert!(

@@ -73,13 +73,13 @@ impl ObliterationProof {
 
         // Generate random nonce
         let mut nonce_bytes = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+        rand::rng().fill_bytes(&mut nonce_bytes);
         let nonce = hex::encode(nonce_bytes);
 
         // Generate commitment: H(content_hash || nonce || timestamp)
         let mut hasher = Sha256::new();
         hasher.update(content_hash.raw_hash().as_bytes());
-        hasher.update(&nonce_bytes);
+        hasher.update(nonce_bytes);
         hasher.update(timestamp.to_rfc3339().as_bytes());
         let commitment = hex::encode(hasher.finalize());
 
@@ -163,7 +163,7 @@ impl ObliterationManager {
         let log = if log_path.exists() {
             let content = ({
                 use std::io::Read;
-                std::fs::File::open(&log_path).and_then(|mut f| {
+                std::fs::File::open(&log_path).and_then(|f| {
                     let mut buf = String::new();
                     f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                     Ok(buf)
@@ -342,7 +342,7 @@ fn secure_overwrite(path: &Path) -> Result<usize> {
         let buffer = if pass == OVERWRITE_PASSES - 1 {
             // Final pass: random data
             let mut random_buffer = vec![0u8; file_size.min(8192)];
-            rand::thread_rng().fill_bytes(&mut random_buffer);
+            rand::rng().fill_bytes(&mut random_buffer);
             random_buffer
         } else {
             // Fixed pattern

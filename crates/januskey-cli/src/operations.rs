@@ -500,7 +500,7 @@ mod tests {
         assert_eq!(
             ({
                 use std::io::Read;
-                std::fs::File::open(&test_file).and_then(|mut f| {
+                std::fs::File::open(&test_file).and_then(|f| {
                     let mut buf = String::new();
                     f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                     Ok(buf)
@@ -531,7 +531,7 @@ mod tests {
         assert_eq!(
             ({
                 use std::io::Read;
-                std::fs::File::open(&test_file).and_then(|mut f| {
+                std::fs::File::open(&test_file).and_then(|f| {
                     let mut buf = String::new();
                     f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                     Ok(buf)
@@ -548,7 +548,7 @@ mod tests {
         assert_eq!(
             ({
                 use std::io::Read;
-                std::fs::File::open(&test_file).and_then(|mut f| {
+                std::fs::File::open(&test_file).and_then(|f| {
                     let mut buf = String::new();
                     f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                     Ok(buf)

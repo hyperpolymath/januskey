@@ -123,7 +123,7 @@ impl TransactionManager {
         let log = if path.exists() {
             let content = ({
                 use std::io::Read;
-                std::fs::File::open(&path).and_then(|mut f| {
+                std::fs::File::open(&path).and_then(|f| {
                     let mut buf = String::new();
                     f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                     Ok(buf)

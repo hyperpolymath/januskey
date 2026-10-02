@@ -184,7 +184,7 @@ impl SecretKey {
 
     pub fn generate() -> Result<Self> {
         let mut bytes = [0u8; KEY_LENGTH];
-        rand::thread_rng().fill_bytes(&mut bytes);
+        rand::rng().fill_bytes(&mut bytes);
         Ok(Self { bytes })
     }
 }
@@ -192,7 +192,6 @@ impl SecretKey {
 /// Key manager for JanusKey
 pub struct KeyManager {
     store_path: PathBuf,
-    root_path: PathBuf,
     kek: Option<SecretKey>,
     audit_log: AuditLog,
 }
@@ -204,7 +203,6 @@ impl KeyManager {
         let audit_log = AuditLog::new(root);
         Self {
             store_path,
-            root_path: root.to_path_buf(),
             kek: None,
             audit_log,
         }
@@ -230,7 +228,7 @@ impl KeyManager {
 
         // Generate salt
         let mut salt = [0u8; SALT_LENGTH];
-        rand::thread_rng().fill_bytes(&mut salt);
+        rand::rng().fill_bytes(&mut salt);
 
         // Derive KEK from passphrase
         let kek = derive_kek(passphrase, &salt)?;
@@ -246,7 +244,7 @@ impl KeyManager {
 
         // Generate initial nonce
         let mut nonce = [0u8; NONCE_LENGTH];
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::rng().fill_bytes(&mut nonce);
 
         // Create empty key store
         let store = KeyStoreData {
@@ -548,7 +546,7 @@ impl KeyManager {
         let path = self.store_path.join("keystore.jks");
         let content = ({
             use std::io::Read;
-            std::fs::File::open(&path).and_then(|mut f| {
+            std::fs::File::open(&path).and_then(|f| {
                 let mut buf = String::new();
                 f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                 Ok(buf)
@@ -607,7 +605,7 @@ fn derive_kek(passphrase: &str, salt: &[u8; SALT_LENGTH]) -> Result<SecretKey> {
 /// Wrap (encrypt) key material
 fn wrap_key(kek: &SecretKey, key: &[u8], metadata: &KeyMetadata) -> Result<WrappedKey> {
     let mut nonce_bytes = [0u8; NONCE_LENGTH];
-    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+    rand::rng().fill_bytes(&mut nonce_bytes);
 
     let cipher = Aes256Gcm::new(kek.as_bytes().into());
     let nonce = Nonce::from_slice(&nonce_bytes);
