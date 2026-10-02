@@ -587,8 +587,15 @@ fn cmd_copy(dir: &PathBuf, source: &PathBuf, destination: &PathBuf, dry_run: boo
     Ok(())
 }
 
+/// Irreversibly erase the given paths. When `dir` holds a `.januskey/`
+/// store, also shred every unshared content-store blob for each path and
+/// purge its operation-log entries (recording each shred in
+/// `.januskey/obliterations.json`); otherwise only the working files are
+/// shredded.
 fn cmd_obliterate(dir: &PathBuf, paths: &[PathBuf], dry_run: bool, auto_yes: bool) -> Result<()> {
-    use januskey::obliteration::obliterate_file;
+    use januskey::obliteration::{
+        obliterate_file, obliterate_path, ObliterationManager, OBLITERATION_LOG_FILE,
+    };
 
     // Resolve each path against the working directory if it is relative.
     let targets: Vec<PathBuf> = paths
@@ -640,20 +647,55 @@ fn cmd_obliterate(dir: &PathBuf, paths: &[PathBuf], dry_run: bool, auto_yes: boo
         }
     }
 
+    // With a JanusKey store, scrub history too; without one, only the
+    // working file exists to be shredded.
+    let mut store = if JanusKey::is_initialized(dir) {
+        let jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
+        let manager =
+            ObliterationManager::new(jk.root.join(".januskey").join(OBLITERATION_LOG_FILE))
+                .context("Failed to open obliteration log")?;
+        Some((jk, manager))
+    } else {
+        None
+    };
+
     let mut obliterated = 0;
+    let mut failed = 0;
     for t in &targets {
-        match obliterate_file(t) {
-            Ok(proof) => {
-                obliterated += 1;
-                println!(
-                    "{} Obliterated {} ({} passes, proof {})",
-                    "✓".green(),
-                    t.display(),
-                    proof.overwrite_passes,
-                    &proof.id[..8]
+        let result = match store.as_mut() {
+            Some((jk, manager)) => obliterate_path(jk, manager, t, None, None).map(|r| {
+                let detail = format!(
+                    "{} history entr(y/ies) purged, {} blob(s) shredded, {} shared blob(s) kept",
+                    r.purged_operation_ids.len(),
+                    r.blob_records.len(),
+                    r.retained_shared.len()
                 );
+                (r.file_proof, detail)
+            }),
+            None => obliterate_file(t).map(|p| (Some(p), String::from("no JanusKey store"))),
+        };
+        match result {
+            Ok((proof, detail)) => {
+                obliterated += 1;
+                match proof {
+                    Some(proof) => println!(
+                        "{} Obliterated {} ({} passes, proof {}; {})",
+                        "✓".green(),
+                        t.display(),
+                        proof.overwrite_passes,
+                        &proof.id[..8],
+                        detail
+                    ),
+                    None => println!(
+                        "{} Obliterated history of {} (working file already absent; {})",
+                        "✓".green(),
+                        t.display(),
+                        detail
+                    ),
+                }
             }
             Err(e) => {
+                failed += 1;
                 eprintln!("{} Failed to obliterate {}: {}", "✗".red(), t.display(), e);
             }
         }
@@ -664,6 +706,9 @@ fn cmd_obliterate(dir: &PathBuf, paths: &[PathBuf], dry_run: bool, auto_yes: boo
         "✓".green(),
         obliterated
     );
+    if failed > 0 {
+        anyhow::bail!("{} path(s) could not be obliterated", failed);
+    }
 
     Ok(())
 }
