@@ -8,12 +8,12 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use dialoguer::{Confirm, Password};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-mod attestation;
-mod keys;
 use attestation::AuditEventType;
+use januskey::attestation;
+use januskey::keys;
 use keys::{KeyAlgorithm, KeyManager, KeyPurpose, KeyState};
 
 #[derive(Parser)]
@@ -293,9 +293,7 @@ fn cmd_generate(
             )
             .into())
         }
-        _ => {
-            return Err(format!("Unknown key type: {}. Use: aes256", key_type).into())
-        }
+        _ => return Err(format!("Unknown key type: {}. Use: aes256", key_type).into()),
     };
 
     let key_purpose = match purpose.to_lowercase().as_str() {
@@ -447,7 +445,7 @@ fn cmd_revoke(
     Ok(())
 }
 
-fn cmd_backup(km: &mut KeyManager, output: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_backup(km: &mut KeyManager, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     unlock_store(km)?;
 
     if output.exists() {
@@ -567,7 +565,7 @@ fn cmd_audit_show(km: &mut KeyManager, limit: usize) -> Result<(), Box<dyn std::
         };
 
         let details = if let Some(ref kd) = entry.key_details {
-            format!("key:{}", &kd.fingerprint)
+            format!("key:{}", kd.fingerprint)
         } else if let Some(ref reason) = entry.reason {
             if reason.len() > 30 {
                 format!("{}...", &reason[..27])
@@ -675,10 +673,7 @@ fn cmd_audit_verify(km: &mut KeyManager) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-fn cmd_audit_export(
-    km: &mut KeyManager,
-    output: &PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_audit_export(km: &mut KeyManager, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     unlock_store(km)?;
 
     if output.exists() {

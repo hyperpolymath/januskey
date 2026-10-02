@@ -117,9 +117,8 @@ fn bench_transactions(c: &mut Criterion) {
 
     group.bench_function("begin_commit", |b| {
         b.iter(|| {
-            let mut active = false;
             // Begin
-            active = true;
+            let mut active = true;
             black_box(active);
             // Commit
             active = false;
@@ -156,7 +155,7 @@ fn bench_key_derivation(c: &mut Criterion) {
 
             for _ in 0..1000 {
                 let mut hasher = Sha256::new();
-                hasher.update(&hash);
+                hasher.update(hash);
                 hash.copy_from_slice(&hasher.finalize());
             }
             black_box(hash);

@@ -15,8 +15,7 @@ use januskey::{
     transaction::TransactionPreview,
     JanusKey,
 };
-use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(
@@ -217,7 +216,7 @@ fn main() -> Result<()> {
     }
 }
 
-fn cmd_init(dir: &PathBuf) -> Result<()> {
+fn cmd_init(dir: &Path) -> Result<()> {
     if JanusKey::is_initialized(dir) {
         println!(
             "{} JanusKey already initialized in {}",
@@ -239,7 +238,7 @@ fn cmd_init(dir: &PathBuf) -> Result<()> {
 }
 
 fn cmd_delete(
-    dir: &PathBuf,
+    dir: &Path,
     paths: &[String],
     recursive: bool,
     dry_run: bool,
@@ -360,7 +359,7 @@ fn cmd_delete(
 }
 
 fn cmd_modify(
-    dir: &PathBuf,
+    dir: &Path,
     pattern: &str,
     paths: &[String],
     dry_run: bool,
@@ -394,7 +393,7 @@ fn cmd_modify(
     for file in &files {
         let content = ({
             use std::io::Read;
-            std::fs::File::open(file).and_then(|mut f| {
+            std::fs::File::open(file).and_then(|f| {
                 let mut buf = String::new();
                 f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                 Ok(buf)
@@ -480,12 +479,12 @@ fn parse_sed_pattern(pattern: &str) -> Result<(String, String, bool)> {
 
     let search = parts[0].to_string();
     let replace = parts[1].to_string();
-    let global = parts.get(2).map_or(false, |f| f.contains('g'));
+    let global = parts.get(2).is_some_and(|f| f.contains('g'));
 
     Ok((search, replace, global))
 }
 
-fn cmd_move(dir: &PathBuf, source: &str, destination: &PathBuf, dry_run: bool) -> Result<()> {
+fn cmd_move(dir: &Path, source: &str, destination: &PathBuf, dry_run: bool) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     let source_path = if PathBuf::from(source).is_absolute() {
@@ -536,7 +535,7 @@ fn cmd_move(dir: &PathBuf, source: &str, destination: &PathBuf, dry_run: bool) -
     Ok(())
 }
 
-fn cmd_copy(dir: &PathBuf, source: &PathBuf, destination: &PathBuf, dry_run: bool) -> Result<()> {
+fn cmd_copy(dir: &Path, source: &PathBuf, destination: &PathBuf, dry_run: bool) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     let source_path = if source.is_absolute() {
@@ -592,7 +591,7 @@ fn cmd_copy(dir: &PathBuf, source: &PathBuf, destination: &PathBuf, dry_run: boo
 /// purge its operation-log entries (recording each shred in
 /// `.januskey/obliterations.json`); otherwise only the working files are
 /// shredded.
-fn cmd_obliterate(dir: &PathBuf, paths: &[PathBuf], dry_run: bool, auto_yes: bool) -> Result<()> {
+fn cmd_obliterate(dir: &Path, paths: &[PathBuf], dry_run: bool, auto_yes: bool) -> Result<()> {
     use januskey::obliteration::{
         obliterate_file, obliterate_path, ObliterationManager, OBLITERATION_LOG_FILE,
     };
@@ -713,7 +712,7 @@ fn cmd_obliterate(dir: &PathBuf, paths: &[PathBuf], dry_run: bool, auto_yes: boo
     Ok(())
 }
 
-fn cmd_undo(dir: &PathBuf, count: usize, id: Option<String>) -> Result<()> {
+fn cmd_undo(dir: &Path, count: usize, id: Option<String>) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     if let Some(op_id) = id {
@@ -767,7 +766,7 @@ fn cmd_undo(dir: &PathBuf, count: usize, id: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn cmd_begin(dir: &PathBuf, name: Option<String>) -> Result<()> {
+fn cmd_begin(dir: &Path, name: Option<String>) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     let tx = jk.transaction_manager.begin(name.clone())?;
@@ -786,7 +785,7 @@ fn cmd_begin(dir: &PathBuf, name: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn cmd_commit(dir: &PathBuf) -> Result<()> {
+fn cmd_commit(dir: &Path) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     let tx = jk.transaction_manager.commit()?;
@@ -801,7 +800,7 @@ fn cmd_commit(dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn cmd_rollback(dir: &PathBuf) -> Result<()> {
+fn cmd_rollback(dir: &Path) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     // Get the active transaction's operation IDs before modifying state
@@ -830,7 +829,7 @@ fn cmd_rollback(dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn cmd_preview(dir: &PathBuf) -> Result<()> {
+fn cmd_preview(dir: &Path) -> Result<()> {
     let jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     let tx = jk
@@ -843,7 +842,7 @@ fn cmd_preview(dir: &PathBuf) -> Result<()> {
     let name = preview
         .transaction_name
         .unwrap_or_else(|| tx.id[..8].to_string());
-    println!("{} Transaction: {}", "📋".to_string(), name.cyan());
+    println!("📋 Transaction: {}", name.cyan());
     println!("Operations pending: {}", preview.operations.len());
     println!();
 
@@ -887,7 +886,7 @@ fn cmd_preview(dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn cmd_history(dir: &PathBuf, limit: usize, filter: Option<String>) -> Result<()> {
+fn cmd_history(dir: &Path, limit: usize, filter: Option<String>) -> Result<()> {
     let jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     let ops: Vec<_> = if let Some(ref filter_str) = filter {
@@ -949,7 +948,7 @@ fn cmd_history(dir: &PathBuf, limit: usize, filter: Option<String>) -> Result<()
     Ok(())
 }
 
-fn cmd_status(dir: &PathBuf) -> Result<()> {
+fn cmd_status(dir: &Path) -> Result<()> {
     let jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     println!("{}", "JanusKey Status".bold());
@@ -965,7 +964,7 @@ fn cmd_status(dir: &PathBuf) -> Result<()> {
     if let Some(tx) = jk.transaction_manager.active() {
         let name = tx.name.clone().unwrap_or_else(|| tx.id[..8].to_string());
         println!();
-        println!("{} Active transaction: {}", "📝".to_string(), name.cyan());
+        println!("📝 Active transaction: {}", name.cyan());
         println!("  Started: {}", tx.started_at.format("%Y-%m-%d %H:%M:%S"));
         println!("  Operations: {}", tx.operation_ids.len());
     } else {
@@ -976,7 +975,7 @@ fn cmd_status(dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn cmd_gc(dir: &PathBuf, keep: Option<usize>, _older_than: Option<u32>) -> Result<()> {
+fn cmd_gc(dir: &Path, keep: Option<usize>, _older_than: Option<u32>) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
     let keep_count = keep.unwrap_or(jk.config.max_history);

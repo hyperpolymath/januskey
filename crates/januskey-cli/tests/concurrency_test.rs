@@ -9,7 +9,7 @@
 //   - Race conditions in commit/rollback don't corrupt state
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
@@ -19,7 +19,7 @@ fn test_dir() -> TempDir {
 }
 
 /// Helper: Setup jk directories
-fn setup_jk_dirs(base: &PathBuf) -> std::io::Result<()> {
+fn setup_jk_dirs(base: &Path) -> std::io::Result<()> {
     fs::create_dir_all(base.join(".jk/content"))?;
     fs::create_dir_all(base.join(".jk/transactions"))?;
     fs::create_dir_all(base.join(".jk/operations"))?;
@@ -60,7 +60,7 @@ fn concurrent_key_operations_no_deadlock() {
 
             // Write content
             fs::write(&content_path, material.as_bytes())
-                .expect(&format!("Write failed for {}", key_id));
+                .unwrap_or_else(|_| panic!("Write failed for {}", key_id));
 
             // Record key
             let key_record = format!(r#"{{"id":"{}","hash":"{}","thread":{}}}"#, key_id, hash, i);
@@ -68,10 +68,11 @@ fn concurrent_key_operations_no_deadlock() {
                 base_clone.join(".jk/keys").join(format!("{}.json", key_id)),
                 &key_record,
             )
-            .expect(&format!("Key record failed for {}", key_id));
+            .unwrap_or_else(|_| panic!("Key record failed for {}", key_id));
 
             // Read back immediately
-            let read_back = fs::read(&content_path).expect(&format!("Read failed for {}", key_id));
+            let read_back =
+                fs::read(&content_path).unwrap_or_else(|_| panic!("Read failed for {}", key_id));
             assert_eq!(
                 read_back,
                 material.as_bytes(),
@@ -127,12 +128,12 @@ fn transaction_isolation_uncommitted_invisible() {
 
         let ops_dir = base_clone.join(".jk/operations");
         let ops: Vec<_> = fs::read_dir(&ops_dir)
-            .unwrap_or_else(|_| fs::read_dir(&base_clone.join(".jk")).unwrap())
+            .unwrap_or_else(|_| fs::read_dir(base_clone.join(".jk")).unwrap())
             .filter_map(Result::ok)
             .filter(|e| {
                 e.file_name()
                     .to_str()
-                    .map_or(false, |n| n.contains(&tx_id_clone))
+                    .is_some_and(|n| n.contains(&tx_id_clone))
             })
             .collect();
 
@@ -159,7 +160,7 @@ fn transaction_isolation_uncommitted_invisible() {
     // but we verify the transaction itself is still "active" not "committed"
     let tx_read = ({
         use std::io::Read;
-        std::fs::File::open(base.join(".jk/transactions/001.json")).and_then(|mut f| {
+        std::fs::File::open(base.join(".jk/transactions/001.json")).and_then(|f| {
             let mut buf = String::new();
             f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
             Ok(buf)
@@ -388,7 +389,7 @@ fn concurrent_commit_rollback_no_corruption() {
         let entry = entry.expect("Dir entry");
         let content = ({
             use std::io::Read;
-            std::fs::File::open(entry.path()).and_then(|mut f| {
+            std::fs::File::open(entry.path()).and_then(|f| {
                 let mut buf = String::new();
                 f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                 Ok(buf)

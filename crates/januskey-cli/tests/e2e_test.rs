@@ -7,7 +7,7 @@
 // Content roundtrip: write → hash → read → delete
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use tempfile::TempDir;
 
 /// Helper: Create a temp directory for test isolation
@@ -16,7 +16,7 @@ fn test_dir() -> TempDir {
 }
 
 /// Helper: Create jk directories
-fn setup_jk_dirs(base: &PathBuf) -> std::io::Result<()> {
+fn setup_jk_dirs(base: &Path) -> std::io::Result<()> {
     fs::create_dir_all(base.join(".jk/content"))?;
     fs::create_dir_all(base.join(".jk/metadata"))?;
     fs::create_dir_all(base.join(".jk/attestation"))?;
@@ -85,7 +85,7 @@ fn full_key_lifecycle_single_key() {
     // Step 5: Verify attestation references the key
     let attest_read = ({
         use std::io::Read;
-        std::fs::File::open(base.join(".jk/attestation/0001.json")).and_then(|mut f| {
+        std::fs::File::open(base.join(".jk/attestation/0001.json")).and_then(|f| {
             let mut buf = String::new();
             f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
             Ok(buf)
@@ -104,7 +104,7 @@ fn full_key_lifecycle_single_key() {
     // Verify key record exists
     let key_read = ({
         use std::io::Read;
-        std::fs::File::open(base.join(".jk/keys/001.json")).and_then(|mut f| {
+        std::fs::File::open(base.join(".jk/keys/001.json")).and_then(|f| {
             let mut buf = String::new();
             f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
             Ok(buf)
@@ -134,7 +134,7 @@ fn full_key_lifecycle_multi_key_transaction() {
 
     for (i, (key_id, material)) in keys.iter().enumerate() {
         // Store content
-        let hash = sha256(*material);
+        let hash = sha256(material);
         let content_path = base.join(".jk/content").join(&hash);
         fs::write(&content_path, material).expect("Store content");
 
@@ -173,11 +173,7 @@ fn full_key_lifecycle_multi_key_transaction() {
     let op_files: Vec<_> = fs::read_dir(base.join(".jk/operations"))
         .expect("Read ops dir")
         .filter_map(Result::ok)
-        .filter(|e| {
-            e.file_name()
-                .to_str()
-                .map_or(false, |n| n.starts_with(tx_id))
-        })
+        .filter(|e| e.file_name().to_str().is_some_and(|n| n.starts_with(tx_id)))
         .collect();
     assert_eq!(op_files.len(), 3, "Transaction must contain 3 operations");
 
@@ -188,7 +184,7 @@ fn full_key_lifecycle_multi_key_transaction() {
     // Verify transaction is committed
     let tx_read = ({
         use std::io::Read;
-        std::fs::File::open(base.join(".jk/transactions/001.json")).and_then(|mut f| {
+        std::fs::File::open(base.join(".jk/transactions/001.json")).and_then(|f| {
             let mut buf = String::new();
             f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
             Ok(buf)
@@ -239,13 +235,13 @@ fn delta_chain_full_history() {
     fs::write(base.join(".jk/metadata/delta-02.json"), &delta_2_to_3).expect("Write delta 2→3");
 
     // Verify chain is intact: can read all versions
-    let read_v1 = fs::read(&base.join(".jk/content").join(&v1_hash)).expect("Read v1");
+    let read_v1 = fs::read(base.join(".jk/content").join(&v1_hash)).expect("Read v1");
     assert_eq!(read_v1, v1, "Version 1 must be recoverable");
 
-    let read_v2 = fs::read(&base.join(".jk/content").join(&v2_hash)).expect("Read v2");
+    let read_v2 = fs::read(base.join(".jk/content").join(&v2_hash)).expect("Read v2");
     assert_eq!(read_v2, v2, "Version 2 must be recoverable");
 
-    let read_v3 = fs::read(&base.join(".jk/content").join(&v3_hash)).expect("Read v3");
+    let read_v3 = fs::read(base.join(".jk/content").join(&v3_hash)).expect("Read v3");
     assert_eq!(read_v3, v3, "Version 3 must be recoverable");
 
     // Verify chain links are recorded
@@ -255,7 +251,7 @@ fn delta_chain_full_history() {
         .filter(|e| {
             e.file_name()
                 .to_str()
-                .map_or(false, |n| n.starts_with("delta"))
+                .is_some_and(|n| n.starts_with("delta"))
         })
         .collect();
     assert_eq!(delta_files.len(), 2, "Delta chain must have 2 links");
@@ -377,7 +373,7 @@ fn corrupted_attestation_entry_detected() {
     // Attempt to read and parse
     let read_result = ({
         use std::io::Read;
-        std::fs::File::open(base.join(".jk/attestation/0001.json")).and_then(|mut f| {
+        std::fs::File::open(base.join(".jk/attestation/0001.json")).and_then(|f| {
             let mut buf = String::new();
             f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
             Ok(buf)

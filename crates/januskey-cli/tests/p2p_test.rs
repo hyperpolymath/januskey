@@ -103,7 +103,7 @@ fn key_operation_creates_attestation_entry() {
     // Verify attestation references the key
     let read_back = ({
         use std::io::Read;
-        std::fs::File::open(attest_path.join("0001.json")).and_then(|mut f| {
+        std::fs::File::open(attest_path.join("0001.json")).and_then(|f| {
             let mut buf = String::new();
             f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
             Ok(buf)
@@ -143,7 +143,7 @@ fn attestation_chain_integrity() {
         .map(|i| {
             ({
                 use std::io::Read;
-                std::fs::File::open(attest_path.join(format!("{:04}.json", i))).and_then(|mut f| {
+                std::fs::File::open(attest_path.join(format!("{:04}.json", i))).and_then(|f| {
                     let mut buf = String::new();
                     f.take(10 * 1024 * 1024).read_to_string(&mut buf)?;
                     Ok(buf)
@@ -195,11 +195,7 @@ fn transaction_groups_operations() {
     let op_files: Vec<_> = std::fs::read_dir(&ops_path)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name()
-                .to_str()
-                .map_or(false, |n| n.starts_with(tx_id))
-        })
+        .filter(|e| e.file_name().to_str().is_some_and(|n| n.starts_with(tx_id)))
         .collect();
     assert_eq!(op_files.len(), 3, "Transaction must group all 3 operations");
 }

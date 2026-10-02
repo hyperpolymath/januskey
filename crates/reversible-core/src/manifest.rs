@@ -41,7 +41,7 @@ impl ManifestEmitter {
 
         // Header
         manifest.push_str("@manifest\n");
-        manifest.push_str(&format!("  version = \"1.0\"\n"));
+        manifest.push_str("  version = \"1.0\"\n");
         manifest.push_str(&format!("  subsystem = \"{}\"\n", subsystem));
         manifest.push_str(&format!("  timestamp = \"{}\"\n", timestamp));
         manifest.push_str(&format!(
@@ -105,7 +105,7 @@ impl ManifestEmitter {
             };
 
             let current = hasher.finalize_reset();
-            hasher.update(&current);
+            hasher.update(current);
             hasher.update(&op_hash);
         }
 
