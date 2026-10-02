@@ -9,6 +9,7 @@ use crate::content_store::ContentHash;
 use crate::error::{Result, ReversibleError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -224,7 +225,11 @@ impl OperationMetadata {
     }
 }
 
-/// Serializable operation log (the append-only ledger)
+/// Serializable operation log (the append-only ledger).
+///
+/// Entries are only ever appended, with two sanctioned exceptions that remove
+/// entries: [`MetadataStore::prune`] (history retention) and
+/// [`MetadataStore::purge_path`] (obliteration / GDPR Art. 17 erasure).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperationLog {
     /// Version for format compatibility
@@ -364,6 +369,61 @@ impl MetadataStore {
         self.log.operations.len()
     }
 
+    /// Remove every operation whose primary path or secondary path equals
+    /// `path`, persist the log, and return every content hash
+    /// (`content_hash` and `new_content_hash`) the removed entries referenced.
+    ///
+    /// Matching is exact `PathBuf` equality against the path as it was stored
+    /// (operations record whatever path the caller passed, which is not
+    /// necessarily canonical); callers that need to match several spellings
+    /// of one file call this once per spelling. The returned list may contain
+    /// duplicates and hashes still referenced by surviving entries — check
+    /// [`MetadataStore::referenced_hashes`] before discarding any blob.
+    ///
+    /// This is the obliteration exception to the append-only ledger: purged
+    /// entries can no longer be undone.
+    pub fn purge_path(&mut self, path: &Path) -> Result<Vec<ContentHash>> {
+        Ok(self
+            .purge_path_entries(path)?
+            .into_iter()
+            .flat_map(|op| op.content_hash.into_iter().chain(op.new_content_hash))
+            .collect())
+    }
+
+    /// Like [`MetadataStore::purge_path`], but return the removed operation
+    /// entries themselves (so callers can record their IDs as well as their
+    /// content hashes). Persists the log only if something was removed.
+    pub fn purge_path_entries(&mut self, path: &Path) -> Result<Vec<OperationMetadata>> {
+        let matches =
+            |op: &OperationMetadata| op.path == path || op.path_secondary.as_deref() == Some(path);
+        let (removed, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.log.operations)
+            .into_iter()
+            .partition(|op| matches(op));
+        self.log.operations = kept;
+        if !removed.is_empty() {
+            self.save()?;
+        }
+        Ok(removed)
+    }
+
+    /// Return the set of content hashes (`content_hash` and
+    /// `new_content_hash`) referenced by any operation currently in the log.
+    ///
+    /// Used to decide whether a content-store blob is shared with another
+    /// surviving history entry and must therefore be kept.
+    pub fn referenced_hashes(&self) -> HashSet<ContentHash> {
+        self.log
+            .operations
+            .iter()
+            .flat_map(|op| {
+                op.content_hash
+                    .iter()
+                    .chain(op.new_content_hash.iter())
+                    .cloned()
+            })
+            .collect()
+    }
+
     /// Prune old operations (keep last N)
     pub fn prune(&mut self, keep: usize) -> Result<usize> {
         let original_count = self.log.operations.len();
@@ -397,6 +457,83 @@ mod tests {
         assert_eq!(OperationType::Create.inverse(), OperationType::Delete);
         assert_eq!(OperationType::Move.inverse(), OperationType::Move);
         assert_eq!(OperationType::Modify.inverse(), OperationType::Modify);
+    }
+
+    /// Build a Modify entry for `path` with the given before/after hashes.
+    fn modify_entry(path: &str, before: &[u8], after: &[u8]) -> OperationMetadata {
+        OperationMetadata::new(OperationType::Modify, PathBuf::from(path))
+            .with_content_hash(ContentHash::from_bytes(before))
+            .with_new_content_hash(ContentHash::from_bytes(after))
+    }
+
+    /// `purge_path` removes primary and secondary matches, returns their hashes, persists.
+    #[test]
+    fn test_purge_path_removes_primary_and_secondary_matches() {
+        let tmp = TempDir::new().unwrap();
+        let log_path = tmp.path().join("metadata.json");
+        let mut store = MetadataStore::new(log_path.clone()).unwrap();
+
+        store.append(modify_entry("/a.txt", b"a0", b"a1")).unwrap();
+        store.append(modify_entry("/b.txt", b"b0", b"b1")).unwrap();
+        // A move *into* /a.txt: matched via path_secondary.
+        let mv = OperationMetadata::new(OperationType::Move, PathBuf::from("/c.txt"))
+            .with_secondary_path(PathBuf::from("/a.txt"))
+            .with_content_hash(ContentHash::from_bytes(b"c0"));
+        store.append(mv).unwrap();
+
+        let hashes = store.purge_path(Path::new("/a.txt")).unwrap();
+        let got: HashSet<_> = hashes.into_iter().collect();
+        let want: HashSet<_> = [b"a0".as_ref(), b"a1", b"c0"]
+            .iter()
+            .map(|b| ContentHash::from_bytes(b))
+            .collect();
+        assert_eq!(got, want);
+        assert_eq!(store.count(), 1);
+        assert_eq!(store.operations()[0].path, PathBuf::from("/b.txt"));
+
+        // Persisted: a reopened store sees the purge.
+        let reopened = MetadataStore::new(log_path).unwrap();
+        assert_eq!(reopened.count(), 1);
+        assert!(reopened
+            .operations()
+            .iter()
+            .all(|op| op.path != Path::new("/a.txt")
+                && op.path_secondary.as_deref() != Some(Path::new("/a.txt"))));
+    }
+
+    /// `purge_path` on an unknown path removes nothing.
+    #[test]
+    fn test_purge_path_no_match_is_noop() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        store.append(modify_entry("/a.txt", b"a0", b"a1")).unwrap();
+        assert!(store.purge_path(Path::new("/zzz")).unwrap().is_empty());
+        assert_eq!(store.count(), 1);
+    }
+
+    /// `referenced_hashes` reflects only surviving entries after a purge.
+    #[test]
+    fn test_referenced_hashes_tracks_survivors() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        store
+            .append(modify_entry("/a.txt", b"shared", b"a1"))
+            .unwrap();
+        store
+            .append(modify_entry("/b.txt", b"shared", b"b1"))
+            .unwrap();
+
+        let before = store.referenced_hashes();
+        assert_eq!(before.len(), 3);
+        assert!(before.contains(&ContentHash::from_bytes(b"a1")));
+
+        store.purge_path(Path::new("/a.txt")).unwrap();
+        let after = store.referenced_hashes();
+        // The shared hash survives via /b.txt; a1 does not.
+        assert!(after.contains(&ContentHash::from_bytes(b"shared")));
+        assert!(after.contains(&ContentHash::from_bytes(b"b1")));
+        assert!(!after.contains(&ContentHash::from_bytes(b"a1")));
+        assert_eq!(after.len(), 2);
     }
 
     #[test]

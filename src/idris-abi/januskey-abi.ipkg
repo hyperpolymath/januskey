@@ -1,0 +1,30 @@
+-- SPDX-License-Identifier: MPL-2.0
+-- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+--
+-- Idris2 package for the JanusKey ABI layer (src/abi/*.idr).
+--
+-- Idris2 resolves module A.B.C to <sourcedir>/A/B/C.idr, but the ABI sources
+-- live flat in src/abi/ (Types.idr declares JanusKey.ABI.Types, etc.), so no
+-- sourcedir value can reach them directly. They also cannot be moved: the
+-- aspect tests, the Mustfile and the Zig FFI all name src/abi/<File>.idr.
+-- This directory therefore holds relative symlinks laid out by module name,
+-- each pointing back to the single real file in src/abi/.
+--
+-- Known defect, deliberately NOT fixed here (tracked as J1-3):
+--   src/abi/Foreign.idr declares `Januskey.ABI.Foreign` (lowercase k) while
+--   Proofs.idr imports `JanusKey.ABI.Foreign`; Foreign.idr in turn imports
+--   `Januskey.ABI.Types` and `Januskey.ABI.Layout`, which no file declares. The
+--   module is listed below under the name it actually declares, so these
+--   imports fail to resolve until J1-3 normalises the casing.
+--   The Januskey/ and JanusKey/ directories also collide on case-insensitive
+--   filesystems (macOS/Windows default); typecheck on Linux.
+--
+-- Run: idris2 --typecheck src/idris-abi/januskey-abi.ipkg   (or: just test-proofs)
+package januskey-abi
+
+sourcedir = "."
+
+modules = JanusKey.ABI.Types
+        , JanusKey.ABI.Layout
+        , Januskey.ABI.Foreign
+        , JanusKey.ABI.Proofs
