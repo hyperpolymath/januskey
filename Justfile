@@ -88,21 +88,24 @@ test-contracts:
         done; \
     fi
 
-# Check Idris2 ABI proofs (requires idris2)
+# Typecheck the Idris2 ABI package (src/idris-abi/januskey-abi.ipkg).
+# Fails if idris2 is missing (set ALLOW_NO_IDRIS=1 to skip) or any module fails.
 test-proofs:
-    @echo "=== Proof Regression ==="
-    @if command -v idris2 >/dev/null 2>&1; then \
-        for f in src/abi/Types.idr src/abi/Layout.idr src/abi/Foreign.idr src/abi/Proofs.idr; do \
-            if [ -f "$$f" ]; then \
-                echo "Checking $$f..."; \
-                idris2 --check "$$f" && echo "  [OK] $$f" || echo "  [FAIL] $$f"; \
-            else \
-                echo "  [SKIP] $$f not found"; \
-            fi; \
-        done; \
-    else \
-        echo "SKIP: idris2 not installed. Install via: pack install-app idris2"; \
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Proof Regression ==="
+    ipkg="src/idris-abi/januskey-abi.ipkg"
+    if ! command -v idris2 >/dev/null 2>&1; then
+        if [ "${ALLOW_NO_IDRIS:-0}" = "1" ]; then
+            echo "SKIP: idris2 not installed and ALLOW_NO_IDRIS=1 -- ABI proofs were NOT checked." >&2
+            exit 0
+        fi
+        echo "FAIL: idris2 not installed; cannot check ABI proofs. Install via: pack install-app idris2 (or set ALLOW_NO_IDRIS=1 to skip explicitly)." >&2
+        exit 1
     fi
+    echo "idris2 --typecheck $ipkg ($(idris2 --version))"
+    idris2 --typecheck "$ipkg"
+    echo "[OK] ABI package typechecks"
 
 # Run full test suite (all categories)
 test-all: test test-p2p test-regressions test-e2e test-aspect test-contracts test-proofs smoke
