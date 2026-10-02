@@ -209,8 +209,7 @@ impl AuditLog {
             )
         })?;
 
-        let mut mac =
-            <Hmac<Sha256>>::new_from_slice(&key).expect("HMAC accepts keys of any length");
+        let mut mac = <Hmac<Sha256>>::new_from_slice(&key).map_err(std::io::Error::other)?;
         mac.update(Self::ATTESTATION_SCHEME.as_bytes());
         mac.update(b"\x00");
         mac.update(data.as_bytes());

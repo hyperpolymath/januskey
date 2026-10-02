@@ -52,10 +52,10 @@ check "No unsafe in reversible-core" "! grep -rh 'unsafe' '${JK_DIR}/crates/reve
 # --- Documentation ---
 echo "--- Documentation ---"
 check "README exists" "[ -f '${JK_DIR}/README.md' ] || [ -f '${JK_DIR}/README.adoc' ]"
-check "SECURITY.md exists" "[ -f '${JK_DIR}/SECURITY.md' ]"
-check "ARCHITECTURE.md exists" "[ -f '${JK_DIR}/ARCHITECTURE.md' ]"
-check "PROOF-NEEDS.md exists" "[ -f '${JK_DIR}/PROOF-NEEDS.md' ]"
-check "TOPOLOGY.md exists" "[ -f '${JK_DIR}/TOPOLOGY.md' ]"
+check "SECURITY exists" "[ -f '${JK_DIR}/SECURITY.md' ] || [ -f '${JK_DIR}/SECURITY.adoc' ]"
+check "ARCHITECTURE exists" "[ -f '${JK_DIR}/ARCHITECTURE.md' ] || [ -f '${JK_DIR}/ARCHITECTURE.adoc' ]"
+check "PROOF-NEEDS exists" "[ -f '${JK_DIR}/PROOF-NEEDS.md' ] || [ -f '${JK_DIR}/PROOF-NEEDS.adoc' ]"
+check "TOPOLOGY exists" "[ -f '${JK_DIR}/TOPOLOGY.md' ] || [ -f '${JK_DIR}/TOPOLOGY.adoc' ]"
 check "LICENSE directory exists" "[ -d '${JK_DIR}/LICENSES' ]"
 
 # --- Proofs ---

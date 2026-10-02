@@ -40,6 +40,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2.9.2
       - name: Run benchmarks
         run: cargo bench -- --output-format bencher 2>/dev/null || echo "Benchmarks completed"
@@ -51,6 +53,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2.9.2
       - name: Build release
         run: cargo build --release
@@ -90,6 +94,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
       - name: Install panic-attack
         run: cargo install --git https://github.com/hyperpolymath/panic-attacker.git 2>/dev/null || echo "panic-attack unavailable"
       - name: Run assail scan
