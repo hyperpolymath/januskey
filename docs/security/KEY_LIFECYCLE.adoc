@@ -484,8 +484,8 @@ All key lifecycle events are logged:
   "event_id": "550e8400-e29b-41d4-a716-446655440000",
   "timestamp": "2025-01-15T14:30:00Z",
   "event_type": "KEY_ROTATED",
-  "key_id": "123e4567-e89b-12d3-a456-426614174000",
-  "new_key_id": "789e0123-e89b-12d3-a456-426614174000",
+  "key_id": "00000000-0000-4000-8000-000000000001",
+  "new_key_id": "00000000-0000-4000-8000-000000000002",
   "actor": "user@example.com",
   "reason": "scheduled_rotation",
   "metadata": {
