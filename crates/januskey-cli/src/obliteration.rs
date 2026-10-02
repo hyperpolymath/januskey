@@ -24,10 +24,13 @@
 
 use crate::content_store::{ContentHash, ContentStore};
 use crate::error::{JanusError, Result};
+use crate::metadata::OperationMetadata;
+use crate::JanusKey;
 use chrono::{DateTime, Utc};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -256,6 +259,30 @@ impl ObliterationManager {
         Ok(record)
     }
 
+    /// Append a record for an already-generated proof (e.g. the working-file
+    /// proof from [`obliterate_file`]) to the obliteration log and persist it.
+    pub fn record_proof(
+        &mut self,
+        proof: ObliterationProof,
+        reason: Option<String>,
+        legal_basis: Option<String>,
+        cleaned_operation_ids: Vec<String>,
+    ) -> Result<ObliterationRecord> {
+        let record = ObliterationRecord {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            user: whoami::username(),
+            content_hash: proof.content_hash.clone(),
+            reason,
+            legal_basis,
+            proof,
+            cleaned_operation_ids,
+        };
+        self.log.records.push(record.clone());
+        self.save()?;
+        Ok(record)
+    }
+
     /// Get all obliteration records
     pub fn records(&self) -> &[ObliterationRecord] {
         &self.log.records
@@ -341,14 +368,10 @@ fn secure_overwrite(path: &Path) -> Result<usize> {
 /// store): hash its current content, securely overwrite it with
 /// [`OVERWRITE_PASSES`] passes, remove it, and return a proof of erasure.
 ///
-/// This is the GDPR Article 17 "right to erasure" primitive applied to a
-/// concrete filesystem path, used by the `jk obliterate <path>` command.
-/// Unlike [`ObliterationManager::obliterate`] it does not consult the content
-/// store, so it works on files the repository never ingested.
-///
-/// TODO(product): also scrub any content-store copies and prune the
-/// associated operation-log entries so no recoverable trace remains, and
-/// thread the resulting proof into the obliteration audit log.
+/// This touches only the working file. It is the fallback used by
+/// `jk obliterate <path>` when no `.januskey/` store exists; when one does,
+/// use [`obliterate_path`], which also scrubs the content-store copies and
+/// operation-log entries for the path.
 pub fn obliterate_file(path: &Path) -> Result<ObliterationProof> {
     if !path.exists() {
         return Err(JanusError::FileNotFound(format!(
@@ -366,6 +389,172 @@ pub fn obliterate_file(path: &Path) -> Result<ObliterationProof> {
     fs::remove_file(path)?;
 
     Ok(ObliterationProof::generate(&content_hash, passes))
+}
+
+/// File name of the obliteration log inside a `.januskey/` directory.
+pub const OBLITERATION_LOG_FILE: &str = "obliterations.json";
+
+/// Outcome of [`obliterate_path`].
+#[derive(Debug)]
+pub struct PathObliterationReport {
+    /// Proof for the working file, if it existed and was shredded.
+    pub file_proof: Option<ObliterationProof>,
+    /// IDs of the operation-log entries that were purged.
+    pub purged_operation_ids: Vec<String>,
+    /// One record per content-store blob that was shredded.
+    pub blob_records: Vec<ObliterationRecord>,
+    /// Hashes referenced by the purged entries that were kept because a
+    /// surviving entry (another path) still references the same blob.
+    pub retained_shared: Vec<ContentHash>,
+}
+
+/// Normalise a path for comparison with stored operation paths: resolve it
+/// against `root` if relative, then canonicalise its parent directory and
+/// re-attach the file name (so it works whether or not the file itself still
+/// exists). Falls back to the joined path if the parent cannot be resolved.
+fn normalise_path(root: &Path, path: &Path) -> PathBuf {
+    let joined = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
+    };
+    match (joined.parent(), joined.file_name()) {
+        (Some(parent), Some(name)) => parent
+            .canonicalize()
+            .map(|p| p.join(name))
+            .unwrap_or_else(|_| joined.clone()),
+        _ => joined,
+    }
+}
+
+/// Return `content_hash` and `new_content_hash` of one operation entry.
+fn entry_hashes(op: &OperationMetadata) -> impl Iterator<Item = &ContentHash> {
+    op.content_hash.iter().chain(op.new_content_hash.iter())
+}
+
+/// Obliterate every recoverable trace of `path` inside a JanusKey store
+/// (GDPR Article 17 "right to erasure" for a tracked file):
+///
+/// 1. shred and remove the working file, if it still exists;
+/// 2. shred every content-store blob referenced by an operation-log entry
+///    whose primary or secondary path is `path`, **unless** a surviving entry
+///    for another path references the same (deduplicated) blob — shared blobs
+///    are kept so the other path's history stays undoable;
+/// 3. purge those operation-log entries (via
+///    [`crate::MetadataStore::purge_path`]), so undo/history no longer
+///    mention the path.
+///
+/// Stored paths are matched after normalisation (relative to `jk.root`,
+/// parent canonicalised), so the spelling used at record time does not
+/// matter. Blobs are shredded *before* the log is purged: if a shred fails,
+/// the entries survive and the command can be re-run to finish the job.
+///
+/// Every shred is recorded in `manager`'s obliteration log (the working
+/// file's proof as well as each blob's). That log is the unkeyed JSON
+/// ledger; chaining these events into the keyed, tamper-evident `AuditLog`
+/// needs an unlocked key and is deferred to J2-3.
+///
+/// Returns `FileNotFound` if the working file is absent and the log holds no
+/// entry for the path.
+pub fn obliterate_path(
+    jk: &mut JanusKey,
+    manager: &mut ObliterationManager,
+    path: &Path,
+    reason: Option<String>,
+    legal_basis: Option<String>,
+) -> Result<PathObliterationReport> {
+    let target = normalise_path(&jk.root, path);
+    let root = jk.root.clone();
+    let matches = |p: &Path| normalise_path(&root, p) == target;
+    let entry_matches = |op: &OperationMetadata| {
+        matches(&op.path) || op.path_secondary.as_deref().is_some_and(matches)
+    };
+
+    // Plan: which stored spellings match, which hashes they reference, and
+    // which of those hashes no surviving entry still needs.
+    let ops = jk.metadata_store.operations();
+    let mut spellings: Vec<PathBuf> = Vec::new();
+    for op in ops.iter().filter(|op| entry_matches(op)) {
+        for p in std::iter::once(&op.path).chain(op.path_secondary.iter()) {
+            if matches(p) && !spellings.contains(p) {
+                spellings.push(p.clone());
+            }
+        }
+    }
+    let purged_ids: Vec<String> = ops
+        .iter()
+        .filter(|op| entry_matches(op))
+        .map(|op| op.id.clone())
+        .collect();
+    let mut seen = HashSet::new();
+    let referenced: Vec<ContentHash> = ops
+        .iter()
+        .filter(|op| entry_matches(op))
+        .flat_map(entry_hashes)
+        .filter(|h| seen.insert((*h).clone()))
+        .cloned()
+        .collect();
+    let surviving: HashSet<&ContentHash> = ops
+        .iter()
+        .filter(|op| !entry_matches(op))
+        .flat_map(entry_hashes)
+        .collect();
+    let (retained_shared, to_shred): (Vec<ContentHash>, Vec<ContentHash>) =
+        referenced.into_iter().partition(|h| surviving.contains(h));
+
+    let working = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        jk.root.join(path)
+    };
+    if !working.exists() && spellings.is_empty() {
+        return Err(JanusError::FileNotFound(format!(
+            "{} not found (no working file and no JanusKey history)",
+            path.display()
+        )));
+    }
+
+    // 1. Working file.
+    let file_proof = if working.exists() {
+        let proof = obliterate_file(&working)?;
+        manager.record_proof(
+            proof.clone(),
+            reason.clone(),
+            legal_basis.clone(),
+            purged_ids.clone(),
+        )?;
+        Some(proof)
+    } else {
+        None
+    };
+
+    // 2. Unshared blobs. A hash with no blob (e.g. a Modify's
+    // `new_content_hash`, which is never stored) is simply skipped.
+    let mut blob_records = Vec::new();
+    for hash in to_shred.iter().filter(|h| jk.content_store.exists(h)) {
+        blob_records.push(manager.obliterate_with_cleanup(
+            &jk.content_store,
+            hash,
+            purged_ids.clone(),
+            reason.clone(),
+            legal_basis.clone(),
+        )?);
+    }
+
+    // 3. Log entries, under every spelling they were stored with.
+    for spelling in &spellings {
+        jk.metadata_store.purge_path(spelling)?;
+    }
+    debug_assert!(to_shred
+        .iter()
+        .all(|h| !jk.metadata_store.referenced_hashes().contains(h)));
+
+    Ok(PathObliterationReport {
+        file_proof,
+        purged_operation_ids: purged_ids,
+        blob_records,
+        retained_shared,
+    })
 }
 
 /// Verify that content no longer exists at a path
