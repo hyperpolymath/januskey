@@ -29,7 +29,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: v1
+          toolchain: stable
 
       - name: Reconcile dashboards against STATE.a2ml
         run: cargo run -q -p dashboard-check -- --check .

@@ -1,4 +1,5 @@
 == JanusKey — Project Topology
+// Last updated: 2026-07-02 (completion dashboard reconciled to STATE.a2ml / READINESS; date carried over from TOPOLOGY.md, dropped by the md-to-adoc migration #102)
 
 === System Architecture
 
