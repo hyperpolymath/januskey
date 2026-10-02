@@ -45,6 +45,35 @@ content |Hash collisions or bugs corrupt stored data
 januskey-cli
 |===
 
+=== Claims ledger
+
+Every claim JanusKey makes about its own correctness is a row here, with one
+of five statuses: PROVEN (a checker accepts a proof), TESTED (a named test
+passes), ASSUMED (relied on, not checked), DESIGNED (specified, not built) or
+OPEN (not true yet). `cargo run -p dashboard-check -- --check .` runs the
+command of every PROVEN and TESTED row and fails unless it exits 0 and, for
+TESTED, prints the named test passing. The counts on README, EXPLAINME,
+TOPOLOGY and READINESS must equal what that checker measures: tests by
+`cargo test --workspace --locked -- --list`, proofs by the PROVEN rows below.
+Each row is one line; the checker rejects a wrapped row.
+
+There are no PROVEN rows: the Idris2 ABI does not typecheck (#145), so no
+proof in this repository is checked by anything.
+
+[cols="3,1,3,3",options="header"]
+|===
+|Claim |Status |Artefact |Command
+|Obliterating a path shreds its unshared blobs and log entries, and undo then has nothing |TESTED |`crates/januskey-cli/tests/obliteration_cas_test.rs::obliterate_scrubs_blobs_log_and_undo` |`cargo test --locked -p januskey --test obliteration_cas_test obliterate_scrubs_blobs_log_and_undo`
+|Obliteration keeps a blob another path still references |TESTED |`crates/januskey-cli/tests/obliteration_cas_test.rs::obliterate_keeps_blob_shared_with_another_path` |`cargo test --locked -p januskey --test obliteration_cas_test obliterate_keeps_blob_shared_with_another_path`
+|`jk obliterate` scrubs the store end to end through the CLI |TESTED |`crates/januskey-cli/tests/obliteration_cas_test.rs::cli_obliterate_scrubs_store_and_undo_has_nothing` |`cargo test --locked -p januskey --test obliteration_cas_test cli_obliterate_scrubs_store_and_undo_has_nothing`
+|Execute then undo restores the prior state (property test over generated ops) |TESTED |`crates/januskey-cli/tests/property_tests.rs::execute_then_undo_is_identity` |`cargo test --locked -p januskey --test property_tests execute_then_undo_is_identity`
+|Content store round-trips arbitrary bytes (property test) |TESTED |`crates/reversible-core/tests/property_tests.rs::content_store_roundtrip` |`cargo test --locked -p reversible-core --test property_tests content_store_roundtrip`
+|A transaction rolled back ends RolledBack with none active (property test) |TESTED |`crates/reversible-core/tests/property_tests.rs::transaction_begin_rollback_roundtrip` |`cargo test --locked -p reversible-core --test property_tests transaction_begin_rollback_roundtrip`
+|The audit log verifies an untampered three-entry chain as valid (tamper detection is not tested) |TESTED |`crates/januskey-cli/src/attestation.rs::test_audit_log_chain_integrity` |`cargo test --locked -p januskey --lib test_audit_log_chain_integrity`
+|The Idris2 ABI typechecks and its six security claims are proved |OPEN |#145 |-
+|Every operation is reversible (MPR), as a theorem linked to the Rust |OPEN |#145 |-
+|===
+
 === Recommended Prover
 
 *Idris2* — Create `+src/abi/+` with dependent type proofs for

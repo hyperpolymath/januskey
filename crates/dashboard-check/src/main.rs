@@ -23,6 +23,8 @@
 // Exits 0 only if every reconciled field was found and agrees with STATE;
 // non-zero with a report otherwise. `--check` is the default and only mode.
 
+mod claims;
+
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -299,6 +301,51 @@ fn check_grade(
     }
 }
 
+/// Check the claims ledger in PROOF-NEEDS (ULTRAPLAN P1-0): run every PROVEN
+/// and TESTED row, then compare the counts printed on the dashboards with the
+/// measured test count and the number of PROVEN rows.
+fn check_claims(root: &Path, r: &mut Report) {
+    let Some(ledger) = read_surface(root, "PROOF-NEEDS") else {
+        r.problems
+            .push("no PROOF-NEEDS.adoc or PROOF-NEEDS.md holding the claims ledger".into());
+        return;
+    };
+    let claims = match claims::parse_ledger(&ledger.text) {
+        Ok(c) => c,
+        Err(errors) => {
+            r.problems.extend(errors);
+            return;
+        }
+    };
+    for c in &claims {
+        match claims::check_claim(root, c, &claims::run_command) {
+            Ok(()) => r
+                .observed
+                .push(format!("{:?}: {} ({})", c.status, c.claim, c.artefact)),
+            Err(e) => r.problems.push(e),
+        }
+    }
+    let proven = claims
+        .iter()
+        .filter(|c| c.status == claims::Status::Proven)
+        .count() as u64;
+    let tests = match claims::measure_tests(root) {
+        Ok(n) => n,
+        Err(e) => {
+            r.problems.push(e);
+            return;
+        }
+    };
+    r.observed
+        .push(format!("{tests} tests measured, {proven} PROVEN claims"));
+    for stem in ["README", "EXPLAINME", "TOPOLOGY", "READINESS"] {
+        if let Some(s) = read_surface(root, stem) {
+            r.problems
+                .extend(claims::check_counts(&s.name, &s.text, tests, proven));
+        }
+    }
+}
+
 /// Read a file to a string, `None` if it is absent or unreadable.
 fn read_opt(path: &Path) -> Option<String> {
     std::fs::read_to_string(path).ok()
@@ -336,7 +383,8 @@ fn main() -> ExitCode {
     let topology = read_surface(&root, "TOPOLOGY");
     let readiness = read_surface(&root, "READINESS");
 
-    let report = reconcile(&state, topology.as_ref(), readiness.as_ref());
+    let mut report = reconcile(&state, topology.as_ref(), readiness.as_ref());
+    check_claims(&root, &mut report);
 
     if report.problems.is_empty() {
         println!(

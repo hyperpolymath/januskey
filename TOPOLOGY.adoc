@@ -1,5 +1,5 @@
 == JanusKey — Project Topology
-// Last updated: 2026-07-02 (completion dashboard reconciled to STATE.a2ml / READINESS; date carried over from TOPOLOGY.md, dropped by the md-to-adoc migration #102)
+// Last updated: 2026-10-02 (test and proof counts reconciled to the PROOF-NEEDS claims ledger by dashboard-check)
 
 === System Architecture
 
@@ -77,9 +77,9 @@ SECURITY (honest)
 INTERFACES & RESEARCH
   CLI Interface (jk)                ████████░░  ~85%   Full command set; no user testing yet
   MPR Methodology                   ████░░░░░░  ~40%   Design documented; FORMAL PROOFS PENDING
-                                                        (30 Idris2 proofs unchecked in CI; not linked
+                                                        (Idris2 ABI does not typecheck, #145; 0 proofs checked; not linked
                                                         to the Rust)
-  Testing (READINESS matrix)        ██████░░░░  ~60%   67 tests + 5 benches; missing fuzz, mutation,
+  Testing (READINESS matrix)        ██████░░░░  ~60%   119 tests + 5 benches; missing fuzz, mutation,
                                                         chaos, compatibility (Grade D)
 
 REPO INFRASTRUCTURE
