@@ -8,8 +8,8 @@ standards/testing-and-benchmarking/TESTING-TAXONOMY.adoc v1.0
 
 === CRG Grade: D (Alpha — Unstable)
 
-*Justification:* Tests exist and pass (67 total), proofs exist (30
-Idris2, unchecked in CI), benchmarks exist (5 Criterion groups). But: no
+*Justification:* 119 tests declared (`cargo test --workspace --locked -- --list`; rust-ci runs them); the
+Idris2 ABI does not typecheck, so 0 proofs are checked (#145); benchmarks exist (5 Criterion groups). But: no
 fuzz testing, no mutation testing, 225 unwrap() calls, E2E mostly skips,
 benchmarks measured fake crypto until this session. RSR compliance
 present. Deep annotation incomplete (TOPOLOGY.md exists but
@@ -60,11 +60,11 @@ handling
 
 |15 |Compatibility |MISSING |0 |— |No version migration tests
 
-|16 |Proof regression |✓ |30 proofs |`+just test-proofs+` |Idris2 –check
+|16 |Proof regression |✗ |0 checked (#145) |`+just test-proofs+` |Idris2 –check
 (requires idris2 binary)
 |===
 
-*Total passing:* 67 tests + 5 benchmark groups + 30 Idris2 proofs *Total
+*Total declared:* 119 tests + 5 benchmark groups; 0 Idris2 proofs checked (#145) *Total
 missing:* Fuzz, mutation, chaos, compatibility
 
 === Aspect Matrix
