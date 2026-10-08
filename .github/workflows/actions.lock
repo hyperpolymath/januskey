@@ -49,9 +49,6 @@ workflows:
     '.github/workflows/rust-ci.yml': []
     '.github/workflows/scorecard.yml': []
     '.github/workflows/secret-scanner.yml': []
-    '.github/workflows/semgrep.yml':
-        - 'actions/checkout@v7.0.1'
-        - 'github/codeql-action@v4.38.0'
     '.github/workflows/workflow-linter.yml':
         - 'actions/checkout@v7.0.1'
 dependencies:
