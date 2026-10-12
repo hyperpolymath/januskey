@@ -84,21 +84,10 @@ test-contracts:
         done; \
     fi
 
-# Check Idris2 ABI proofs (requires idris2)
+# Check Idris2 ABI proofs (requires idris2); mirrors the root Justfile recipe
 test-proofs:
-    @echo "=== Proof Regression ==="
-    @if command -v idris2 >/dev/null 2>&1; then \
-        for f in src/abi/Types.idr src/abi/Layout.idr src/abi/Foreign.idr src/abi/Proofs.idr; do \
-            if [ -f "$$f" ]; then \
-                echo "Checking $$f..."; \
-                idris2 --check "$$f" && echo "  [OK] $$f" || echo "  [FAIL] $$f"; \
-            else \
-                echo "  [SKIP] $$f not found"; \
-            fi; \
-        done; \
-    else \
-        echo "SKIP: idris2 not installed. Install via: pack install-app idris2"; \
-    fi
+    bash scripts/check-abi-tree.sh
+    idris2 --typecheck src/abi/januskey-abi.ipkg
 
 # Run full test suite (all categories)
 test-all: test test-p2p test-regressions test-e2e test-aspect test-contracts test-proofs smoke

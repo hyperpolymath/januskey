@@ -55,7 +55,7 @@ just setup-dev
 ----
 januskey/
 ├── src/                  # Source code
-├── src/abi/              # Idris2 ABI definitions (if applicable)
+├── src/abi/              # Idris2 ABI package (januskey-abi.ipkg, JanusKey/ABI/*.idr)
 ├── ffi/zig/              # Zig FFI bridge (if applicable)
 ├── tests/                # Test suite
 ├── docs/                 # Documentation

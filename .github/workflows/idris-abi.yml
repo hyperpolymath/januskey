@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: MPL-2.0
-# Typechecks the Idris2 ABI package (src/idris-abi/januskey-abi.ipkg).
-# NOT a required check: it is expected to be red until J1-3 fixes the known
-# errors in src/abi (Types.idr, and the Januskey/JanusKey module-name casing).
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+# Checks the Idris2 ABI tree invariants (scripts/check-abi-tree.sh) and
+# typechecks the ABI package (src/abi/januskey-abi.ipkg).
+# NOT yet a required check: the typecheck step is expected to be red until the
+# follow-up commits land (Foreign.idr still carries the RSR template FFI, and
+# Types.idr has known errors); the tree-invariant step must be green now.
 name: Idris ABI typecheck
 on:
   pull_request:
@@ -12,7 +15,7 @@ permissions:
   contents: read
 jobs:
   idris-abi:
-    name: "idris-abi (expected red until J1-3)"
+    name: "idris-abi"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     container:
@@ -22,7 +25,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: ABI tree invariants
+        run: bash scripts/check-abi-tree.sh
       - name: Typecheck ABI package
         run: |
           idris2 --version
-          idris2 --typecheck src/idris-abi/januskey-abi.ipkg
+          idris2 --typecheck src/abi/januskey-abi.ipkg

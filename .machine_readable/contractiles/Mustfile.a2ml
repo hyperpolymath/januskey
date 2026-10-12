@@ -147,7 +147,7 @@ trust level: even maximal-trust agents cannot violate MUST constraints.
 
 ### abi-proofs-preserved
 - description: Idris2 ABI definitions and proofs must not be removed (changes require proof update)
-- run: test -f src/abi/Types.idr && test -f src/abi/Proofs.idr && test -f src/abi/Foreign.idr
+- run: test -f src/abi/JanusKey/ABI/Types.idr && test -f src/abi/JanusKey/ABI/Proofs.idr && test -f src/abi/JanusKey/ABI/Foreign.idr && test -f src/abi/januskey-abi.ipkg
 - severity: critical
 
 ### generated-code-in-generated
