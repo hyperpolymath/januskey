@@ -90,3 +90,4 @@ deps/
 .cache/
 build/
 dist/
+*.agdai

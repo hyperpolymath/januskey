@@ -88,6 +88,10 @@ test-contracts:
         done; \
     fi
 
+# Agda kernel proofs (verification/proofs/agda) against the pinned resource-algebra.
+test-agda:
+    bash scripts/check-agda.sh
+
 # One ABI tree: no symlink farm, one ipkg, one Foreign.idr, module names match paths.
 abi-tree-check:
     bash scripts/check-abi-tree.sh
