@@ -35,6 +35,60 @@ commits, not this one:
 regenerated with capitalised module names or removed is an owner decision
 (JNK-01, open question).
 
+==== Same day, three commits later: the package typechecks
+
+`+idris2 --typecheck src/abi/januskey-abi.ipkg+` builds all four modules
+with zero warnings under Idris2 0.8.0 (bootstrap build, locally; the CI
+image `+idris2-pack@sha256:f0758996…+` is the gate of record). Bypass census
+in `+src/abi/+`: no `+believe_me+`, `+assert_total+`, `+assert_smaller+`,
+`+%partial+` or holes (`+tests/aspect/cross_cutting_test.sh+`, 29/29).
+
+Status rows, in the five-status vocabulary. A status moves only with a named
+module, lemma, fixture or log line.
+
+[cols="1,3,1,2",options="header"]
+|===
+| ID | Claim | Status | Artefact
+| A-1 | Status codes are a closed sum with a total decoder; encode/decode round-trips; encoding is injective | PROVEN | `+Foreign.statusFromCode+`, `+statusRoundTrip+`, `+statusCodeInjective+`
+| A-2 | Op-kind and algorithm encodings round-trip against januskey.h's enum order | PROVEN | `+Foreign.opKindRoundTrip+`, `+algorithmRoundTrip+`
+| A-3 | Idris2 sizes, status codes, enums and exported symbols agree with januskey.h and ffi/zig | TESTED | `+scripts/check-abi-layout.sh+` (negative control: one perturbed code → FAIL)
+| A-4 | A library handle is destroyed at most once, and a linear handle cannot be forgotten | PROVEN at the type (multiplicity 1 on `+Foreign.closeOnce+`); TESTED | `+tests/reject-idris/{DoubleClose,ForgottenClose}.idr+` refused
+| A-5 | A code the header does not define is never read as Ok | TESTED | `+tests/reject-idris/UnknownStatusIsOk.idr+` refused
+| C-1 | Composition of CNOs is a CNO | PROVEN | `+Proofs.seqCNO+`
+| C-2 | Copy-then-uncopy is a CNO in the (path, hash) log model | PROVEN | `+Layout.copyIsCNO+`
+| C-3 | A transaction containing an obliteration is not all-reversible | PROVEN | `+Layout.obliterateNotReversible+`
+| C-4 | Replacing a chain entry by one with a different hash breaks the link | PROVEN | `+Proofs.tamperBreaksLink+`
+| C-5 | Struct sizes 32/16/112 and 8-byte alignment as divisibility | PROVEN (literals) | `+Layout.{contentHashSize,keyIdSize,oblitProofSize,hashAligned,keyIdAligned,oblitAligned}+`
+| G-1 | Reversibility as a Loss grade: lossless traces have only lossless steps; obliteration absorbs; wrap/unwrap is grade 𝟙 given cancellation | PROVEN (Agda kernel, pinned resource-algebra `+cf9235c+`) | `+verification/proofs/agda/Reversibility.agda+`; `+tests/reject-agda/*+` refused
+| G-2 | The Idris2 `+IsCNO+`/`+ReversibleOp+` pair corresponds to Agda `+ReversiblePair+` | ASSUMED (transcription) | no mechanical link claimed
+| G-3 | The FFI bridge preserves grade 𝟙 (homomorphism) | OPEN | resource-algebra lists homomorphisms OPEN; to file from JNK-01
+| X-1 | Hash one-wayness; physical erasure | EXTERNAL (cryptographic / physical assumptions) | not theorems of this repo
+|===
+
+Removed, with the reason recorded beside the replacement in source:
+`+memoryDefeatsGPU+`, `+timeCostMonotonic+`, `+outputIs256Bits+`,
+`+threePassMinimum+` (closed literals or restated hypotheses);
+`+defaultExceedsMinimum+`, `+defaultMeetsOWASP+`, `+defaultMemoryOWASP+`
+(restated record fields that already carry the bound); `+cnoPairCompose+`,
+`+tamperDetectable+` (returned Unit); `+identityIsCNO+` (`+s = s+`);
+`+hashOneWay+` (`+Void -> Void+`); `+canRollback+` (returned its argument);
+`+copyDeleteCNO+` (no body, false as stated); `+linearFileConsumed+`
+(ill-typed; claimed `+LinearFile -> Void+`); `+systemForgetsOldKey+`
+("forgets" has no negative form in the Knows model);
+`+errorCodeDeterministic+` over an undefined `+CError+` (now
+`+statusCodeInjective+`).
+
+Model limits, stated so no reader over-counts them: `+Knows Adversary a+`
+being uninhabited is a modelling choice, not a security proof; `+FSState+`
+tracks (path, hash) pairs, not contents, so C-2 is about the operation log;
+linearity is a property of the binding — a handle bound by an IO `+<-+` is
+unrestricted, the guarantee holds for `+(1 h : LibHandle Open)+` parameters.
+
+Dashboards (README, TOPOLOGY, READINESS) still carry the "does not
+typecheck (#145)" wording and the ledger counts from #146; they are to be
+reconciled by `+dashboard-check+` against this table when this stack lands,
+not edited by hand here.
+
 === Current State
 
 _Re-verified 2026-06-29 (idris2 0.8.0); paths updated 2026-10-12 to the
