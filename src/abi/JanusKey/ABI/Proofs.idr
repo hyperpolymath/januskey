@@ -21,52 +21,50 @@ import Data.Nat
 -- 1. CNO Composition Proofs
 -- ============================================================
 
-||| Sequential composition of CNOs is a CNO
-||| If f;f⁻¹ = id and g;g⁻¹ = id, then (f;g);(g⁻¹;f⁻¹) = id
+-- Sequential composition of reversible operations: forward runs f then g,
+-- inverse runs g⁻¹ then f⁻¹. The composite keeps f's kind tag (ReversibleOp
+-- has no "sequence" kind); nothing below depends on the tag.
 public export
-cnoPairCompose : IsCNO op1 -> IsCNO op2 -> Type
-cnoPairCompose _ _ = Unit  -- The proof is structural: given two CNO witnesses,
-                            -- their sequential composition is also a CNO by
-                            -- associativity of function composition and the
-                            -- individual inverse properties.
+seqOp : (f, g : ReversibleOp) -> ReversibleOp
+seqOp f g = MkRevOp (kind f) (\s => forward g (forward f s)) (\s => inverse f (inverse g s))
 
-||| The identity operation is trivially a CNO
+-- Composition of CNOs is a CNO: (f;g);(g⁻¹;f⁻¹) = id. This is the theorem
+-- the former `cnoPairCompose` (which returned Unit) claimed in a comment.
 public export
-identityIsCNO : (s : FSState) -> s = s
-identityIsCNO s = Refl
+seqCNO : {f, g : ReversibleOp} -> IsCNO f -> IsCNO g -> IsCNO (seqOp f g)
+seqCNO (MkCNO pf) (MkCNO pg) =
+  MkCNO (\s => trans (cong (inverse f) (pg (forward f s))) (pf s))
 
 -- ============================================================
 -- 2. Obliteration Completeness
 -- ============================================================
 
-||| Overwrite pass covers all bytes
-||| For a file of size n, each pass writes exactly n bytes
+-- Overwrite pass covers all bytes
+-- For a file of size n, each pass writes exactly n bytes
 public export
 overwriteCoversAll : (fileSize : Nat) -> (pass : OverwritePassIdx)
                   -> (bytesWritten : Nat)
                   -> bytesWritten = fileSize
                   -> So (bytesWritten >= fileSize)
-overwriteCoversAll Z _ Z Refl = Oh
-overwriteCoversAll (S k) _ (S k) Refl = Oh
+overwriteCoversAll n _ _ Refl = gteRefl n
+  where
+    gteRefl : (m : Nat) -> So (m >= m)
+    gteRefl Z = Oh
+    gteRefl (S j) = gteRefl j
 
-||| Three passes is the minimum for secure deletion
-||| (DoD 5220.22-M standard requires 3 passes minimum)
-public export
-threePassMinimum : So (3 >= 3)
-threePassMinimum = Oh
-
-||| After obliteration, content hash cannot be reversed to content
-||| This is a consequence of SHA256 being a one-way function
-public export
-hashOneWay : ContentHash -> Type
-hashOneWay h = Void -> Void  -- Content cannot be recovered from hash alone
+-- The three-pass minimum is carried by ObliterationProof itself: its
+-- `passesValid : So (overwritePasses >= 3)` field cannot be filled otherwise
+-- (the former `threePassMinimum : So (3 >= 3)` restated a literal). Hash
+-- one-wayness is a cryptographic assumption, not a theorem of this module;
+-- it is recorded in PROOF-NEEDS.adoc as external, and the former
+-- `hashOneWay` (which returned `Void -> Void`) is gone.
 
 -- ============================================================
 -- 3. Transaction Safety Proofs
 -- ============================================================
 
-||| A transaction cannot be committed twice
-||| (Committed is a terminal state — no TxTransition from Committed)
+-- A transaction cannot be committed twice
+-- (Committed is a terminal state — no TxTransition from Committed)
 public export
 noDoubleCommit : TxTransition Committed s -> Void
 noDoubleCommit _ impossible
@@ -107,28 +105,13 @@ txLifecycleComplete RolledBack _        = Right (\case _ impossible)
 -- 4. Key Derivation Correctness
 -- ============================================================
 
-||| Argon2 time cost is monotonic with security
-||| Higher time cost → harder to brute force
-public export
-timeCostMonotonic : (a, b : Nat) -> So (a >= b) -> So (a >= b)
-timeCostMonotonic a b prf = prf
-
-||| Memory cost of 64 MiB defeats GPU attacks
-||| (GPUs have limited per-thread memory)
-public export
-memoryDefeatsGPU : So (65536 >= 65536)
-memoryDefeatsGPU = Oh
-
-||| Output length of 32 bytes = 256 bits of key material
-public export
-outputIs256Bits : So (32 * 8 >= 256)
-outputIs256Bits = Oh
-
-||| Default parameters exceed minimum requirements
-public export
-defaultExceedsMinimum : (p : Argon2Params) -> p = defaultArgon2
-                     -> (So (timeCost p >= 3), So (memoryCost p >= 65536))
-defaultExceedsMinimum _ Refl = (Oh, Oh)
+||| Argon2 parameter bounds are carried by Layout.Argon2Params: a record can
+||| only be built with proofs of timeCost >= 3, memoryCost >= 65536 KiB,
+||| parallelism >= 1 and outputLen >= 32, and `defaultArgon2` supplies them.
+||| The former `timeCostMonotonic` (returned its hypothesis),
+||| `memoryDefeatsGPU` and `outputIs256Bits` (closed literals) and
+||| `defaultExceedsMinimum` (restated the record fields) are gone; none was
+||| a statement about key derivation.
 
 -- ============================================================
 -- 5. Attestation Chain Integrity
@@ -156,17 +139,18 @@ data ValidChain : List AttestEntry -> Type where
 public export
 chainNoGaps : ValidChain chain -> (i : Fin (length chain))
            -> So (length chain > 0)
-chainNoGaps (SingleEntry) FZ = Oh
-chainNoGaps (ChainLink _ _) FZ = Oh
+chainNoGaps EmptyChain i = absurd i
+chainNoGaps SingleEntry _ = Oh
+chainNoGaps (ChainLink _ _) _ = Oh
 
-||| Tampering with any entry breaks the chain
-||| If an attacker modifies entry i, the hash at i+1 won't match
+||| Tampering breaks the chain: replace e1 by an entry whose hash differs and
+||| the link from e2 cannot be re-established. This is the theorem the former
+||| `tamperDetectable` (which returned Unit) claimed in a comment.
 public export
-tamperDetectable : (chain : List AttestEntry)
-                -> ValidChain chain
-                -> Type
-tamperDetectable _ _ = Unit  -- Structural: any modification to entryHash
-                              -- invalidates the next entry's prevHash check
+tamperBreaksLink : ValidChain (e2 :: e1 :: rest)
+                -> Not (entryHash e1' = entryHash e1)
+                -> ValidChain (e2 :: e1' :: rest) -> Void
+tamperBreaksLink (ChainLink p _) neq (ChainLink p' _) = neq (trans (sym p') p)
 
 -- ============================================================
 -- 6. Effect Safety Proofs
@@ -191,22 +175,18 @@ oblitNeedsEntropy = There (There (Here))
 -- 7. Linearity Proofs
 -- ============================================================
 
-||| A linear file consumed by obliteration cannot be used again
-||| (This is enforced by QTT multiplicities — included for documentation)
-public export
-linearFileConsumed : (1 f : LinearFile) -> (ObliterationProof, LinearFile -> Void)
-linearFileConsumed f = (obliterateLinear f, \_ => ())
--- Note: after obliterateLinear consumes f with multiplicity 1,
--- there is no remaining reference to construct a second use.
+||| Linearity is carried by signatures, not restated here: `obliterateLinear`
+||| and `zeroize` in Types.idr take their argument at multiplicity 1, so a
+||| second use of the same value is a type error at the call site. (The
+||| former `linearFileConsumed` claimed `LinearFile -> Void`, which is false —
+||| LinearFile is inhabited — and was ill-typed.)
 
 -- ============================================================
 -- 8. Tropical Cost Proofs
 -- ============================================================
 
-||| Copy is cheaper than obliteration for any file size > 0
-public export
-copyCheaperThanOblit : (n : Nat) -> So (n > 0) -> So (3 * n > n)
-copyCheaperThanOblit (S k) Oh = Oh
+||| Obliteration cost dominates copy cost: see Types.oblitCostDominates
+||| (LTE n (3 * n)); the strict form for n > 0 is not stated.
 
 ||| Sequential cost is additive (tropical multiplication)
 public export
@@ -234,28 +214,18 @@ data AuditorView : Type where
   CanSeeOps : List OpKind -> AuditorView
   -- No constructor for seeing key bytes
 
-||| System forgets old key material after rotation
-public export
-systemForgetsOldKey : KeyRotated old new -> Knows System KeyId
-systemForgetsOldKey rot = systemKnowsNewKey rot
--- Returns knowledge of NEW key only — old key is not in the result
+||| "The system forgets the old key" is not expressible in the Knows model:
+||| Knows has no negative form, so the former `systemForgetsOldKey` (which
+||| returned knowledge of the new key and said nothing about the old) is gone.
+||| Types.systemKnowsNewKey remains as the positive statement.
 
 -- ============================================================
 -- 10. Error Code Proofs
 -- ============================================================
 
-||| Every operation returns exactly one error code
+||| Status codes are a closed sum with a total decoder and an injective
+||| encoding: Foreign.statusRoundTrip and Foreign.statusCodeInjective.
+||| Re-exported here under the name the old (never-typechecking) proof used.
 public export
-errorCodeDeterministic : (e1, e2 : CError) -> errorCode e1 = errorCode e2 -> e1 = e2
-errorCodeDeterministic JK_OK JK_OK Refl = Refl
-errorCodeDeterministic JK_ERR_NOT_INITIALIZED JK_ERR_NOT_INITIALIZED Refl = Refl
-errorCodeDeterministic JK_ERR_INVALID_PATH JK_ERR_INVALID_PATH Refl = Refl
-errorCodeDeterministic JK_ERR_IO JK_ERR_IO Refl = Refl
-errorCodeDeterministic JK_ERR_CRYPTO JK_ERR_CRYPTO Refl = Refl
-errorCodeDeterministic JK_ERR_TX_NOT_ACTIVE JK_ERR_TX_NOT_ACTIVE Refl = Refl
-errorCodeDeterministic JK_ERR_TX_CONFLICT JK_ERR_TX_CONFLICT Refl = Refl
-errorCodeDeterministic JK_ERR_KEY_NOT_FOUND JK_ERR_KEY_NOT_FOUND Refl = Refl
-errorCodeDeterministic JK_ERR_KEY_REVOKED JK_ERR_KEY_REVOKED Refl = Refl
-errorCodeDeterministic JK_ERR_OBLITERATION JK_ERR_OBLITERATION Refl = Refl
-errorCodeDeterministic JK_ERR_ATTESTATION JK_ERR_ATTESTATION Refl = Refl
-errorCodeDeterministic JK_ERR_BUFFER_TOO_SMALL JK_ERR_BUFFER_TOO_SMALL Refl = Refl
+errorCodeDeterministic : (e1, e2 : Status) -> statusCode e1 = statusCode e2 -> e1 = e2
+errorCodeDeterministic = statusCodeInjective
