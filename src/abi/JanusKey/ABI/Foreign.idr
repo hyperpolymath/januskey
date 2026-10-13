@@ -206,7 +206,9 @@ data LibState = Open | Closed
 ||| Scope, stated plainly: linearity is a property of the binding. A handle
 ||| bound by an IO `<-` is unrestricted; the discipline holds for handles
 ||| passed as `(1 h : LibHandle Open)` parameters, which is how callers that
-||| want the guarantee must receive it.
+||| want the guarantee must receive it. Plain IO's bind is not linear, so such
+||| a handle cannot be closed inside IO do-notation at all; sequencing linear
+||| steps needs a linear monad (Control.Linear.LIO), which is not used here.
 public export
 data LibHandle : LibState -> Type where
   Opened : (ptr : AnyPtr) -> LibHandle Open

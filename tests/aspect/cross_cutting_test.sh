@@ -45,6 +45,12 @@ check "No believe_me in proofs" "! grep -rh 'believe_me' '${JK_DIR}/src/abi/' 2>
 check "No assert_total in proofs" "! grep -rh 'assert_total' '${JK_DIR}/src/abi/' 2>/dev/null | grep -v '^\s*--' | grep -q ."
 check "No postulate in proofs" "! grep -rq '^postulate' '${JK_DIR}/src/abi/' 2>/dev/null"
 check "No sorry in proofs" "! grep -rh 'sorry' '${JK_DIR}/src/abi/' 2>/dev/null | grep -v '^\s*--' | grep -q ."
+# The rest of the census PROOF-NEEDS.adoc cites: each of these lets a
+# definition typecheck without being proved. Comment and docstring lines are
+# stripped first.
+check "No assert_smaller in proofs" "! grep -rh 'assert_smaller' '${JK_DIR}/src/abi/' 2>/dev/null | grep -vE '^\s*(--|\|\|\|)' | grep -q ."
+check "No partial in proofs" "! grep -rhw 'partial' '${JK_DIR}/src/abi/' 2>/dev/null | grep -vE '^\s*(--|\|\|\|)' | grep -q ."
+check "No holes in proofs" "! grep -rhE '\?[A-Za-z_][A-Za-z0-9_]*' '${JK_DIR}/src/abi/' 2>/dev/null | grep -vE '^\s*(--|\|\|\|)' | grep -q ."
 # NB: exclude the '#![forbid(unsafe_code)]' attribute (which BANS unsafe)
 # and '//' comment lines from the unsafe check.
 check "No unsafe in reversible-core" "! grep -rh 'unsafe' '${JK_DIR}/crates/reversible-core/src/' 2>/dev/null | grep -v 'forbid(unsafe_code)' | grep -v '^\s*//' | grep -q ."
@@ -63,7 +69,7 @@ echo "--- Formal Proofs ---"
 check "Types.idr exists (L1-L12)" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Types.idr' ]"
 check "Layout.idr exists (CNO)" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Layout.idr' ]"
 check "Foreign.idr exists (FFI)" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Foreign.idr' ]"
-check "Proofs.idr exists (30+ proofs)" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Proofs.idr' ]"
+check "Proofs.idr exists" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Proofs.idr' ]"
 check "C header present (mirrors Foreign.idr)" "[ -f '${JK_DIR}/ffi/zig/include/januskey.h' ]"
 
 # --- Build ---
