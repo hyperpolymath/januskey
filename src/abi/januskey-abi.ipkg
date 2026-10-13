@@ -1,0 +1,20 @@
+-- SPDX-License-Identifier: MPL-2.0
+-- SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+--
+-- Idris2 package for the JanusKey ABI layer.
+--
+-- Sources live under src/abi/JanusKey/ABI/<Module>.idr, laid out by module
+-- name, so `idris2 --typecheck src/abi/januskey-abi.ipkg` reaches them
+-- directly. The former src/idris-abi/ symlink farm (PR #140) and the
+-- Januskey/JanusKey casing split it worked around are gone; the tree
+-- invariants are enforced by scripts/check-abi-tree.sh (just abi-tree-check).
+--
+-- Run: idris2 --typecheck src/abi/januskey-abi.ipkg   (or: just test-proofs)
+package januskey-abi
+
+sourcedir = "."
+
+modules = JanusKey.ABI.Types
+        , JanusKey.ABI.Layout
+        , JanusKey.ABI.Foreign
+        , JanusKey.ABI.Proofs

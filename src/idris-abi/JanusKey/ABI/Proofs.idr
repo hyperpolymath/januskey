@@ -1,1 +1,0 @@
-../../../abi/Proofs.idr

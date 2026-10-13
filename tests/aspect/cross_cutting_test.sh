@@ -60,11 +60,11 @@ check "LICENSE directory exists" "[ -d '${JK_DIR}/LICENSES' ]"
 
 # --- Proofs ---
 echo "--- Formal Proofs ---"
-check "Types.idr exists (L1-L12)" "[ -f '${JK_DIR}/src/abi/Types.idr' ]"
-check "Layout.idr exists (CNO)" "[ -f '${JK_DIR}/src/abi/Layout.idr' ]"
-check "Foreign.idr exists (FFI)" "[ -f '${JK_DIR}/src/abi/Foreign.idr' ]"
-check "Proofs.idr exists (30+ proofs)" "[ -f '${JK_DIR}/src/abi/Proofs.idr' ]"
-check "C header generated" "[ -f '${JK_DIR}/ffi/zig/include/januskey.h' ]"
+check "Types.idr exists (L1-L12)" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Types.idr' ]"
+check "Layout.idr exists (CNO)" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Layout.idr' ]"
+check "Foreign.idr exists (FFI)" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Foreign.idr' ]"
+check "Proofs.idr exists (30+ proofs)" "[ -f '${JK_DIR}/src/abi/JanusKey/ABI/Proofs.idr' ]"
+check "C header present (mirrors Foreign.idr)" "[ -f '${JK_DIR}/ffi/zig/include/januskey.h' ]"
 
 # --- Build ---
 echo "--- Build ---"

@@ -88,13 +88,17 @@ test-contracts:
         done; \
     fi
 
-# Typecheck the Idris2 ABI package (src/idris-abi/januskey-abi.ipkg).
+# One ABI tree: no symlink farm, one ipkg, one Foreign.idr, module names match paths.
+abi-tree-check:
+    bash scripts/check-abi-tree.sh
+
+# Typecheck the Idris2 ABI package (src/abi/januskey-abi.ipkg).
 # Fails if idris2 is missing (set ALLOW_NO_IDRIS=1 to skip) or any module fails.
-test-proofs:
+test-proofs: abi-tree-check
     #!/usr/bin/env bash
     set -euo pipefail
     echo "=== Proof Regression ==="
-    ipkg="src/idris-abi/januskey-abi.ipkg"
+    ipkg="src/abi/januskey-abi.ipkg"
     if ! command -v idris2 >/dev/null 2>&1; then
         if [ "${ALLOW_NO_IDRIS:-0}" = "1" ]; then
             echo "SKIP: idris2 not installed and ALLOW_NO_IDRIS=1 -- ABI proofs were NOT checked." >&2

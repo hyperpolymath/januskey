@@ -110,7 +110,7 @@ pub const OblitProof = extern struct {
 };
 
 comptime {
-    // Layout invariants — these mirror src/abi/Layout.idr and the comments
+    // Layout invariants — these mirror src/abi/JanusKey/ABI/Layout.idr and the comments
     // in januskey.h. If any fires, the C ABI and the Idris spec disagree.
     std.debug.assert(@sizeOf(ContentHash) == 32);
     std.debug.assert(@sizeOf(KeyId) == 16);

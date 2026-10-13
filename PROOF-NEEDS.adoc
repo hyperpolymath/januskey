@@ -1,11 +1,47 @@
 == PROOF-NEEDS.md — januskey
 
+=== One ABI tree (2026-10-12)
+
+The Idris2 ABI surface was three trees: the flat sources in `+src/abi/+`,
+the `+src/idris-abi/+` symlink farm added by PR #140 so that an `+.ipkg+`
+could reach them, and `+generated/idrisiser/+`. It is now one: the sources
+live at `+src/abi/JanusKey/ABI/{Types,Layout,Foreign,Proofs}.idr+`, laid out
+by module name, with the package file beside them at
+`+src/abi/januskey-abi.ipkg+`; the symlink farm is deleted; the
+`+Januskey.ABI.Foreign+` / `+JanusKey.ABI.*+` casing split (J1-3) is
+normalised to `+JanusKey+`. `+scripts/check-abi-tree.sh+` (`+just
+abi-tree-check+`, first step of `+idris-abi.yml+`) fails on a second package
+file, a second `+Foreign.idr+`, a symlink under `+src/abi+`, a module whose
+declared name differs from its path, or a package/file mismatch.
+
+What this commit does *not* claim: the package still does not typecheck.
+Two facts were established while relocating it and are the next two
+commits, not this one:
+
+* `+Foreign.idr+` is the RSR *template* FFI (`+januskey_init+`,
+  `+januskey_process+`, `+januskey_get_string+`, …) written against
+  template types (`+createHandle+`, `+handlePtr+`, `+Result+`) that the
+  hand-written `+Types.idr+` does not define. It never described
+  `+ffi/zig+`, which exports `+jk_init+` … `+jk_version+` against
+  `+ffi/zig/include/januskey.h+`; that header's former comment
+  "generated from src/abi/Foreign.idr" was false and has been corrected.
+* `+Types.idr+` has the ten known errors from PR #140 (first:
+  `+isInfixOf+` without `+import Data.String+`; also forward references in
+  `+ResultOf+`, a `+Handle+` whose only constructor cannot inhabit
+  `+Handle Locked+`, linear variables used twice or not at all, and
+  `+oblitMostExpensive (S k) = Oh+` on an open `+k+`).
+
+`+generated/idrisiser/+` is unchanged and outside the gate; whether it is
+regenerated with capitalised module names or removed is an owner decision
+(JNK-01, open question).
+
 === Current State
 
-_Re-verified 2026-06-29 (idris2 0.8.0)._
+_Re-verified 2026-06-29 (idris2 0.8.0); paths updated 2026-10-12 to the
+single tree._
 
-* **src/abi/*.idr**: PRESENT but **placeholder** —
-`+src/abi/Proofs.idr+` typechecks, but its theorems are
+* **src/abi/JanusKey/ABI/*.idr**: PRESENT but **placeholder** —
+`+src/abi/JanusKey/ABI/Proofs.idr+` typechecks (when the package does), but its theorems are
 trivial/tautological (e.g. `+memoryDefeatsGPU : So (65536 >= 65536)+`,
 `+timeCostMonotonic : So (a >= b) -> So (a >= b)+` returns its own
 hypothesis). NOT the security proofs listed below.
@@ -17,7 +53,7 @@ verified.
 * *Dangerous patterns*: *265* `+unwrap()+` calls across the Rust
 codebase.
 * *LOC*: ~12,200 (Rust)
-* *ABI layer*: present (`+src/abi/{Types,Foreign,Layout,Proofs}.idr+`)
+* *ABI layer*: present (`+src/abi/JanusKey/ABI/{Types,Foreign,Layout,Proofs}.idr+`, package `+src/abi/januskey-abi.ipkg+`)
 but carries no load-bearing security proof yet — the real obligations
 below are still open.
 

@@ -9,10 +9,10 @@
 ||| All functions are declared here with type signatures and safety proofs.
 ||| Implementations live in ffi/zig/
 
-module Januskey.ABI.Foreign
+module JanusKey.ABI.Foreign
 
-import Januskey.ABI.Types
-import Januskey.ABI.Layout
+import JanusKey.ABI.Types
+import JanusKey.ABI.Layout
 
 %default total
 
