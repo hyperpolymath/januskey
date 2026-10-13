@@ -47,4 +47,4 @@ same "exported symbols" "$idris_syms" "$hdr_syms"
 zig_syms=$(grep -oE 'pub export fn jk_[a-z_]+' "$Z" | awk '{print $NF}' | sort -u | tr '\n' ' ' | sed 's/ $//')
 same "zig exports" "$idris_syms" "$zig_syms"
 
-[ "$fail" -eq 0 ] && say "OK: Idris2 ABI, januskey.h and ffi/zig agree" || { say "FAIL"; exit 1; }
+[ "$fail" -eq 0 ] && say "PASS: Idris2 ABI, januskey.h and ffi/zig agree" || { say "FAIL"; exit 1; }
