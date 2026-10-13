@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MPL-2.0
 # SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 name: Agda proofs
-# DESIGNED until its first green run. Pattern: choreographic-types /
+# First green run 2026-10-13, Agda 2.6.4.3 (PR #150). Pattern: choreographic-types /
 # residual-evidence-types (pinned Debian prover, sibling fetched by commit).
 # Checks verification/proofs/agda/Reversibility.agda under the kernel flags
 # and refuses the fixtures under tests/reject-agda. Local run: just test-agda.
