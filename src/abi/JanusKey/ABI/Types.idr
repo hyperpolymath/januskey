@@ -394,15 +394,15 @@ data Knows : Agent -> Type -> Type where
   SystemKnows  : (val : a) -> Knows System a
   AuditorKnows : (val : a) -> Knows Auditor a
 
-||| After obliteration, adversary cannot know content
-||| (There is no constructor `AdversaryKnows` — this is an impossibility proof)
+||| Marker that the content with this hash has been obliterated.
 public export
 data PostObliteration : ContentHash -> Type where
   Obliterated : (hash : ContentHash) -> PostObliteration hash
 
-||| Proof: adversary cannot recover obliterated content
-||| No term of type `Knows Adversary content -> PostObliteration hash -> Void`
-||| can be constructed because `Knows Adversary content` is uninhabited
+||| `Knows Adversary a` is uninhabited because `Knows` has no Adversary
+||| constructor: a property of this model, not a security proof. What a real
+||| attacker can recover after obliteration is OPEN in the claims ledger
+||| (PROOF-NEEDS.adoc).
 public export
 adversaryCannotKnow : Knows Adversary a -> Void
 adversaryCannotKnow _ impossible
@@ -412,7 +412,8 @@ public export
 data KeyRotated : KeyId -> KeyId -> Type where
   Rotated : (old : KeyId) -> (new : KeyId) -> KeyRotated old new
 
-||| System knows the new key but not the old after rotation
+||| After rotation the system knows the new key. ("And not the old one" is
+||| not stated: `Knows` has no negative form.)
 public export
 systemKnowsNewKey : KeyRotated old new -> Knows System KeyId
 systemKnowsNewKey (Rotated _ new) = SystemKnows new

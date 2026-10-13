@@ -1,9 +1,10 @@
 -- SPDX-License-Identifier: MPL-2.0
 -- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 --
--- JanusKey ABI Proofs — Standalone formal verification module
--- Proves correctness properties for all JanusKey operations
--- No believe_me, no assert_total, no postulate — fully total
+-- JanusKey ABI lemmas: CNO composition, transaction and attestation-chain
+-- lemmas, tropical costs, status-code injectivity. What each states, and
+-- what is not claimed, is the claims ledger in PROOF-NEEDS.adoc; the
+-- bypass census over src/abi is tests/aspect/cross_cutting_test.sh.
 
 module JanusKey.ABI.Proofs
 
@@ -202,11 +203,9 @@ parallelCostMin a b = Refl
 -- 9. Epistemic Safety Proofs
 -- ============================================================
 
-||| After key revocation, adversary cannot use the key
-||| (No constructor for Knows Adversary _ exists)
-public export
-revokedKeyUnusable : Knows Adversary KeyId -> Void
-revokedKeyUnusable = adversaryCannotKnow
+-- The former `revokedKeyUnusable` was `adversaryCannotKnow` at KeyId: it took
+-- no revocation and said nothing about one, so it is gone. That an attacker
+-- cannot use a revoked key is OPEN in the claims ledger (PROOF-NEEDS.adoc).
 
 ||| Auditor can see operations but not key material
 public export
