@@ -4,6 +4,7 @@
 -- Expected rejection: a trace with a lossy step cannot be certified lossless.
 -- The claim below is false (fin 1 +g fin 0 = fin 1), and the checker must
 -- refuse it; this fixture pins that Theorem 2 is not vacuous.
+-- expect: 1 != 0
 module HiddenLoss where
 
 open import ResourceAlgebra.Prelude

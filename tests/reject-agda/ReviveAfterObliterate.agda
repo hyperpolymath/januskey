@@ -3,6 +3,7 @@
 -- SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 -- Expected rejection: nothing after an obliterating step restores a lossless
 -- grade. The claim below is false (inf +g fin 0 = inf) and must be refused.
+-- expect: inf != fin 0
 module ReviveAfterObliterate where
 
 open import ResourceAlgebra.Prelude

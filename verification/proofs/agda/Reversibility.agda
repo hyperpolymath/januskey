@@ -9,9 +9,11 @@
 -- fin n, obliteration is inf = 𝟘. Everything below is about the grade
 -- algebra and the trace shape; the one operational fact it rests on — that
 -- unwrap after wrap is the identity — is a *premise* carried by the
--- ReversiblePair record, discharged outside this module by
--- crates/reversible-core/tests/property_tests.rs (wrap/unwrap round trip),
--- never assumed here.
+-- ReversiblePair record, never assumed here. In the Rust, wrap is
+-- `ReversibleExecutor::execute` and unwrap is `undo`
+-- (crates/reversible-core/src/lib.rs); the premise is tested by
+-- crates/januskey-cli/tests/property_tests.rs::execute_then_undo_is_identity,
+-- a TESTED row of the claims ledger in PROOF-NEEDS.adoc.
 --
 -- Pinned sibling: hyperpolymath/resource-algebra, see scripts/fetch-siblings.sh.
 -- Kernel ruling (2026-10-12): Agda --safe --without-K is the proof kernel;
@@ -126,7 +128,7 @@ module Steps (S : Set) where
 
   ----------------------------------------------------------------------
   -- The reversible pair: wrap then unwrap. The cancellation law is the
-  -- operational premise (januskey's wrap/unwrap round-trip property test);
+  -- operational premise (execute_then_undo_is_identity, cited above);
   -- given it, both steps are graded 𝟙 and the two-step trace is lossless.
   ----------------------------------------------------------------------
 
