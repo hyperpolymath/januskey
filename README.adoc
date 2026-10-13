@@ -142,7 +142,7 @@ Reversibility is the default. Secure obliteration (`jk shred`) is the deliberate
 
 [CAUTION]
 ====
-**Formal proofs are pending.** The claim "data loss is architecturally impossible" is an engineering intent supported by the inversion-metadata mechanism. It is not yet a mechanically verified theorem. The `src/abi/` and `idrisiser/` directories suggest Idris 2 specification targets, but these are not yet discharging the reversibility guarantee.
+**Formal proofs are pending.** The claim "data loss is architecturally impossible" is an engineering intent supported by the inversion-metadata mechanism. It is not yet a mechanically verified theorem. The `src/abi/` package typechecks (gate: `just test-proofs`) and discharges the ABI obligations listed in PROOF-NEEDS.adoc; it does not discharge "data loss is architecturally impossible", and `generated/idrisiser/` is outside the gate.
 ====
 
 [CAUTION]

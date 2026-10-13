@@ -9,13 +9,14 @@ standards/testing-and-benchmarking/TESTING-TAXONOMY.adoc v1.0
 === CRG Grade: D (Alpha — Unstable)
 
 *Justification:* 119 tests declared (`cargo test --workspace --locked -- --list`; rust-ci runs them); the
-Idris2 ABI does not typecheck, so 0 proofs are checked (#145); benchmarks exist (5 Criterion groups). But: no
+Idris2 ABI typechecks and 8 proofs are checked (PROVEN ledger rows: ABI and grade lemmas, not the
+security obligations); benchmarks exist (5 Criterion groups). But: no
 fuzz testing, no mutation testing, 225 unwrap() calls, E2E mostly skips,
 benchmarks measured fake crypto until this session. RSR compliance
 present. Deep annotation incomplete (TOPOLOGY.md exists but
 per-directory orientation missing → blocks C).
 
-*Promotion path D→C:* Fix unwrap() calls, wire Idris2 proof check in CI,
+*Promotion path D→C:* Fix unwrap() calls, make the Idris2 and Agda proof checks required in CI,
 complete per-directory annotation, add real E2E with built binary,
 dogfood in at least one real workflow.
 
@@ -60,11 +61,11 @@ handling
 
 |15 |Compatibility |MISSING |0 |— |No version migration tests
 
-|16 |Proof regression |✗ |0 checked (#145) |`+just test-proofs+` |Idris2 –check
-(requires idris2 binary)
+|16 |Proof regression |✓ |8 proofs checked |`+just test-proofs test-proofs-reject test-agda+` |Idris2 0.8.0 typecheck, Agda kernel, expected rejections
+(run by idris-abi.yml, agda-proofs.yml and dashboard-check)
 |===
 
-*Total declared:* 119 tests + 5 benchmark groups; 0 Idris2 proofs checked (#145) *Total
+*Total declared:* 119 tests + 5 benchmark groups; 8 proofs checked (PROVEN ledger rows) *Total
 missing:* Fuzz, mutation, chaos, compatibility
 
 === Aspect Matrix
@@ -128,7 +129,7 @@ recording.
 
 * 225 unwrap() calls (tracked in PROOF-NEEDS.md)
 * E2E test needs pre-built binary to exercise full lifecycle
-* Idris2 proofs not checked in CI (requires idris2 in CI image)
+* idris-abi.yml and agda-proofs.yml run on every PR but are not yet required checks
 * No code coverage measurement
 * No mutation testing
 * Benchmarks not baselined in VeriSimDB

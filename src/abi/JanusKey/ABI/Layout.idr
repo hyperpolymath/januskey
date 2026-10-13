@@ -10,6 +10,8 @@ import JanusKey.ABI.Types
 import Data.Vect
 import Data.Fin
 import Data.So
+import Data.List
+import Data.List.Elem
 
 %default total
 
@@ -43,25 +45,28 @@ oblitProofSize = MkSize 112
 -- Alignment Proofs
 -- ============================================================
 
-||| Proof that a size is aligned to a boundary
+||| Proof that a size is aligned to a boundary: size is a whole number of
+||| boundaries. Stated as divisibility with an explicit quotient (`mod` on Nat
+||| does not reduce at compile time, so `mod size boundary = 0` could never
+||| be discharged by Refl).
 public export
 data Aligned : (size : Nat) -> (boundary : Nat) -> Type where
-  MkAligned : (prf : mod size boundary = 0) -> Aligned size boundary
+  MkAligned : {size, boundary : Nat} -> (k : Nat) -> (prf : size = k * boundary) -> Aligned size boundary
 
 ||| ContentHash is 8-byte aligned
 public export
 hashAligned : Aligned 32 8
-hashAligned = MkAligned Refl
+hashAligned = MkAligned 4 Refl
 
 ||| KeyId is 8-byte aligned
 public export
 keyIdAligned : Aligned 16 8
-keyIdAligned = MkAligned Refl
+keyIdAligned = MkAligned 2 Refl
 
 ||| ObliterationProof is 8-byte aligned
 public export
 oblitAligned : Aligned 112 8
-oblitAligned = MkAligned Refl
+oblitAligned = MkAligned 14 Refl
 
 -- ============================================================
 -- Endianness-Safe Serialization
@@ -109,12 +114,27 @@ data IsCNO : ReversibleOp -> Type where
   MkCNO : ((s : FSState) -> inverse op (forward op s) = s)
         -> IsCNO op
 
-||| Copy-then-delete is a CNO (move + unmove = identity)
+||| Copy, on the state model: forward records (dst, h) at the head of
+||| `files`; inverse removes exactly that head. This replaces the former
+||| `copyDeleteCNO`, which claimed IsCNO for *any* op of kind Copy and had
+||| no body (it never typechecked): that statement is false for an op whose
+||| forward and inverse are arbitrary functions.
 public export
-copyDeleteCNO : (src, dst : ValidPath) -> (h : ContentHash)
-             -> (op : ReversibleOp)
-             -> (prf : kind op = Copy)
-             -> IsCNO op
+copyOp : (dst : ValidPath) -> (h : ContentHash) -> ReversibleOp
+copyOp dst h = MkRevOp Copy
+  (\s => { files $= ((dst, h) ::) } s)
+  (\s => { files $= drop 1 } s)
+
+||| Copy-then-uncopy is a CNO in this model: a theorem, by cases on the state.
+||| Scope: the model tracks (path, hash) pairs, keys and a counter, not file
+||| contents, so this is a statement about the operation log, not about bytes.
+copyCancels : (dst : ValidPath) -> (h : ContentHash) -> (s : FSState)
+           -> inverse (copyOp dst h) (forward (copyOp dst h) s) = s
+copyCancels dst h (MkFSState fs ks n) = Refl
+
+public export
+copyIsCNO : (dst : ValidPath) -> (h : ContentHash) -> IsCNO (copyOp dst h)
+copyIsCNO dst h = MkCNO (copyCancels dst h)
 
 ||| Obliterate does NOT have a CNO inverse — this is intentional
 ||| The type system prevents constructing IsCNO for Obliterate
@@ -142,12 +162,13 @@ data AllReversible : List OpKind -> Type where
                 -> AllReversible ks
                 -> AllReversible (k :: ks)
 
-||| Proof: a committed transaction can be rolled back if all ops are reversible
+||| A transaction containing an obliteration is not all-reversible, so it
+||| cannot be rolled back by inversion. This replaces `canRollback`, which
+||| returned its argument unchanged.
 public export
-canRollback : AllReversible ops -> TxOps Active ops -> TxOps Active ops
-canRollback NilReversible Empty = Empty
-canRollback (ConsReversible notOblit rest) (Append txOps k) =
-  Append (canRollback rest txOps) k
+obliterateNotReversible : AllReversible ops -> Elem Obliterate ops -> Void
+obliterateNotReversible (ConsReversible notOblit _) Here = notOblit Refl
+obliterateNotReversible (ConsReversible _ rest) (There later) = obliterateNotReversible rest later
 
 -- ============================================================
 -- Key Derivation Safety
@@ -171,11 +192,5 @@ public export
 defaultArgon2 : Argon2Params
 defaultArgon2 = MkArgon2 3 65536 4 32 Oh Oh Oh Oh
 
-||| Proof: default parameters meet OWASP recommendations
-public export
-defaultMeetsOWASP : So (timeCost defaultArgon2 >= 3)
-defaultMeetsOWASP = Oh
-
-public export
-defaultMemoryOWASP : So (memoryCost defaultArgon2 >= 65536)
-defaultMemoryOWASP = Oh
+-- The bounds are the record's own fields (timeOk, memoryOk, parallelOk,
+-- outputOk); `defaultArgon2` discharges them with Oh at the literals.

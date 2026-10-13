@@ -35,16 +35,74 @@ commits, not this one:
 regenerated with capitalised module names or removed is an owner decision
 (JNK-01, open question).
 
+==== Same day, three commits later: the package typechecks
+
+`+idris2 --typecheck src/abi/januskey-abi.ipkg+` builds all four modules
+with zero warnings under Idris2 0.8.0 (bootstrap build, locally; the CI
+image `+idris2-pack@sha256:f0758996…+` is the gate of record). Bypass census
+in `+src/abi/+`: no `+believe_me+`, `+assert_total+`, `+assert_smaller+`,
+`+partial+` or holes (`+tests/aspect/cross_cutting_test.sh+`, 32/32; the
+last three checks were added when these rows entered the claims ledger).
+
+Status rows, in the five-status vocabulary. A status moves only with a named
+module, lemma, fixture or log line. Every row is also a row of the claims
+ledger below, which `+dashboard-check+` runs on every pull request; the two
+tables must agree.
+
+[cols="1,3,1,2",options="header"]
+|===
+| ID | Claim | Status | Artefact
+| A-1 | Status codes are a closed sum with a total decoder; encode/decode round-trips; encoding is injective | PROVEN | `+Foreign.statusFromCode+`, `+statusRoundTrip+`, `+statusCodeInjective+`
+| A-2 | Op-kind and algorithm encodings round-trip against januskey.h's enum order | PROVEN | `+Foreign.opKindRoundTrip+`, `+algorithmRoundTrip+`
+| A-3 | Idris2 sizes, status codes, enums and exported symbols agree with januskey.h and ffi/zig | TESTED | `+scripts/check-abi-layout.sh+` (negative control: one perturbed code → FAIL)
+| A-4 | A linearly held library handle is closed at most once and cannot be forgotten (multiplicity 1 on `+Foreign.closeOnce+`) | TESTED | `+tests/reject-idris/{DoubleClose,ForgottenClose}.idr+` refused with "2 uses" / "0 uses" of the handle
+| A-5 | A code the header does not define is never read as Ok | TESTED | `+tests/reject-idris/UnknownStatusIsOk.idr+` refused
+| C-1 | Composition of CNOs is a CNO | PROVEN | `+Proofs.seqCNO+`
+| C-2 | Copy-then-uncopy is a CNO in the (path, hash) log model | PROVEN | `+Layout.copyIsCNO+`
+| C-3 | A transaction containing an obliteration is not all-reversible | PROVEN | `+Layout.obliterateNotReversible+`
+| C-4 | Replacing a chain entry by one with a different hash breaks the link | PROVEN | `+Proofs.tamperBreaksLink+`
+| C-5 | Struct sizes 32/16/112 and 8-byte alignment as divisibility (statements about the literals) | PROVEN | `+Layout.{contentHashSize,keyIdSize,oblitProofSize,hashAligned,keyIdAligned,oblitAligned}+`
+| G-1 | Reversibility as a Loss grade: lossless traces have only lossless steps; obliteration absorbs; wrap/unwrap is grade 𝟙 given cancellation | PROVEN | `+verification/proofs/agda/Reversibility.agda+` (Agda kernel, resource-algebra pinned at `+cf9235c+`); `+tests/reject-agda/*+` refused; the cancellation premise is the TESTED row `+execute_then_undo_is_identity+`
+| G-2 | The Idris2 `+IsCNO+`/`+ReversibleOp+` pair corresponds to Agda `+ReversiblePair+` (by transcription) | ASSUMED | no mechanical link claimed
+| G-3 | The FFI bridge preserves grade 𝟙 (homomorphism) | OPEN | resource-algebra lists homomorphisms OPEN; to file from JNK-01
+| E-1 | An attacker cannot recover obliterated content or use a revoked key | OPEN | `+Types.adversaryCannotKnow+` holds only because `+Knows+` has no Adversary constructor (#145 item 3)
+| X-1 | Hash one-wayness; physical erasure (cryptographic and physical assumptions, external to this repository) | ASSUMED | not theorems of this repo
+|===
+
+Removed, with the reason recorded beside the replacement in source:
+`+memoryDefeatsGPU+`, `+timeCostMonotonic+`, `+outputIs256Bits+`,
+`+threePassMinimum+` (closed literals or restated hypotheses);
+`+defaultExceedsMinimum+`, `+defaultMeetsOWASP+`, `+defaultMemoryOWASP+`
+(restated record fields that already carry the bound); `+cnoPairCompose+`,
+`+tamperDetectable+` (returned Unit); `+identityIsCNO+` (`+s = s+`);
+`+hashOneWay+` (`+Void -> Void+`); `+canRollback+` (returned its argument);
+`+copyDeleteCNO+` (no body, false as stated); `+linearFileConsumed+`
+(ill-typed; claimed `+LinearFile -> Void+`); `+systemForgetsOldKey+`
+("forgets" has no negative form in the Knows model);
+`+revokedKeyUnusable+` (`+adversaryCannotKnow+` at `+KeyId+`; took no
+revocation); `+errorCodeDeterministic+` over an undefined `+CError+` (now
+`+statusCodeInjective+`).
+
+Model limits, stated so no reader over-counts them: `+Knows Adversary a+`
+being uninhabited is a modelling choice, not a security proof; `+FSState+`
+tracks (path, hash) pairs, not contents, so C-2 is about the operation log;
+linearity is a property of the binding — a handle bound by an IO `+<-+` is
+unrestricted, the guarantee holds for `+(1 h : LibHandle Open)+` parameters,
+and plain IO's bind is not linear, so such a handle cannot be closed inside
+IO do-notation at all.
+
+The dashboards (README, TOPOLOGY, READINESS) carry the proof count that
+`+dashboard-check+` measures from the PROVEN rows of the ledger below.
+
 === Current State
 
 _Re-verified 2026-06-29 (idris2 0.8.0); paths updated 2026-10-12 to the
-single tree._
+single tree; ABI bullet re-verified 2026-10-13._
 
-* **src/abi/JanusKey/ABI/*.idr**: PRESENT but **placeholder** —
-`+src/abi/JanusKey/ABI/Proofs.idr+` typechecks (when the package does), but its theorems are
-trivial/tautological (e.g. `+memoryDefeatsGPU : So (65536 >= 65536)+`,
-`+timeCostMonotonic : So (a >= b) -> So (a >= b)+` returns its own
-hypothesis). NOT the security proofs listed below.
+* **src/abi/JanusKey/ABI/*.idr**: typechecks (Idris2 0.8.0; `+idris-abi.yml+`
+and `+dashboard-check+`). The tautological placeholders are gone (list
+above). What it proves are ABI and model lemmas (ledger rows A-*, C-*),
+NOT the security proofs listed below.
 * **generated/idrisiser/idris2/Januskey/Verified/*.idr**: **DO NOT
 typecheck** — `+idris2 --check+` fails ("`Expected a capitalised
 identifier, got: key`") because the generated module names are
@@ -93,8 +151,11 @@ TOPOLOGY and READINESS must equal what that checker measures: tests by
 `cargo test --workspace --locked -- --list`, proofs by the PROVEN rows below.
 Each row is one line; the checker rejects a wrapped row.
 
-There are no PROVEN rows: the Idris2 ABI does not typecheck (#145), so no
-proof in this repository is checked by anything.
+PROVEN rows run their checker: `+idris2 --typecheck src/abi/januskey-abi.ipkg+`
+(Idris2 0.8.0) for the ABI, `+bash scripts/check-agda.sh+` (Agda, resource-algebra
+pinned) for the kernel. `+dashboard-check.yml+` therefore runs in the same pinned
+idris2-pack image as `+idris-abi.yml+` and installs Agda from apt. Row IDs match
+the status table above.
 
 [cols="3,1,3,3",options="header"]
 |===
@@ -102,24 +163,44 @@ proof in this repository is checked by anything.
 |Obliterating a path shreds its unshared blobs and log entries, and undo then has nothing |TESTED |`crates/januskey-cli/tests/obliteration_cas_test.rs::obliterate_scrubs_blobs_log_and_undo` |`cargo test --locked -p januskey --test obliteration_cas_test obliterate_scrubs_blobs_log_and_undo`
 |Obliteration keeps a blob another path still references |TESTED |`crates/januskey-cli/tests/obliteration_cas_test.rs::obliterate_keeps_blob_shared_with_another_path` |`cargo test --locked -p januskey --test obliteration_cas_test obliterate_keeps_blob_shared_with_another_path`
 |`jk obliterate` scrubs the store end to end through the CLI |TESTED |`crates/januskey-cli/tests/obliteration_cas_test.rs::cli_obliterate_scrubs_store_and_undo_has_nothing` |`cargo test --locked -p januskey --test obliteration_cas_test cli_obliterate_scrubs_store_and_undo_has_nothing`
-|Execute then undo restores the prior state (property test over generated ops) |TESTED |`crates/januskey-cli/tests/property_tests.rs::execute_then_undo_is_identity` |`cargo test --locked -p januskey --test property_tests execute_then_undo_is_identity`
+|Execute then undo restores the prior state (property test over generated ops; the cancellation premise of G-1) |TESTED |`crates/januskey-cli/tests/property_tests.rs::execute_then_undo_is_identity` |`cargo test --locked -p januskey --test property_tests execute_then_undo_is_identity`
 |Content store round-trips arbitrary bytes (property test) |TESTED |`crates/reversible-core/tests/property_tests.rs::content_store_roundtrip` |`cargo test --locked -p reversible-core --test property_tests content_store_roundtrip`
 |A transaction rolled back ends RolledBack with none active (property test) |TESTED |`crates/reversible-core/tests/property_tests.rs::transaction_begin_rollback_roundtrip` |`cargo test --locked -p reversible-core --test property_tests transaction_begin_rollback_roundtrip`
 |The audit log verifies an untampered three-entry chain as valid (tamper detection is not tested) |TESTED |`crates/januskey-cli/src/attestation.rs::test_audit_log_chain_integrity` |`cargo test --locked -p januskey --lib test_audit_log_chain_integrity`
-|The Idris2 ABI typechecks and its six security claims are proved |OPEN |#145 |-
-|Every operation is reversible (MPR), as a theorem linked to the Rust |OPEN |#145 |-
+|A-1: Status codes are a closed sum with a total decoder; encoding round-trips and is injective |PROVEN |`src/abi/JanusKey/ABI/Foreign.idr::statusCodeInjective` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
+|A-2: Op-kind and algorithm encodings round-trip in januskey.h's enum order |PROVEN |`src/abi/JanusKey/ABI/Foreign.idr::opKindRoundTrip` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
+|C-1: Sequential composition of CNOs is a CNO |PROVEN |`src/abi/JanusKey/ABI/Proofs.idr::seqCNO` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
+|C-2: Copy-then-uncopy is a CNO in the (path, hash) log model |PROVEN |`src/abi/JanusKey/ABI/Layout.idr::copyIsCNO` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
+|C-3: A transaction containing an obliteration is not all-reversible |PROVEN |`src/abi/JanusKey/ABI/Layout.idr::obliterateNotReversible` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
+|C-4: Replacing an attestation-chain entry by one with a different hash breaks the link |PROVEN |`src/abi/JanusKey/ABI/Proofs.idr::tamperBreaksLink` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
+|C-5: The 32-, 16- and 112-byte ABI structs are 8-byte aligned (divisibility at the literals) |PROVEN |`src/abi/JanusKey/ABI/Layout.idr::oblitAligned` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
+|G-1: Reversibility as a Loss grade: a trace is lossless only if every step is, and an obliterating step absorbs |PROVEN |`verification/proofs/agda/Reversibility.agda::lossless-trace-all` |`bash scripts/check-agda.sh`
+|A-3: Idris2 struct sizes, status codes, enums and exported symbols agree with januskey.h and ffi/zig |TESTED |`scripts/check-abi-layout.sh::check-abi-layout` |`bash scripts/check-abi-layout.sh`
+|A-4: A linearly held library handle cannot be closed twice |TESTED |`tests/reject-idris/DoubleClose.idr::DoubleClose` |`bash scripts/check-idris-reject.sh DoubleClose`
+|A-4: A linearly held library handle cannot be forgotten |TESTED |`tests/reject-idris/ForgottenClose.idr::ForgottenClose` |`bash scripts/check-idris-reject.sh ForgottenClose`
+|A-5: A status code the header does not define never decodes as Ok |TESTED |`tests/reject-idris/UnknownStatusIsOk.idr::UnknownStatusIsOk` |`bash scripts/check-idris-reject.sh UnknownStatusIsOk`
+|src/abi uses no proof bypass: no believe_me, assert_total, assert_smaller, partial, postulate, sorry or holes |TESTED |`tests/aspect/cross_cutting_test.sh::No holes in proofs` |`bash tests/aspect/cross_cutting_test.sh`
+|G-2: The Idris2 IsCNO / ReversibleOp pair corresponds to the Agda ReversiblePair (by transcription) |ASSUMED |`verification/proofs/agda/Reversibility.agda` |-
+|X-1: Hash one-wayness and physical erasure (cryptographic and physical assumptions) |ASSUMED |`src/abi/JanusKey/ABI/Proofs.idr` |-
+|G-3: The FFI bridge preserves grade 𝟙 (a homomorphism; resource-algebra lists homomorphisms as OPEN) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
+|E-1: An attacker cannot recover obliterated content or use a revoked key (adversaryCannotKnow holds only by construction of the model) |OPEN |`src/abi/JanusKey/ABI/Types.idr` |-
+|The six security obligations under "What Needs Proving" (obliteration, key derivation, attestation chain, content store, transaction atomicity, reversible-core) are proved |OPEN |`PROOF-NEEDS.adoc` |-
+|Every operation is reversible (MPR), as a theorem linked to the Rust (needs G-2 made mechanical, and G-3) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
 |===
 
 === Recommended Prover
 
-*Idris2* — Create `+src/abi/+` with dependent type proofs for
-obliteration completeness, attestation chain integrity, and transaction
-atomicity. The 225 `+unwrap()+` calls should be systematically replaced
-with proven error handling.
+*Agda* (`+--safe --without-K+`) is the proof kernel and *Idris2* the
+ABI/runtime layer (ruling 2026-10-12): kernel statements live in
+`+verification/proofs/agda/+` with siblings consumed by pin
+(`+scripts/fetch-siblings.sh+`); the ABI lives in `+src/abi/+`.
+Obliteration completeness, attestation chain integrity and transaction
+atomicity are still to be stated there. The 225 `+unwrap()+` calls should
+be systematically replaced with proven error handling.
 
 === Priority
 
 *HIGH* — JanusKey handles cryptographic key management, attestation
 chains, and data obliteration. Any correctness bug in obliteration or
-key derivation is a critical security vulnerability. Missing ABI layer
-entirely.
+key derivation is a critical security vulnerability. The ABI layer now
+typechecks, but none of the security obligations above is proved.

@@ -27,7 +27,11 @@ jobs:
           persist-credentials: false
       - name: ABI tree invariants
         run: bash scripts/check-abi-tree.sh
+      - name: ABI <-> header <-> Zig agreement
+        run: bash scripts/check-abi-layout.sh
       - name: Typecheck ABI package
         run: |
           idris2 --version
           idris2 --typecheck src/abi/januskey-abi.ipkg
+      - name: Expected rejections
+        run: bash scripts/check-idris-reject.sh
