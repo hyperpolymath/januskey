@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+name: Agda proofs
+# DESIGNED until its first green run. Pattern: choreographic-types /
+# residual-evidence-types (pinned Debian prover, sibling fetched by commit).
+# Checks verification/proofs/agda/Reversibility.agda under the kernel flags
+# and refuses the fixtures under tests/reject-agda. Local run: just test-agda.
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  proofs:
+    name: Reversibility as a grade (Loss instance), expected rejections
+    runs-on: ubuntu-latest
+    # trixie-slim, resolved 2026-10-13; re-pin deliberately, like the prover below.
+    container: debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+    steps:
+      - name: Install the pinned prover
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y ca-certificates git agda-bin=2.6.4.3-1+b2
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify the checked Agda version
+        run: test "$(agda --version)" = 'Agda version 2.6.4.3'
+      - name: Proofs, sibling pin, expected rejections
+        run: bash scripts/check-agda.sh

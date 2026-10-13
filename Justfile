@@ -88,13 +88,25 @@ test-contracts:
         done; \
     fi
 
+# Agda kernel proofs (verification/proofs/agda) against the pinned resource-algebra.
+test-agda:
+    bash scripts/check-agda.sh
+
+# Idris2 ABI <-> januskey.h <-> ffi/zig agreement (sizes, status codes, enums, symbols); no compiler needed.
+abi-layout-check:
+    bash scripts/check-abi-layout.sh
+
+# Expected-rejection fixtures for the Idris2 ABI (double close, forgotten close, unknown status).
+test-proofs-reject:
+    bash scripts/check-idris-reject.sh
+
 # One ABI tree: no symlink farm, one ipkg, one Foreign.idr, module names match paths.
 abi-tree-check:
     bash scripts/check-abi-tree.sh
 
 # Typecheck the Idris2 ABI package (src/abi/januskey-abi.ipkg).
 # Fails if idris2 is missing (set ALLOW_NO_IDRIS=1 to skip) or any module fails.
-test-proofs: abi-tree-check
+test-proofs: abi-tree-check abi-layout-check
     #!/usr/bin/env bash
     set -euo pipefail
     echo "=== Proof Regression ==="

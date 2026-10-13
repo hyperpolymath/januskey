@@ -1,5 +1,5 @@
 == JanusKey — Project Topology
-// Last updated: 2026-10-02 (test and proof counts reconciled to the PROOF-NEEDS claims ledger by dashboard-check)
+// Last updated: 2026-10-13 (proof count reconciled to the PROOF-NEEDS claims ledger by dashboard-check)
 
 === System Architecture
 
@@ -77,8 +77,8 @@ SECURITY (honest)
 INTERFACES & RESEARCH
   CLI Interface (jk)                ████████░░  ~85%   Full command set; no user testing yet
   MPR Methodology                   ████░░░░░░  ~40%   Design documented; FORMAL PROOFS PENDING
-                                                        (Idris2 ABI does not typecheck, #145; 0 proofs checked; not linked
-                                                        to the Rust)
+                                                        (Idris2 ABI typechecks; 8 proofs checked: ABI and grade
+                                                        lemmas, not the security obligations; MPR not linked to the Rust)
   Testing (READINESS matrix)        ██████░░░░  ~60%   119 tests + 5 benches; missing fuzz, mutation,
                                                         chaos, compatibility (Grade D)
 

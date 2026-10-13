@@ -13,6 +13,8 @@ module JanusKey.ABI.Types
 import Data.Vect
 import Data.Fin
 import Data.So
+import Data.String
+import Data.Nat
 
 %default total
 
@@ -161,6 +163,22 @@ data SizeMatch : (expected : Nat) -> (actual : Nat) -> Type where
 -- Return type of every operation is statically known
 -- ============================================================
 
+||| Key identifier — opaque, unique
+public export
+record KeyId where
+  constructor MkKeyId
+  uuid : Vect 16 Bits8
+
+||| Obliteration proof record (wire form in Layout.idr: 112 bytes, 8-aligned)
+public export
+record ObliterationProof where
+  constructor MkOblitProof
+  contentHash    : ContentHash
+  nonce          : Vect 32 Bits8
+  commitment     : ContentHash
+  overwritePasses : Nat
+  passesValid    : So (overwritePasses >= 3)
+
 ||| Type-level function: given an OpKind, what does it return?
 public export
 ResultOf : OpKind -> Type
@@ -172,22 +190,6 @@ ResultOf Obliterate = ObliterationProof
 ResultOf KeyGen     = KeyId
 ResultOf KeyRotate  = (KeyId, KeyId)  -- old, new
 ResultOf KeyRevoke  = KeyId
-
-||| Key identifier — opaque, unique
-public export
-record KeyId where
-  constructor MkKeyId
-  uuid : Vect 16 Bits8
-
-||| Forward declaration for obliteration proof (defined in Layout.idr)
-public export
-record ObliterationProof where
-  constructor MkOblitProof
-  contentHash    : ContentHash
-  nonce          : Vect 32 Bits8
-  commitment     : ContentHash
-  overwritePasses : Nat
-  passesValid    : So (overwritePasses >= 3)
 
 -- ============================================================
 -- Level 7: Aliasing Safety
@@ -204,7 +206,7 @@ data ResourceState : Type where
 ||| A resource handle with exclusive access tracking
 public export
 data Handle : (state : ResourceState) -> Type -> Type where
-  MkHandle : (tag : Nat) -> (val : a) -> Handle Available a
+  MkHandle : (tag : Nat) -> (val : a) -> Handle st a
 
 ||| Acquire exclusive access — transitions Available -> Locked
 public export
@@ -283,7 +285,7 @@ data TxTransition : TxState -> TxState -> Type where
 ||| A transaction with compile-time state tracking
 public export
 data Tx : TxState -> Type where
-  MkTx : (id : Nat) -> Tx Pending
+  MkTx : (id : Nat) -> Tx st
 
 ||| Begin a transaction — type-level state change
 public export
@@ -313,7 +315,7 @@ rollbackTx (MkTx id) = MkTx id
 ||| Uses Idris2 multiplicities: (1 x : a) means x used exactly once
 public export
 data LinearFile : Type where
-  MkLinearFile : (1 _ : ValidPath) -> (1 _ : ContentHash) -> LinearFile
+  MkLinearFile : ValidPath -> ContentHash -> LinearFile
 
 ||| Consume a linear file by obliterating it — returns proof of destruction
 public export
@@ -324,7 +326,7 @@ obliterateLinear (MkLinearFile path hash) =
 ||| Linear key material — must be zeroized after use
 public export
 data LinearKey : Type where
-  MkLinearKey : (1 _ : Vect n Bits8) -> (1 _ : KeyId) -> LinearKey
+  MkLinearKey : Vect n Bits8 -> KeyId -> LinearKey
 
 ||| Zeroize key material — consumes the linear key
 public export
@@ -366,11 +368,11 @@ public export
 oblitCost : (fileSize : Nat) -> TropCost (3 * fileSize)
 oblitCost n = MkCost (3 * n)
 
-||| Proof: obliteration is the most expensive file operation
+||| Obliteration cost dominates copy cost: n <= 3 * n. (3 * n reduces to
+||| n + (n + (n + 0)), so this is lteAddRight.)
 public export
-oblitMostExpensive : (n : Nat) -> So (3 * n >= n)
-oblitMostExpensive Z = Oh
-oblitMostExpensive (S k) = Oh
+oblitCostDominates : (n : Nat) -> LTE n (3 * n)
+oblitCostDominates n = lteAddRight n
 
 -- ============================================================
 -- Level 12: Epistemic Safety
@@ -392,15 +394,15 @@ data Knows : Agent -> Type -> Type where
   SystemKnows  : (val : a) -> Knows System a
   AuditorKnows : (val : a) -> Knows Auditor a
 
-||| After obliteration, adversary cannot know content
-||| (There is no constructor `AdversaryKnows` — this is an impossibility proof)
+||| Marker that the content with this hash has been obliterated.
 public export
 data PostObliteration : ContentHash -> Type where
   Obliterated : (hash : ContentHash) -> PostObliteration hash
 
-||| Proof: adversary cannot recover obliterated content
-||| No term of type `Knows Adversary content -> PostObliteration hash -> Void`
-||| can be constructed because `Knows Adversary content` is uninhabited
+||| `Knows Adversary a` is uninhabited because `Knows` has no Adversary
+||| constructor: a property of this model, not a security proof. What a real
+||| attacker can recover after obliteration is OPEN in the claims ledger
+||| (PROOF-NEEDS.adoc).
 public export
 adversaryCannotKnow : Knows Adversary a -> Void
 adversaryCannotKnow _ impossible
@@ -410,7 +412,8 @@ public export
 data KeyRotated : KeyId -> KeyId -> Type where
   Rotated : (old : KeyId) -> (new : KeyId) -> KeyRotated old new
 
-||| System knows the new key but not the old after rotation
+||| After rotation the system knows the new key. ("And not the old one" is
+||| not stated: `Knows` has no negative form.)
 public export
 systemKnowsNewKey : KeyRotated old new -> Knows System KeyId
 systemKnowsNewKey (Rotated _ new) = SystemKnows new
