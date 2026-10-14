@@ -21,7 +21,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A cold `cabal build` of casket-ssg outran 15 minutes on its first run
+    # (run 38492666537: cancelled 13 minutes into the build step). The cabal
+    # cache is saved only when the job succeeds, so a limit below the cold
+    # build time keeps every run cold. Warm runs reuse ~/.cabal/store.
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
