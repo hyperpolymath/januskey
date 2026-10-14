@@ -108,7 +108,7 @@ trust level: even maximal-trust agents cannot violate MUST constraints.
 
 ### no-dangerous-proof-escapes
 - description: No believe_me / assert_total in Idris2 proof code
-- run: "! grep -rnE 'believe_me|assert_total' src/abi/ generated/idrisiser/ 2>/dev/null | head -1 | grep -q ."
+- run: "! grep -rnE 'believe_me|assert_total' src/abi/ 2>/dev/null | head -1 | grep -q ."
 - severity: critical
 
 ### no-unsafe-without-comment
@@ -149,11 +149,6 @@ trust level: even maximal-trust agents cannot violate MUST constraints.
 - description: Idris2 ABI definitions and proofs must not be removed (changes require proof update)
 - run: test -f src/abi/JanusKey/ABI/Types.idr && test -f src/abi/JanusKey/ABI/Proofs.idr && test -f src/abi/JanusKey/ABI/Foreign.idr && test -f src/abi/januskey-abi.ipkg
 - severity: critical
-
-### generated-code-in-generated
-- description: Generated code lives in generated/ only
-- run: test -d generated
-- severity: warning
 
 ### tests-not-deleted
 - description: Test directories must not be deleted or emptied

@@ -31,9 +31,9 @@ commits, not this one:
   `+Handle Locked+`, linear variables used twice or not at all, and
   `+oblitMostExpensive (S k) = Oh+` on an open `+k+`).
 
-`+generated/idrisiser/+` is unchanged and outside the gate; whether it is
-regenerated with capitalised module names or removed is an owner decision
-(JNK-01, open question).
+`+generated/idrisiser/+` was left outside the gate here; the owner decided
+(2026-10-14) to remove it, with its `+idrisiser/*.tsig+` inputs and
+`+idrisiser.toml+`. `+scripts/check-abi-tree.sh+` now fails if any of them returns.
 
 ==== Same day, three commits later: the package typechecks
 
@@ -103,11 +103,9 @@ single tree; ABI bullet re-verified 2026-10-13._
 and `+dashboard-check+`). The tautological placeholders are gone (list
 above). What it proves are ABI and model lemmas (ledger rows A-*, C-*),
 NOT the security proofs listed below.
-* **generated/idrisiser/idris2/Januskey/Verified/*.idr**: **DO NOT
-typecheck** — `+idris2 --check+` fails ("`Expected a capitalised
-identifier, got: key`") because the generated module names are
-lowercase. Despite the `+Verified/+` name, nothing there is currently
-verified.
+* **generated/idrisiser/**: removed 2026-10-14 (owner decision). It never
+typechecked (lowercase generated module names), so nothing in it was
+verified; no ledger row depended on it.
 * *Dangerous patterns*: *265* `+unwrap()+` calls across the Rust
 codebase.
 * *LOC*: ~12,200 (Rust)
