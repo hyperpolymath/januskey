@@ -48,13 +48,13 @@ jk modify config.yaml --sed 's/log_level: INFO/log_level: DEBUG/'
 jk begin "reorganize project"
 
 # Move files to new structure
-jk mkdir -p src/components
-jk mkdir -p src/utils
-jk mkdir -p src/services
+jk mkdir -p ./src/components
+jk mkdir -p ./src/utils
+jk mkdir -p ./src/services
 
-jk move components/* src/components/
-jk move utils/* src/utils/
-jk move services/* src/services/
+jk move components/* ./src/components/
+jk move utils/* ./src/utils/
+jk move services/* ./src/services/
 
 # Preview the changes
 jk preview

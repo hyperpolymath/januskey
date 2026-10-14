@@ -196,9 +196,9 @@ jk begin "risky refactor"
 # jk rollback
 
 # Complex multi-step operation
-jk move src/old_module/ src/legacy/
-jk delete src/deprecated/*.py
-jk modify src/main.py --file new_main.py
+jk move ./src/old_module/ ./src/legacy/
+jk delete ./src/deprecated/*.py
+jk modify ./src/main.py --file new_main.py
 
 # Verify
 ./verify_integrity.sh
