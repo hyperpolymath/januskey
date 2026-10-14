@@ -15,7 +15,7 @@
 // null-guard semantics that the conformance suite
 // (`ffi/zig/test/integration_test.zig`) exercises are implemented for real,
 // while the cryptographic / CNO product internals are stubbed and marked
-// `TODO(product):`. Every public function returns a documented `JK_OK` /
+// `TODO(#155):`. Every public function returns a documented `JK_OK` /
 // `JK_ERR_*` code from `Error` below.
 
 const std = @import("std");
@@ -183,7 +183,7 @@ pub export fn jk_init(path: ?[*:0]const u8, out_handle: ?*?*anyopaque) c_int {
         return code(.invalid_path);
     }
 
-    // TODO(product): create the on-disk `.januskey/` layout, content store,
+    // TODO(#155): create the on-disk `.januskey/` layout, content store,
     // metadata log and transaction directory for `path` (mirrors
     // crates/reversible-core JanusKey::init). The scaffold only allocates an
     // in-memory handle so the FFI lifecycle is exercisable end-to-end.
@@ -203,7 +203,7 @@ pub export fn jk_init(path: ?[*:0]const u8, out_handle: ?*?*anyopaque) c_int {
 
 /// Open an existing repository. Scaffold shares `jk_init`'s behaviour.
 pub export fn jk_open(path: ?[*:0]const u8, out_handle: ?*?*anyopaque) c_int {
-    // TODO(product): require the repository to already exist and load its
+    // TODO(#155): require the repository to already exist and load its
     // state, rather than creating it.
     return jk_init(path, out_handle);
 }
@@ -243,7 +243,7 @@ pub export fn jk_execute(
     _ = kind;
     _ = src;
     _ = dst;
-    // TODO(product): dispatch on `op` and execute the reversible operation
+    // TODO(#155): dispatch on `op` and execute the reversible operation
     // (copy/move/delete/modify/obliterate/key-*) recording inverse metadata,
     // delegating to the reversible-core executor.
     return code(.ok);
@@ -253,7 +253,7 @@ pub export fn jk_execute(
 pub export fn jk_undo(handle: ?*anyopaque) c_int {
     const h = asHandle(handle) orelse return code(.not_initialized);
     if (!h.initialized) return code(.not_initialized);
-    // TODO(product): pop the last operation from the log and apply its
+    // TODO(#155): pop the last operation from the log and apply its
     // stored inverse (Theorem 3.4: Sequential Reversibility).
     return code(.ok);
 }
@@ -269,7 +269,7 @@ pub export fn jk_obliterate(
     const h = asHandle(handle) orelse return code(.not_initialized);
     if (!h.initialized) return code(.not_initialized);
     if (path == null) return code(.invalid_path);
-    // TODO(product): perform the DoD 5220.22-M secure-overwrite passes and
+    // TODO(#155): perform the DoD 5220.22-M secure-overwrite passes and
     // compute the real commitment H(content_hash || nonce || timestamp)
     // (mirrors crates/januskey-cli/src/obliteration.rs). The scaffold returns
     // a structurally-valid proof so consumers can exercise the ABI.
@@ -296,7 +296,7 @@ pub export fn jk_generate_key(
     if (!h.initialized) return code(.not_initialized);
     _ = algo;
     _ = passphrase;
-    // TODO(product): derive key material (Argon2id KDF + AEAD), persist the
+    // TODO(#155): derive key material (Argon2id KDF + AEAD), persist the
     // wrapped key, and return its UUID.
     if (out_id) |id| id.* = .{};
     return code(.ok);
@@ -313,7 +313,7 @@ pub export fn jk_rotate_key(
     if (!h.initialized) return code(.not_initialized);
     if (old_id == null) return code(.key_not_found);
     _ = new_passphrase;
-    // TODO(product): re-wrap content under the new key and retire the old one.
+    // TODO(#155): re-wrap content under the new key and retire the old one.
     if (out_new_id) |id| id.* = .{};
     return code(.ok);
 }
@@ -323,7 +323,7 @@ pub export fn jk_revoke_key(handle: ?*anyopaque, key_id: ?*const KeyId) c_int {
     const h = asHandle(handle) orelse return code(.not_initialized);
     if (!h.initialized) return code(.not_initialized);
     if (key_id == null) return code(.key_not_found);
-    // TODO(product): mark the key revoked in the key store / audit log.
+    // TODO(#155): mark the key revoked in the key store / audit log.
     return code(.ok);
 }
 
@@ -359,7 +359,7 @@ pub export fn jk_tx_commit(handle: ?*anyopaque, tx: ?*anyopaque) c_int {
     const active = h.active_tx orelse return code(.tx_not_active);
     const given = asTx(tx) orelse return code(.tx_not_active);
     if (given != active) return code(.tx_not_active);
-    // TODO(product): durably commit the staged operations.
+    // TODO(#155): durably commit the staged operations.
     h.allocator.destroy(active);
     h.active_tx = null;
     return code(.ok);
@@ -371,7 +371,7 @@ pub export fn jk_tx_rollback(handle: ?*anyopaque, tx: ?*anyopaque) c_int {
     const active = h.active_tx orelse return code(.tx_not_active);
     const given = asTx(tx) orelse return code(.tx_not_active);
     if (given != active) return code(.tx_not_active);
-    // TODO(product): undo the staged operations in reverse order.
+    // TODO(#155): undo the staged operations in reverse order.
     h.allocator.destroy(active);
     h.active_tx = null;
     return code(.ok);
