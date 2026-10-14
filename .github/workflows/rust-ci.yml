@@ -10,6 +10,10 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  # Weekly, so a new RustSec advisory against an unchanged Cargo.lock is still
+  # caught (the scheduled cargo-audit.yml was folded into this workflow).
+  schedule:
+    - cron: '0 6 * * 1'
 
 permissions:
   actions: read
@@ -17,8 +21,12 @@ permissions:
 
 jobs:
   rust-ci:
-    uses: hyperpolymath/standards/.github/workflows/rust-ci-reusable.yml@84355587cb2a1f86e6882de83514a32db2646e7a
+    uses: hyperpolymath/standards/.github/workflows/rust-ci-reusable.yml@7d2041a2315572d8257341449257e6cfddc9aebc # standards main, 2026-10-13
     permissions:
       actions: read
       contents: read
       security-events: write
+    with:
+      # Replaces the retired cargo-audit.yml (standards CI regularisation spec:
+      # fold the audit into rust-ci through enable_audit).
+      enable_audit: true

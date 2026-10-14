@@ -46,6 +46,20 @@ jobs:
         with:
           path: '.'
           strict: 'false'
+          # The action's defaults, plus audits/assail-classifications.a2ml: that
+          # file is not a repo manifest but panic-attack's suppression registry
+          # (read from <target>/audits/assail-classifications.a2ml), so the
+          # manifest identity check does not apply to it (hypatia#243 pattern:
+          # tell a target file from a tool-data file).
+          paths-ignore: |
+            vendor/
+            vendored/
+            verified-container-spec/
+            .audittraining/
+            integration/fixtures/
+            test/fixtures/
+            tests/fixtures/
+            audits/assail-classifications.a2ml
 
       - name: Write summary
         run: |

@@ -73,7 +73,7 @@ mod p2p_tests {
         std::fs::create_dir_all(&attest_path).unwrap();
 
         // Simulate key generation
-        let key_id = "550e8400-e29b-41d4-a716-446655440000";
+        let key_id = "550e8400-e29b-81d4-a716-446655440000";
         let entry = format!(
             r#"{{"op":"key_gen","key_id":"{}","algo":"aes256gcm","timestamp":{}}}"#,
             key_id,

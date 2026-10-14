@@ -1,6 +1,11 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
+# CodeQL — thin caller of the estate reusable in hyperpolymath/standards
+# (CI regularisation spec: "REMAKE · GATE: thin caller of codeql-reusable.yml").
+# One call per language, per the reusable's design. januskey has no
+# JavaScript/TypeScript, so the reusable's javascript-typescript default would
+# fail with "no source code seen"; it analyses the workflow YAML (actions) and
+# the Rust crates (rust, build-mode none).
 name: CodeQL Security Analysis
 
 on:
@@ -11,48 +16,26 @@ on:
   schedule:
     - cron: '0 6 1 * *'   # monthly 1st 06:00 UTC
 
-# Estate guardrail: cancel superseded runs so re-pushes / rebased PR
-# updates do not pile up queued runs against the shared account-wide
-# Actions concurrency pool. Applied only to read-only check workflows
-# (no publish/mutation), so cancelling a superseded run is always safe.
+# Queue rather than cancel: a cancelled CodeQL run uploads nothing, and a
+# ruleset that expects a code-scanning result for the head commit then waits
+# on it indefinitely (same reasoning as standards' own codeql.yml).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
+# Must cover everything the reusable's analyze job requests: a reusable cannot
+# widen its caller's grant, and asking for more ends the run in startup_failure.
 permissions:
   actions: read
   contents: read
+  security-events: write
 
 jobs:
-  analyze:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # januskey has no JavaScript/TypeScript source — the
-          # javascript-typescript extractor errors with "no source code seen"
-          # (exit 32, configuration error). CodeQL's GitHub Actions analysis
-          # scans the workflow YAML that does exist here, keeping this a
-          # meaningful security check (same fix as oblibeny + maa-framework).
-          - language: actions
-            build-mode: none
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.38.2
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.38.2
-        with:
-          category: "/language:${{ matrix.language }}"
+  codeql-actions:
+    uses: hyperpolymath/standards/.github/workflows/codeql-reusable.yml@7d2041a2315572d8257341449257e6cfddc9aebc # standards main, 2026-10-13
+    with:
+      language: actions
+  codeql-rust:
+    uses: hyperpolymath/standards/.github/workflows/codeql-reusable.yml@7d2041a2315572d8257341449257e6cfddc9aebc # standards main, 2026-10-13
+    with:
+      language: rust

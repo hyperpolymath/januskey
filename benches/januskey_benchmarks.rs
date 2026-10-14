@@ -173,7 +173,7 @@ fn bench_attestation(c: &mut Criterion) {
     group.bench_function("entry_generation", |b| {
         b.iter(|| {
             let entry = serde_json::json!({
-                "key_id": "550e8400-e29b-41d4-a716-446655440000",
+                "key_id": "550e8400-e29b-81d4-a716-446655440000",
                 "op": "key_gen",
                 "algo": "aes256gcm",
                 "timestamp": chrono::Utc::now().timestamp(),
