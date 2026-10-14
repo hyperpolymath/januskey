@@ -1,0 +1,93 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk> -->
+
+# JanusKey Wiki
+
+## Welcome to JanusKey
+
+JanusKey is a reversible file operations utility (formal proofs pending) that pursues complete reversibility through architectural design rather than logging or backups. Unlike traditional backup systems that restore from external state, JanusKey operations carry sufficient information for inversion — the goal is to make data loss architecturally impossible. 30 Idris2 ABI proofs are landed; the reversibility theorems themselves are a target, not yet complete.
+
+### Project Status (2026-06-12)
+
+Landed since 2026-04: estate standardization merged (flat contractiles, `bot_directives/`, `6a2/anchor/`, `self-validating/`, GOVERNANCE +
+MAINTAINERS + CODEOWNERS); license migrated PMPL-1.0-or-later → MPL-2.0 (Cargo.toml aligned in \#52); CI converted to SHA-pinned reusable-workflow wrappers (rust-ci \#39, hypatia-scan \#40/#46, mirror \#42, secret-scanner \#43, scorecard \#44/#48) with cargo-audit + workflow-linter prevention workflows; CodeQL cron now monthly; CHANGELOG.md seeded (#45); MCP-exposure threat model drafted (status: draft-pending-human-review); Trustfile hardened to the crypto-minimal baseline; 166 `.expect("TODO: handle error")` sites cleared. CRG grade remains D (promotion path in READINESS.md).
+
+### Core Philosophy
+
+JanusKey implements **Maximal Principle Reduction (MPR)**, a security methodology where vulnerability elimination occurs by construction rather than verification. This represents a fundamental shift from:
+
+| Traditional Approach            | JanusKey Approach                                                                                   |
+|---------------------------------|-----------------------------------------------------------------------------------------------------|
+| Data protection through backups | Data loss impossible by construction                                                                |
+| Logging for accountability      | Structural reversibility guarantee                                                                  |
+| Trust in operational processes  | Formal mathematical proofs (in progress — Idris2 ABI proofs landed, reversibility theorems pending) |
+| Recovery from external state    | Recovery from operation metadata                                                                    |
+
+### Quick Navigation
+
+| Section                                       | Description                                                |
+|-----------------------------------------------|------------------------------------------------------------|
+| [Theory](theory/index.md)                   | Formal foundations: MPR, MAA Framework, RMR/RMO primitives |
+| [Architecture](architecture/index.md)       | System design, component overview, data flow               |
+| [Operations Reference](operations/index.md) | Complete guide to all reversible operations                |
+| [CLI Guide](guides/cli.md)                  | Command-line interface documentation                       |
+| [Transactions](guides/transactions.md)      | Grouping operations with commit/rollback                   |
+| [API Reference](api/index.md)               | Rust library API documentation                             |
+| [Formal Proofs](formal-proofs/index.md)     | Mathematical proofs of reversibility                       |
+| [Examples](examples/index.md)               | Practical usage examples and patterns                      |
+
+### Key Guarantees (design targets — formal proofs pending)
+
+1.  **Reversibility by design**: Every operation carries inversion metadata (formal proof of "always" is pending)
+
+2.  **Instant Rollback**: Undo changes in milliseconds, not hours
+
+3.  **Data loss impossible by construction**: the architectural goal the pending proofs are to establish
+
+4.  **Complete Audit Trail**: Every change tracked automatically
+
+5.  **Transaction Support**: Group operations, commit/rollback together
+
+6.  **Content-Addressed Storage**: SHA256 hashing with deduplication
+
+### The Janus Symbol
+
+The name "JanusKey" derives from Janus, the Roman god of beginnings, endings, doorways, and transitions. Janus is typically depicted with two faces—one looking to the past, one to the future. This perfectly captures the essence of JanusKey:
+
+- **Forward Operations**: Execute changes moving from present state to future state
+
+- **Reverse Operations**: Perfect restoration from any point back to the past
+
+The "Key" represents the cryptographic foundation (SHA256 content addressing) that ensures integrity and enables the formal guarantees of the system.
+
+### Quick Start
+
+``` bash
+# Build from source
+cd crates/januskey-cli
+cargo build --release
+
+# Initialize in a directory
+jk init
+
+# Delete files (reversible)
+jk delete *.log
+
+# Instantly undo
+jk undo
+
+# Group operations
+jk begin "cleanup"
+jk delete temp*.txt
+jk move old/ archive/
+jk preview    # Review changes
+jk commit     # Or: jk rollback
+```
+
+### License
+
+JanusKey is dual-licensed under MIT OR MPL-2.0.
+
+### Contributing
+
+See [../../.github/CONTRIBUTING.md](../../.github/CONTRIBUTING.md) for guidelines.

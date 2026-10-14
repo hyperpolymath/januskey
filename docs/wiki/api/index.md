@@ -1,36 +1,29 @@
-// SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= API Reference
-:toc: left
-:toclevels: 3
-:icons: font
-:source-highlighter: rouge
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk> -->
 
-== Overview
+# API Reference
+
+## Overview
 
 JanusKey is implemented as a Rust library with a CLI frontend. This reference documents the public API for programmatic use.
 
-== Crate Structure
+## Crate Structure
 
-[source]
-----
-januskey/
-├── lib.rs              # Main entry point
-├── content_store.rs    # Content-addressed storage
-├── metadata.rs         # Operation metadata and logging
-├── operations.rs       # File operations
-├── transaction.rs      # Transaction management
-└── error.rs            # Error types
-----
+    januskey/
+    ├── lib.rs              # Main entry point
+    ├── content_store.rs    # Content-addressed storage
+    ├── metadata.rs         # Operation metadata and logging
+    ├── operations.rs       # File operations
+    ├── transaction.rs      # Transaction management
+    └── error.rs            # Error types
 
-== Core Types
+## Core Types
 
-=== JanusKey
+### JanusKey
 
 The main entry point for JanusKey functionality.
 
-[source,rust]
-----
+``` rust
 pub struct JanusKey {
     pub root: PathBuf,
     pub config: Config,
@@ -49,12 +42,11 @@ impl JanusKey {
     /// Check if directory is initialized
     pub fn is_initialized(root: &Path) -> bool;
 }
-----
+```
 
-==== Example
+#### Example
 
-[source,rust]
-----
+``` rust
 use januskey::JanusKey;
 use std::path::Path;
 
@@ -67,14 +59,13 @@ fn main() -> januskey::Result<()> {
 
     Ok(())
 }
-----
+```
 
-=== Config
+### Config
 
 Configuration for JanusKey behavior.
 
-[source,rust]
-----
+``` rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub storage_path: PathBuf,
@@ -93,16 +84,15 @@ impl Config {
 impl Default for Config {
     fn default() -> Self;
 }
-----
+```
 
-== Content Store
+## Content Store
 
-=== ContentHash
+### ContentHash
 
 SHA256 content hash with verification.
 
-[source,rust]
-----
+``` rust
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ContentHash(pub String);
 
@@ -119,14 +109,13 @@ impl ContentHash {
     /// Verify content matches this hash
     pub fn verify(&self, content: &[u8]) -> bool;
 }
-----
+```
 
-=== ContentStore
+### ContentStore
 
 Content-addressed storage with optional compression.
 
-[source,rust]
-----
+``` rust
 pub struct ContentStore {
     root: PathBuf,
     compression: bool,
@@ -157,12 +146,11 @@ impl ContentStore {
     /// Count stored content blobs
     pub fn count(&self) -> Result<usize>;
 }
-----
+```
 
-==== Example
+#### Example
 
-[source,rust]
-----
+``` rust
 use januskey::ContentStore;
 
 fn example() -> januskey::Result<()> {
@@ -179,16 +167,15 @@ fn example() -> januskey::Result<()> {
 
     Ok(())
 }
-----
+```
 
-== Metadata
+## Metadata
 
-=== OperationType
+### OperationType
 
 Enumeration of all operation types.
 
-[source,rust]
-----
+``` rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationType {
     Delete,
@@ -205,14 +192,13 @@ pub enum OperationType {
     Truncate,
     Touch,
 }
-----
+```
 
-=== FileMetadata
+### FileMetadata
 
 File metadata for preservation and restoration.
 
-[source,rust]
-----
+``` rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileMetadata {
     pub permissions: u32,
@@ -231,14 +217,13 @@ impl FileMetadata {
     /// Apply metadata to a file
     pub fn apply(&self, path: &Path) -> Result<()>;
 }
-----
+```
 
-=== OperationMetadata
+### OperationMetadata
 
 Complete metadata for an operation (sufficient for reversal).
 
-[source,rust]
-----
+``` rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperationMetadata {
     pub id: String,
@@ -266,14 +251,13 @@ impl OperationMetadata {
     pub fn with_original_metadata(self, metadata: FileMetadata) -> Self;
     pub fn with_transaction_id(self, id: String) -> Self;
 }
-----
+```
 
-=== MetadataStore
+### MetadataStore
 
 Append-only operation log.
 
-[source,rust]
-----
+``` rust
 pub struct MetadataStore {
     path: PathBuf,
     log: OperationLog,
@@ -315,16 +299,15 @@ impl MetadataStore {
     /// Prune old operations
     pub fn prune(&mut self, keep: usize) -> Result<usize>;
 }
-----
+```
 
-== Operations
+## Operations
 
-=== FileOperation
+### FileOperation
 
 Enumeration of all file operations.
 
-[source,rust]
-----
+``` rust
 #[derive(Debug, Clone)]
 pub enum FileOperation {
     Delete { path: PathBuf },
@@ -351,14 +334,13 @@ impl FileOperation {
     /// Get primary path
     pub fn path(&self) -> &Path;
 }
-----
+```
 
-=== OperationExecutor
+### OperationExecutor
 
 Executes operations with reversibility support.
 
-[source,rust]
-----
+``` rust
 pub struct OperationExecutor<'a> {
     content_store: &'a ContentStore,
     metadata_store: &'a mut MetadataStore,
@@ -379,12 +361,11 @@ impl<'a> OperationExecutor<'a> {
     /// Undo an operation using its metadata
     pub fn undo(&mut self, operation_id: &str) -> Result<OperationMetadata>;
 }
-----
+```
 
-==== Example
+#### Example
 
-[source,rust]
-----
+``` rust
 use januskey::{JanusKey, FileOperation, OperationExecutor};
 use std::path::PathBuf;
 
@@ -413,16 +394,15 @@ fn example() -> januskey::Result<()> {
     println!("File restored");
     Ok(())
 }
-----
+```
 
-== Transactions
+## Transactions
 
-=== Transaction
+### Transaction
 
 A transaction grouping multiple operations.
 
-[source,rust]
-----
+``` rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
     pub id: String,
@@ -448,14 +428,13 @@ impl Transaction {
     pub fn commit(&mut self);
     pub fn rollback(&mut self);
 }
-----
+```
 
-=== TransactionManager
+### TransactionManager
 
 Manages transaction lifecycle.
 
-[source,rust]
-----
+``` rust
 pub struct TransactionManager {
     path: PathBuf,
     log: TransactionLog,
@@ -495,14 +474,13 @@ impl TransactionManager {
     /// Get active transaction ID
     pub fn active_id(&self) -> Option<&str>;
 }
-----
+```
 
-=== TransactionExecutor
+### TransactionExecutor
 
 Helper for executing operations within transactions.
 
-[source,rust]
-----
+``` rust
 pub struct TransactionExecutor<'a> {
     content_store: &'a ContentStore,
     metadata_store: &'a mut MetadataStore,
@@ -519,12 +497,11 @@ impl<'a> TransactionExecutor<'a> {
     /// Execute an operation within the current transaction
     pub fn execute(&mut self, operation: FileOperation) -> Result<OperationMetadata>;
 }
-----
+```
 
-==== Example
+#### Example
 
-[source,rust]
-----
+``` rust
 use januskey::{JanusKey, FileOperation, TransactionExecutor};
 
 fn example() -> januskey::Result<()> {
@@ -562,14 +539,13 @@ fn example() -> januskey::Result<()> {
 
     Ok(())
 }
-----
+```
 
-== Error Handling
+## Error Handling
 
-=== JanusError
+### JanusError
 
-[source,rust]
-----
+``` rust
 #[derive(Debug, thiserror::Error)]
 pub enum JanusError {
     #[error("File not found: {0}")]
@@ -613,10 +589,12 @@ pub enum JanusError {
 }
 
 pub type Result<T> = std::result::Result<T, JanusError>;
-----
+```
 
-== Further Reading
+## Further Reading
 
-* link:../guides/cli.adoc[CLI Guide]
-* link:../operations/index.adoc[Operations Reference]
-* link:../theory/formal-model.adoc[Formal Model]
+- [CLI Guide](../guides/cli.md)
+
+- [Operations Reference](../operations/index.md)
+
+- [Formal Model](../theory/formal-model.md)
