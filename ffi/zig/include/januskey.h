@@ -2,7 +2,7 @@
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 /* SPDX-License-Identifier: MPL-2.0 */
 /* Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) */
-/* JanusKey C FFI Header — hand-maintained; src/abi/JanusKey/ABI/Foreign.idr must mirror it (checked by the ABI package typecheck) */
+/* JanusKey C FFI Header — hand-maintained; src/abi/JanusKey/ABI/Foreign.idr mirrors it: symbols, status codes, enums and sizes are compared by scripts/check-abi-layout.sh */
 
 #ifndef JANUSKEY_H
 #define JANUSKEY_H

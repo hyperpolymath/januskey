@@ -11,7 +11,7 @@ fail=0
 say() { echo "[check-abi-tree] $*"; }
 
 # 1. The symlink farm (PR #140, src/idris-abi/) is retired.
-if [ -e src/idris-abi ]; then say "FAIL: src/idris-abi exists (retired symlink farm)"; fail=1; fi
+if [ -e src/idris-abi ] || [ -L src/idris-abi ]; then say "FAIL: src/idris-abi exists (retired symlink farm)"; fail=1; fi
 
 # 2. Exactly one package file, and it is the one the gates name.
 n=$(find src/abi -name '*.ipkg' | wc -l)
