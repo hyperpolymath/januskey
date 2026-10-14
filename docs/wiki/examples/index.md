@@ -1,21 +1,17 @@
-// SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= Examples and Use Cases
-:toc: left
-:toclevels: 3
-:icons: font
-:source-highlighter: rouge
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk> -->
 
-== Overview
+# Examples and Use Cases
+
+## Overview
 
 This section provides practical examples of JanusKey usage for common scenarios.
 
-== Basic Operations
+## Basic Operations
 
-=== Safe File Deletion
+### Safe File Deletion
 
-[source,bash]
-----
+``` bash
 # Initialize JanusKey
 jk init
 
@@ -29,12 +25,11 @@ jk history --type DELETE --count 50
 
 jk undo --id abc123
 # File restored
-----
+```
 
-=== Modifying Configuration Files
+### Modifying Configuration Files
 
-[source,bash]
-----
+``` bash
 # Modify a config file
 jk modify config.yaml --sed 's/debug: true/debug: false/'
 
@@ -45,22 +40,21 @@ jk undo
 jk modify config.yaml --sed 's/log_level: INFO/log_level: DEBUG/'
 
 # Works! Keep it
-----
+```
 
-=== Reorganizing Directory Structure
+### Reorganizing Directory Structure
 
-[source,bash]
-----
+``` bash
 jk begin "reorganize project"
 
 # Move files to new structure
-jk mkdir -p src/components
-jk mkdir -p src/utils
-jk mkdir -p src/services
+jk mkdir -p ./src/components
+jk mkdir -p ./src/utils
+jk mkdir -p ./src/services
 
-jk move components/* src/components/
-jk move utils/* src/utils/
-jk move services/* src/services/
+jk move components/* ./src/components/
+jk move utils/* ./src/utils/
+jk move services/* ./src/services/
 
 # Preview the changes
 jk preview
@@ -74,14 +68,13 @@ else
     jk rollback
     echo "Tests failed, reverted changes"
 fi
-----
+```
 
-== Advanced Patterns
+## Advanced Patterns
 
-=== Batch Processing with Rollback
+### Batch Processing with Rollback
 
-[source,bash]
-----
+``` bash
 #!/bin/bash
 # batch_process.sh - Process files with automatic rollback on error
 
@@ -101,12 +94,11 @@ done
 
 jk commit
 echo "All files processed successfully"
-----
+```
 
-=== Safe Deployment Preparation
+### Safe Deployment Preparation
 
-[source,bash]
-----
+``` bash
 #!/bin/bash
 # prepare_deploy.sh
 
@@ -135,12 +127,11 @@ else
     echo "Build/test failed, changes reverted"
     exit 1
 fi
-----
+```
 
-=== Configuration Migration
+### Configuration Migration
 
-[source,bash]
-----
+``` bash
 #!/bin/bash
 # migrate_config.sh - Migrate config format with safety
 
@@ -169,14 +160,13 @@ else
     echo "Validation failed, reverted"
     exit 1
 fi
-----
+```
 
-== Integration Examples
+## Integration Examples
 
-=== Git Pre-Commit Hook
+### Git Pre-Commit Hook
 
-[source,bash]
-----
+``` bash
 #!/bin/bash
 # .git/hooks/pre-commit
 
@@ -200,12 +190,11 @@ if ! git diff --quiet; then
 else
     jk rollback  # No changes needed
 fi
-----
+```
 
-=== CI/CD Pipeline Integration
+### CI/CD Pipeline Integration
 
-[source,yaml]
-----
+``` yaml
 # .github/workflows/test.yml
 name: Test with JanusKey Protection
 
@@ -237,57 +226,55 @@ jobs:
             echo "Tests modified files unexpectedly"
           fi
           exit $TEST_RESULT
-----
+```
 
-=== Makefile Integration
+### Makefile Integration
 
-[source,makefile]
-----
+``` makefile
 # Makefile with JanusKey support
 
 .PHONY: clean build test deploy
 
 init:
-	jk init
+    jk init
 
 clean:
-	jk begin "clean"
-	jk delete -r build/
-	jk delete -r dist/
-	jk delete "*.pyc"
-	jk commit
+    jk begin "clean"
+    jk delete -r build/
+    jk delete -r dist/
+    jk delete "*.pyc"
+    jk commit
 
 build: clean
-	jk begin "build"
-	python setup.py build
-	npm run build
-	jk commit
+    jk begin "build"
+    python setup.py build
+    npm run build
+    jk commit
 
 test:
-	jk begin "test"
-	pytest tests/
-	npm test
-	@if [ $$? -eq 0 ]; then \
-		jk commit; \
-	else \
-		jk rollback; \
-		exit 1; \
-	fi
+    jk begin "test"
+    pytest tests/
+    npm test
+    @if [ $$? -eq 0 ]; then \
+        jk commit; \
+    else \
+        jk rollback; \
+        exit 1; \
+    fi
 
 deploy: build test
-	jk begin "deploy prep"
-	jk delete .env.local
-	jk delete -r __pycache__/
-	# ... deployment steps
-	jk commit
-----
+    jk begin "deploy prep"
+    jk delete .env.local
+    jk delete -r __pycache__/
+    # ... deployment steps
+    jk commit
+```
 
-== Rust Library Examples
+## Rust Library Examples
 
-=== Basic Library Usage
+### Basic Library Usage
 
-[source,rust]
-----
+``` rust
 use januskey::{JanusKey, FileOperation, OperationExecutor};
 use std::path::PathBuf;
 
@@ -316,12 +303,11 @@ fn main() -> januskey::Result<()> {
 
     Ok(())
 }
-----
+```
 
-=== Transaction Example
+### Transaction Example
 
-[source,rust]
-----
+``` rust
 use januskey::{JanusKey, FileOperation, TransactionExecutor};
 
 fn batch_cleanup(jk: &mut JanusKey) -> januskey::Result<()> {
@@ -359,12 +345,11 @@ fn batch_cleanup(jk: &mut JanusKey) -> januskey::Result<()> {
 
     Ok(())
 }
-----
+```
 
-=== Custom Operation Wrapper
+### Custom Operation Wrapper
 
-[source,rust]
-----
+``` rust
 use januskey::{JanusKey, FileOperation, OperationExecutor, OperationMetadata};
 use std::path::Path;
 
@@ -427,14 +412,13 @@ impl SafeFileOps {
         executor.undo(&id)
     }
 }
-----
+```
 
-== Real-World Scenarios
+## Real-World Scenarios
 
-=== Log Rotation with Recovery
+### Log Rotation with Recovery
 
-[source,bash]
-----
+``` bash
 #!/bin/bash
 # rotate_logs.sh - Rotate logs with ability to recover
 
@@ -464,12 +448,11 @@ echo "Log rotation complete"
 # If something went wrong with the app after rotation:
 # jk rollback
 # This restores all logs to their original locations
-----
+```
 
-=== Database Migration Companion
+### Database Migration Companion
 
-[source,bash]
-----
+``` bash
 #!/bin/bash
 # migrate_with_files.sh - Database migration with file changes
 
@@ -491,14 +474,13 @@ else
     echo "Note: Database changes may need manual rollback"
     exit 1
 fi
-----
+```
 
-== Troubleshooting Examples
+## Troubleshooting Examples
 
-=== Recovering from Mistakes
+### Recovering from Mistakes
 
-[source,bash]
-----
+``` bash
 # Accidentally deleted important files
 $ rm -rf src/  # Oops! Wrong directory
 
@@ -508,12 +490,11 @@ $ jk history --path "src/*" --count 100
 
 $ jk undo --count 47  # Undo all src/ deletions
 # Files restored!
-----
+```
 
-=== Viewing What Changed
+### Viewing What Changed
 
-[source,bash]
-----
+``` bash
 # What did I change in the last hour?
 $ jk history --since "1 hour ago"
 
@@ -522,12 +503,11 @@ $ jk history --path "config/*"
 
 # Details on a specific operation
 $ jk info abc123
-----
+```
 
-=== Cleaning Up History
+### Cleaning Up History
 
-[source,bash]
-----
+``` bash
 # Check current storage usage
 $ jk status
 Content store: 156 MB (2341 blobs)
@@ -539,10 +519,12 @@ Would remove: 89 MB (1205 blobs)
 
 $ jk gc --older-than 30d
 Removed: 89 MB
-----
+```
 
-== Further Reading
+## Further Reading
 
-* link:../guides/cli.adoc[CLI Reference]
-* link:../guides/transactions.adoc[Transaction Guide]
-* link:../api/index.adoc[API Reference]
+- [CLI Reference](../guides/cli.md)
+
+- [Transaction Guide](../guides/transactions.md)
+
+- [API Reference](../api/index.md)

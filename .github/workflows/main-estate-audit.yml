@@ -1,16 +1,24 @@
 # This workflow is managed by gh actions-lock.
-
+# SPDX-License-Identifier: MPL-2.0
+# Central estate audit (hyperpolymath/cicd-suite). PERIODIC tier under the
+# standards CI signal discipline: push to main, weekly, or on demand; never on
+# pull_request, and never a required check (standards config/rulesets/gates.json).
 name: Central Estate CI/CD Audit
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  schedule:
+    - cron: '41 4 * * 1'   # weekly, Monday 04:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   estate-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
       

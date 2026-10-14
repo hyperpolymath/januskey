@@ -1,180 +1,157 @@
-// SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= Transaction Guide
-:toc: left
-:toclevels: 3
-:icons: font
-:source-highlighter: rouge
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk> -->
 
-== Overview
+# Transaction Guide
+
+## Overview
 
 Transactions allow you to group multiple operations into an atomic unit that can be committed or rolled back as a whole. This implements the Sequential Reversibility guarantee (Theorem 3.4).
 
-== Basic Usage
+## Basic Usage
 
-=== Starting a Transaction
+### Starting a Transaction
 
-[source,bash]
-----
+``` bash
 jk begin
 # or with a name
 jk begin "cleanup old files"
-----
+```
 
-=== Performing Operations
+### Performing Operations
 
 While a transaction is active, all operations are tracked:
 
-[source,bash]
-----
+``` bash
 jk begin "refactor"
 jk delete old_module/*.py
 jk move config/old.yaml config/legacy.yaml
 jk modify README.md --content "Updated documentation"
-----
+```
 
-=== Previewing Changes
+### Previewing Changes
 
 Before committing, review what will happen:
 
-[source,bash]
-----
+``` bash
 jk preview
-----
+```
 
 Output:
-----
-Transaction: refactor
-Started: 2025-12-17T10:30:00Z
-User: jonathan
 
-Operations:
-  1. DELETE old_module/utils.py
-  2. DELETE old_module/helpers.py
-  3. DELETE old_module/__init__.py
-  4. MOVE   config/old.yaml → config/legacy.yaml
-  5. MODIFY README.md
+    Transaction: refactor
+    Started: 2025-12-17T10:30:00Z
+    User: jonathan
 
-Files affected: 5
-Content stored: 12.3 KB
-----
+    Operations:
+      1. DELETE old_module/utils.py
+      2. DELETE old_module/helpers.py
+      3. DELETE old_module/__init__.py
+      4. MOVE   config/old.yaml → config/legacy.yaml
+      5. MODIFY README.md
 
-=== Committing
+    Files affected: 5
+    Content stored: 12.3 KB
+
+### Committing
 
 Make the changes permanent:
 
-[source,bash]
-----
+``` bash
 jk commit
-----
+```
 
 After commit, individual operations can still be undone, but not as a group.
 
-=== Rolling Back
+### Rolling Back
 
 Undo all operations in the transaction:
 
-[source,bash]
-----
+``` bash
 jk rollback
-----
+```
 
 This reverses all operations in reverse order, restoring the original state completely.
 
-== Transaction States
+## Transaction States
 
-[ditaa]
-....
-    +----------+
-    |  Begin   |
-    +----+-----+
-         |
-         v
-    +----+-----+
-    |  Active  |<----+
-    +----+-----+     |
-         |           |
-    +----+----+------+
-    |         |
-    v         v
-+---+---+ +---+---+
-| Commit| |Rollback|
-+---+---+ +---+---+
-    |         |
-    v         v
-+---+---+ +---+---+
-|Committed| |RolledBack|
-+---------+ +----------+
-....
+        +----------+
+        |  Begin   |
+        +----+-----+
+             |
+             v
+        +----+-----+
+        |  Active  |<----+
+        +----+-----+     |
+             |           |
+        +----+----+------+
+        |         |
+        v         v
+    +---+---+ +---+---+
+    | Commit| |Rollback|
+    +---+---+ +---+---+
+        |         |
+        v         v
+    +---+---+ +---+---+
+    |Committed| |RolledBack|
+    +---------+ +----------+
 
-|===
-| State | Description
+| State      | Description                      |
+|------------|----------------------------------|
+| Active     | Transaction accepting operations |
+| Committed  | Operations finalized             |
+| RolledBack | Operations reversed              |
 
-| Active
-| Transaction accepting operations
+## Transaction Rules
 
-| Committed
-| Operations finalized
-
-| RolledBack
-| Operations reversed
-|===
-
-== Transaction Rules
-
-=== Single Active Transaction
+### Single Active Transaction
 
 Only one transaction can be active at a time:
 
-[source,bash]
-----
+``` bash
 $ jk begin "first"
 Transaction started: first
 
 $ jk begin "second"
 Error: Transaction already active: first
 Use 'jk commit' or 'jk rollback' first.
-----
+```
 
-=== No Nested Transactions
+### No Nested Transactions
 
-JanusKey doesn't support nested transactions. For complex workflows, commit or rollback the current transaction first.
+JanusKey doesn’t support nested transactions. For complex workflows, commit or rollback the current transaction first.
 
-=== Operations Outside Transactions
+### Operations Outside Transactions
 
 Operations performed without an active transaction are immediately recorded and can be individually undone:
 
-[source,bash]
-----
+``` bash
 # No transaction active
 jk delete file1.txt  # Immediately recorded
 jk delete file2.txt  # Separately recorded
 
 jk undo              # Restores file2.txt only
 jk undo              # Restores file1.txt
-----
+```
 
-== Advanced Patterns
+## Advanced Patterns
 
-=== Batch Operations
+### Batch Operations
 
 Group related changes:
 
-[source,bash]
-----
+``` bash
 jk begin "migrate config format"
 for file in config/*.json; do
     jk modify "$file" --sed 's/"debug": true/"debug": false/g'
 done
 jk commit
-----
+```
 
-=== Safe Experimentation
+### Safe Experimentation
 
 Try changes without risk:
 
-[source,bash]
-----
+``` bash
 jk begin "experimental changes"
 # Make changes...
 jk modify main.py --file experimental_main.py
@@ -187,12 +164,11 @@ else
     jk commit
     echo "Tests passed, changes committed"
 fi
-----
+```
 
-=== Deployment Preparation
+### Deployment Preparation
 
-[source,bash]
-----
+``` bash
 jk begin "prepare release"
 
 # Remove development files
@@ -207,37 +183,35 @@ jk preview
 
 # If everything looks good
 jk commit
-----
+```
 
-=== Recovery Checkpoint
+### Recovery Checkpoint
 
 Create a safe point before risky operations:
 
-[source,bash]
-----
+``` bash
 jk begin "risky refactor"
 
 # If something goes wrong at any point:
 # jk rollback
 
 # Complex multi-step operation
-jk move src/old_module/ src/legacy/
-jk delete src/deprecated/*.py
-jk modify src/main.py --file new_main.py
+jk move ./src/old_module/ ./src/legacy/
+jk delete ./src/deprecated/*.py
+jk modify ./src/main.py --file new_main.py
 
 # Verify
 ./verify_integrity.sh
 
 # Finalize
 jk commit
-----
+```
 
-== Transaction Lifecycle API
+## Transaction Lifecycle API
 
 For programmatic use:
 
-[source,rust]
-----
+``` rust
 use januskey::{JanusKey, FileOperation};
 
 fn main() -> Result<()> {
@@ -276,77 +250,79 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-----
+```
 
-== Formal Guarantees
+## Formal Guarantees
 
-=== Atomicity
+### Atomicity
 
-All operations in a transaction either:
-* All succeed (commit)
-* All are reversed (rollback)
+All operations in a transaction either: \* All succeed (commit) \* All are reversed (rollback)
 
 There is no partial state.
 
-=== Sequential Reversibility (Theorem 3.4)
+### Sequential Reversibility (Theorem 3.4)
 
-For operations stem:[O_1, O_2, \ldots, O_n] in a transaction:
+For operations $O_1, O_2, \ldots, O_n$ in a transaction:
 
-[stem]
-++++
-\text{rollback}() = O_n^{-1} \circ O_{n-1}^{-1} \circ \cdots \circ O_1^{-1}
-++++
+$$\text{rollback}() = O_n^{-1} \circ O_{n-1}^{-1} \circ \cdots \circ O_1^{-1}$$
 
 Operations are undone in reverse order.
 
-=== Isolation
+### Isolation
 
-Transaction operations are visible immediately to the file system. JanusKey doesn't provide isolation between concurrent processes—it tracks operations for reversal, not database-style ACID isolation.
+Transaction operations are visible immediately to the file system. JanusKey doesn’t provide isolation between concurrent processes—it tracks operations for reversal, not database-style ACID isolation.
 
-== Error Handling
+## Error Handling
 
-=== Operation Failure During Transaction
+### Operation Failure During Transaction
 
 If an operation fails mid-transaction:
 
-[source,bash]
-----
+``` bash
 jk begin "multi-step"
 jk delete file1.txt  # Success
 jk delete nonexistent.txt  # Fails
 # Transaction remains active
 # Choose: rollback to undo file1.txt deletion, or continue
-----
+```
 
-=== Rollback Failure
+### Rollback Failure
 
 If rollback fails (e.g., content store corrupted):
 
-[source,bash]
-----
+``` bash
 $ jk rollback
 Error: Failed to restore file1.txt: Content integrity error
 Partial rollback completed. Manual intervention required.
 See: jk history --transaction current
-----
+```
 
-== Best Practices
+## Best Practices
 
-1. **Name your transactions**: Makes history more readable
-2. **Keep transactions focused**: One logical change per transaction
-3. **Preview before commit**: Always `jk preview` for complex transactions
-4. **Test after rollback**: Verify state is as expected
-5. **Don't leave transactions open**: Commit or rollback promptly
+1.  **Name your transactions**: Makes history more readable
 
-== Limitations
+2.  **Keep transactions focused**: One logical change per transaction
 
-1. **No concurrent transactions**: One active transaction per directory
-2. **No cross-directory transactions**: Each .januskey is independent
-3. **Operations are immediate**: File changes happen immediately, even in transaction
-4. **No isolation**: Other processes see changes immediately
+3.  **Preview before commit**: Always `jk preview` for complex transactions
 
-== Further Reading
+4.  **Test after rollback**: Verify state is as expected
 
-* link:cli.adoc[CLI Commands]
-* link:../operations/index.adoc[Operations Reference]
-* link:../theory/rmr-primitive.adoc[RMR Primitive]
+5.  **Don’t leave transactions open**: Commit or rollback promptly
+
+## Limitations
+
+1.  **No concurrent transactions**: One active transaction per directory
+
+2.  **No cross-directory transactions**: Each .januskey is independent
+
+3.  **Operations are immediate**: File changes happen immediately, even in transaction
+
+4.  **No isolation**: Other processes see changes immediately
+
+## Further Reading
+
+- [CLI Commands](cli.md)
+
+- [Operations Reference](../operations/index.md)
+
+- [RMR Primitive](../theory/rmr-primitive.md)

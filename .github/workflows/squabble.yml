@@ -1,0 +1,107 @@
+# This workflow is managed by gh actions-lock.
+# SPDX-License-Identifier: MPL-2.0
+# squabble.yml — hyperpolymath/cicd-squabbler in januskey's CI (squabble ≠ bypass:
+# every green it reports is a required check that actually ran and passed).
+#
+# chains  On every push, PR and weekly: map januskey's cross-repo CI
+#         dependencies (reusable workflows, actions) and probe each upstream
+#         once. Fails only on a blocking finding (exit 4): a dependency cycle,
+#         or a dead upstream, which produces no check run and so reads green.
+#         Its "pins N upstream refs by tag/branch" warning is expected here:
+#         januskey is an actions.lock repository, where the lock is the
+#         immutable resolution and direct refs stay version tags (standards
+#         governance-reusable.yml: "Do not also rewrite direct refs to raw SHAs").
+# fight   On demand (Run workflow, with a PR number): classify each red check
+#         on that PR as self-win | escalate | assign-owner. Propose-only: no
+#         --apply, so it never writes, pushes or re-runs anything. Exit 3 (the
+#         base branch has no required_status_checks rule) is a finding about the
+#         rulesets, reported as a notice, not a failure.
+#
+# Not a required check. The action is pinned by commit, as its README requires;
+# it installs squabble v0.1.0 only after its sha256 and its build-provenance
+# attestation both check out (hence attestations: read).
+name: Squabble
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * 1'   # weekly, Monday 05:17 UTC
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'Pull request number to fight (propose-only); leave empty to run chains'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: squabble-${{ github.ref }}-${{ inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  chains:
+    name: CI dependency chains
+    if: github.event_name != 'workflow_dispatch' || inputs.pr == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: squabble chains (fails only on a blocking finding)
+        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@b34cd53f9157d1b8a4f9c5c8d843846557f8622c # main 2026-10-12, squabble v0.1.0
+        with:
+          args: |
+            chains
+            .
+            --follow
+            1
+
+  fight:
+    name: squabble fight (propose-only)
+    if: github.event_name == 'workflow_dispatch' && inputs.pr != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+      actions: read
+      checks: read
+      pull-requests: read
+      statuses: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: squabble fight
+        id: fight
+        continue-on-error: true
+        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@b34cd53f9157d1b8a4f9c5c8d843846557f8622c # main 2026-10-12, squabble v0.1.0
+        with:
+          args: |
+            fight
+            ${{ github.repository }}
+            ${{ inputs.pr }}
+            --repo-root
+            .
+
+      - name: Read the verdict
+        env:
+          RC: ${{ steps.fight.outputs.exit-code }}
+        run: |
+          case "$RC" in
+            0) echo "squabble fight: every required check on the PR is legitimately green or has a proposal above." ;;
+            3) echo "::notice::squabble fight exit 3: the base branch has no required_status_checks rule. That is a ruleset finding, not a CI failure." ;;
+            *) echo "::error::squabble fight exited ${RC:-without running (install failed)}; see the step above."; exit 1 ;;
+          esac
