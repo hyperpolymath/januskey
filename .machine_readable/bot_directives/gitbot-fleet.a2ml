@@ -22,12 +22,11 @@ ci-green-before-merge = true
 never-touch = [
   ".claude/CLAUDE.md",
   "src/abi/",
-  "generated/idrisiser/",
   ".machine_readable/threat-model.a2ml",
   ".machine_readable/contractiles/Trustfile.a2ml",
   "LICENSE",
 ]
-never-touch-notes = "src/abi/ (one tree: src/abi/januskey-abi.ipkg + JanusKey/ABI/*.idr, invariants in scripts/check-abi-tree.sh) + generated/idrisiser/ are the Idris2 ABI proof surface (changes require proof re-verification); threat-model.a2ml awaits human sign-off; the Trustfile may never be widened by an agent (see its self-integrity rule)."
+never-touch-notes = "src/abi/ (one tree: src/abi/januskey-abi.ipkg + JanusKey/ABI/*.idr, invariants in scripts/check-abi-tree.sh) is the Idris2 ABI proof surface (changes require proof re-verification); threat-model.a2ml awaits human sign-off; the Trustfile may never be widened by an agent (see its self-integrity rule)."
 
 [per-bot.sustainabot]
 allow = ["Cargo.toml", "Cargo.lock", ".github/workflows (SHA bumps via grouped dependabot PRs only)"]

@@ -45,10 +45,11 @@ while IFS= read -r f; do
   if ! grep -qx "$mod" <<< "$listed"; then say "FAIL: $f is not listed in src/abi/januskey-abi.ipkg"; fail=1; fi
 done < <(find src/abi -name '*.idr' | sort)
 
-# 7. Report, do not fail, on generated trees: they are not part of this gate.
-if [ -d generated/idrisiser ]; then
-  say "note: generated/idrisiser is present and is NOT part of the ABI gate (its modules do not typecheck; see PROOF-NEEDS.adoc)"
-fi
+# 7. The idrisiser tree (generated/idrisiser/, idrisiser/, idrisiser.toml) is retired
+#    (removed 2026-10-14): a second, generated ABI tree must not come back.
+for p in generated/idrisiser idrisiser idrisiser.toml; do
+  if [ -e "$p" ] || [ -L "$p" ]; then say "FAIL: $p exists (retired idrisiser tree)"; fail=1; fi
+done
 
 if [ "$fail" -ne 0 ]; then say "FAIL"; exit 1; fi
 say "OK: one ABI tree ($(find src/abi -name '*.idr' | wc -l) modules, 1 package)"
