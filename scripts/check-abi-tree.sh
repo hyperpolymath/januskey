@@ -7,6 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0
+# say MSG...: print MSG prefixed with the script's tag to stdout.
 say() { echo "[check-abi-tree] $*"; }
 
 # 1. The symlink farm (PR #140, src/idris-abi/) is retired.
