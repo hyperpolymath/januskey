@@ -37,9 +37,6 @@ workflows:
         - 'actions/checkout@v7.0.1'
     '.github/workflows/label-triage.yml': []
     '.github/workflows/labels.yml': []
-    '.github/workflows/main-estate-audit.yml':
-        - 'actions/checkout@v7.0.1'
-        - 'hyperpolymath/cicd-suite@main'
     '.github/workflows/mirror.yml':
         - 'hyperpolymath/standards@a85aa8e70326cceedae169013a47daee554918b7'
     '.github/workflows/rust-ci.yml':
@@ -154,29 +151,11 @@ dependencies:
         commit: 'sha1-b34cd53f9157d1b8a4f9c5c8d843846557f8622c'
         owner_id: 6759885
         repo_id: 1284026967
-    'hyperpolymath/cicd-suite@main':
-        ref: 'main'
-        commit: 'sha1-5a10b72e574ef63855fafd4568a4c178657f3294'
-        owner_id: 6759885
-        repo_id: 1326697643
-        uses:
-            - 'hyperpolymath/deed-ecosystem@f9d999b60cb5f383679ea19912bcdc49c944973a'
-            - 'hyperpolymath/k9-ecosystem@2155aa26a21758f2ba119f61bc7e0e1981c106fb'
-    'hyperpolymath/deed-ecosystem@f9d999b60cb5f383679ea19912bcdc49c944973a':
-        ref: 'main'
-        commit: 'sha1-f9d999b60cb5f383679ea19912bcdc49c944973a'
-        owner_id: 6759885
-        repo_id: 1275649586
     'hyperpolymath/deed-ecosystem@main':
         ref: 'main'
         commit: 'sha1-ed83d6927e8fb21431e403dbf6d7a4af96772746'
         owner_id: 6759885
         repo_id: 1275649586
-    'hyperpolymath/k9-ecosystem@2155aa26a21758f2ba119f61bc7e0e1981c106fb':
-        ref: 'main'
-        commit: 'sha1-2155aa26a21758f2ba119f61bc7e0e1981c106fb'
-        owner_id: 6759885
-        repo_id: 1275650185
     'hyperpolymath/k9-ecosystem@main':
         ref: 'main'
         commit: 'sha1-c1a34884054fabf0e9de81dbf68f4ba7874e85f1'

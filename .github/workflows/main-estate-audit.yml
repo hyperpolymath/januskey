@@ -1,9 +1,22 @@
-# This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# Central estate audit (hyperpolymath/cicd-suite). PERIODIC tier under the
-# standards CI signal discipline: push to main, weekly, or on demand; never on
-# pull_request, and never a required check (standards config/rulesets/gates.json).
 name: Central Estate CI/CD Audit
+
+# Thin caller of the estate audit, which lives in hyperpolymath/cicd-suite as
+# a reusable workflow and reports five component checks: governance,
+# hygiene, manifests, languages, advisory. Do not copy the audit's steps in
+# here. A copy freezes this repository at whatever cicd-suite commit its
+# actions.lock happened to hold, and fixes made upstream never arrive.
+#
+# PERIODIC tier under the standards CI signal discipline: push to main,
+# weekly, or on demand; never on pull_request, and never a required check
+# (standards config/rulesets/gates.json).
+#
+# ⚠ DE-ONBOARDED from actions.lock, deliberately, like the secret-scanner
+# caller. A reusable workflow onboarded cross-repo startup-fails with zero
+# jobs under sha_pinning_required (see the header of cicd-suite's
+# main-estate-audit.yml). Do not run a full-directory `gh actions-lock` that
+# re-onboards this file. If one does, cicd-suite/scripts/deonboard-estate-audit.sh
+# reverses it.
 
 on:
   push:
@@ -16,86 +29,18 @@ permissions:
   contents: read
 
 jobs:
-  estate-audit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7.0.1
-      
-      - name: Required Files Gate
-        uses: hyperpolymath/cicd-suite/actions/required-files-check@main
-        
-      - name: Code Hygiene Gate
-        uses: hyperpolymath/cicd-suite/actions/code-hygiene-check@main
-        
-      - name: Manifest Validation Gate
-        uses: hyperpolymath/cicd-suite/actions/manifest-check@main
-        
-      - name: Idris2 ABI Purity Gate
-        uses: hyperpolymath/cicd-suite/actions/idris2-abi-check@main
-        
-      - name: Zig UnifiedApiAdapter API Gate
-        uses: hyperpolymath/cicd-suite/actions/zig-unified-api-adapter-check@main
-        
-      - name: Contractile Validation Gate
-        uses: hyperpolymath/cicd-suite/actions/contractile-validation-check@main
-        
-      - name: Recipes Set Validation Gate
-        uses: hyperpolymath/cicd-suite/actions/recipes-set-check@main
-        
-      - name: Affirmation Document Gate
-        uses: hyperpolymath/cicd-suite/actions/affirmation-check@main
-        
-      - name: Academic Referencing Gate
-        uses: hyperpolymath/cicd-suite/actions/referencing-check@main
-        
-      - name: Semantic Audit Gate
-        uses: hyperpolymath/cicd-suite/actions/semantic-audit-check@main
-        
-      - name: SPDX License Gate
-        uses: hyperpolymath/cicd-suite/actions/spdx-license-check@main
-        
-      - name: Proof Runner Gate
-        uses: hyperpolymath/cicd-suite/actions/proof-runner-check@main
-        
-      - name: PRAT Testing Gate
-        uses: hyperpolymath/cicd-suite/actions/prat-check@main
-        
-      - name: Panic Attack & Pons Gate
-        uses: hyperpolymath/cicd-suite/actions/custom-tools-check@main
-        
-      - name: WWW & Well-Known Compliance Gate
-        uses: hyperpolymath/cicd-suite/actions/www-compliance-check@main
-        
-      - name: BoJ Cartridge Validation Gate
-        uses: hyperpolymath/cicd-suite/actions/boj-cartridge-check@main
-        
-      - name: Formatting Validation Gate
-        uses: hyperpolymath/cicd-suite/actions/formatting-check@main
-        
-      - name: Accreditations & Badges Gate
-        uses: hyperpolymath/cicd-suite/actions/badges-check@main
-        
-      - name: Metrics Extraction Gate
-        uses: hyperpolymath/cicd-suite/actions/metrics-check@main
-        
-      - name: Linguist & Banned Languages Gate
-        uses: hyperpolymath/cicd-suite/actions/linguist-check@main
-        
-      - name: Test & Benchmarks Dashboard Gate
-        uses: hyperpolymath/cicd-suite/actions/tests-benches-check@main
-        
-      - name: Hosting & Site Status Gate
-        uses: hyperpolymath/cicd-suite/actions/hosting-check@main
-        
-      - name: Git-Sea Analytics Gate
-        uses: hyperpolymath/cicd-suite/actions/gitsea-check@main
-        
-      - name: Trust & Humans Validation Gate
-        uses: hyperpolymath/cicd-suite/actions/trust-humans-check@main
-        
-      - name: Are We UnAPI Gate (Secret Scanning)
-        uses: hyperpolymath/cicd-suite/actions/secrets-check@main
-        
-      - name: Reasonably Good Token Validation Gate
-        uses: hyperpolymath/cicd-suite/actions/vaulted-tokens-check@main
+  estate:
+    uses: hyperpolymath/cicd-suite/.github/workflows/main-estate-audit.yml@b17ec1af1bbf097d77a58ac3363c4cf5db4d7f4a # cicd-suite main, 2026-10-19 (#55)
+    with:
+      # audits/assail-classifications.a2ml is panic-attack's suppression
+      # registry, read from that fixed path; it is not a DEED manifest. A list
+      # replaces the validator's defaults, so they are repeated here first.
+      manifest-deed-paths-ignore: |
+        vendor/
+        vendored/
+        verified-container-spec/
+        .audittraining/
+        integration/fixtures/
+        test/fixtures/
+        tests/fixtures/
+        audits/assail-classifications.a2ml
