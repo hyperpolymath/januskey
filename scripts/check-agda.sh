@@ -11,7 +11,9 @@ prover="${AGDA:-agda}"
 bash scripts/fetch-siblings.sh
 flags=(--safe --without-K --no-libraries --ignore-interfaces --double-check
        -i verification/proofs/agda -i _build/dependencies/resource-algebra/src)
-"$prover" "${flags[@]}" verification/proofs/agda/Reversibility.agda
+for module in Reversibility TransactionAtomicity; do
+  "$prover" "${flags[@]}" "verification/proofs/agda/$module.agda"
+done
 mkdir -p _build/check-logs
 shopt -s nullglob
 rejects=(tests/reject-agda/*.agda)
