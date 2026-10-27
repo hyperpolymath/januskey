@@ -79,7 +79,7 @@ INTERFACES & RESEARCH
   MPR Methodology                   ████░░░░░░  ~40%   Design documented; FORMAL PROOFS PENDING
                                                         (Idris2 ABI typechecks; 11 proofs checked: ABI, grade and transaction-model
                                                         lemmas, not the security obligations; MPR not linked to the Rust)
-  Testing (READINESS matrix)        ██████░░░░  ~60%   134 tests + 5 benches; missing fuzz, mutation,
+  Testing (READINESS matrix)        ██████░░░░  ~60%   135 tests + 5 benches; missing fuzz, mutation,
                                                         chaos, compatibility (Grade D)
 
 REPO INFRASTRUCTURE

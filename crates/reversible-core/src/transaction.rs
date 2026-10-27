@@ -117,10 +117,26 @@ fn unique_tmp_path(path: &Path) -> PathBuf {
     PathBuf::from(tmp)
 }
 
-/// Create the temporary file, failing if it exists: never truncate or adopt a
-/// file another writer may be using. If `like` exists, the new file takes its
-/// permissions straight away, before any content is written, so a log
-/// restricted to its owner is never readable by others through its copy.
+/// Open the temporary file, failing if it exists: never truncate or adopt a
+/// file another writer may be using. On Unix, if `like` exists the file is
+/// created with its mode (less whatever the umask clears), so at no instant is
+/// it more readable than `like`; a descriptor opened in some earlier window
+/// could otherwise outlive a later `chmod` and read the content written after.
+fn open_tmp(tmp: &Path, like: &Path) -> std::io::Result<fs::File> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    if let Ok(existing) = fs::metadata(like) {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        options.mode(existing.permissions().mode() & 0o7777);
+    }
+    #[cfg(not(unix))]
+    let _ = like;
+    options.open(tmp)
+}
+
+/// Create the temporary file with the permissions of `like`, exactly, before
+/// any content is written (see [`open_tmp`]).
 ///
 /// # Errors
 ///
@@ -128,10 +144,7 @@ fn unique_tmp_path(path: &Path) -> PathBuf {
 /// or its permissions cannot be set. On a permissions error the file created
 /// here is removed.
 fn create_tmp(tmp: &Path, like: &Path) -> std::io::Result<fs::File> {
-    let file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(tmp)?;
+    let file = open_tmp(tmp, like)?;
     if let Ok(existing) = fs::metadata(like) {
         if let Err(e) = file.set_permissions(existing.permissions()) {
             let _ = fs::remove_file(tmp);
@@ -666,6 +679,26 @@ mod tests {
         fs::write(&taken, b"another writer's bytes").expect("plant");
         assert!(create_tmp(&taken, &dir.path().join("transactions.json")).is_err());
         assert_eq!(fs::read(&taken).expect("read"), b"another writer's bytes");
+    }
+
+    /// T-5: the temporary file is created with the log's mode at the `open`
+    /// itself, so a restricted log is never exposed through its copy even for
+    /// an instant. This sees the file before any permissions call. It tells the
+    /// two apart only when the umask leaves owner read-write (the usual 022).
+    #[cfg(unix)]
+    #[test]
+    fn the_temporary_file_is_opened_with_the_logs_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().join("transactions.json");
+        fs::write(&path, b"{}").expect("existing log");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).expect("chmod");
+
+        let file = open_tmp(&dir.path().join("transactions.json.new.tmp"), &path).expect("open");
+
+        let mode = file.metadata().expect("stat").permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "owner-only from the open, before any chmod");
     }
 
     /// T-5: a save that cannot create its temporary file (the name is another
