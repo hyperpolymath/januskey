@@ -800,6 +800,16 @@ fn cmd_commit(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Undo the active transaction in `dir` in reverse order, then mark it rolled back.
+///
+/// Operations already recorded as undone are skipped on retry. On success,
+/// print a summary; its operation count includes those skipped operations.
+///
+/// # Errors
+///
+/// Propagates errors opening the repository, undoing operations or saving the
+/// final transaction state, and errors if no transaction is active. An undo or
+/// final save error leaves the transaction active; completed undos remain applied.
 fn cmd_rollback(dir: &Path) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
@@ -810,8 +820,16 @@ fn cmd_rollback(dir: &Path) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("No active transaction"))?
         .clone();
 
-    // Undo operations in reverse order (Theorem 3.4: Sequential Reversibility)
+    // Undo operations in reverse order (Theorem 3.4: Sequential Reversibility).
+    //
+    // Resumable: an undo that fails leaves the transaction Active with the later
+    // operations already undone, so a retry must skip those and carry on from the
+    // operation that failed (PROOF-NEEDS T-4). Without this the retry stops at
+    // the first, already undone, operation and the rollback can never finish.
     for op_id in active_tx.operation_ids.iter().rev() {
+        if jk.metadata_store.get(op_id).is_some_and(|op| op.undone) {
+            continue;
+        }
         let mut executor = OperationExecutor::new(&jk.content_store, &mut jk.metadata_store);
         executor.undo(op_id)?;
     }

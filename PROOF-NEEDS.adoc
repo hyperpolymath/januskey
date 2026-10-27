@@ -70,10 +70,11 @@ tables must agree.
 | T-1 | Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute (the sequential Theorem 3.4) | PROVEN | `+TransactionAtomicity.rollback-restores+`; `+tests/reject-agda/ForwardRollback.agda+` refused
 | T-2 | begin, add_operation, commit and mark_rolled_back each preserve the log invariant (given a fresh id for begin) and rewrite only the Active transaction, so a completed one is never modified | PROVEN | `+TransactionAtomicity.lifecycle-preserves-good+`; `+tests/reject-agda/CommitWhenIdle.agda+` refused
 | T-3 | At most one transaction is Active, and exactly one when the active pointer is set | PROVEN | `+TransactionAtomicity.at-most-one-active+`
-| T-4 | A rollback that fails part-way can be retried to completion | OPEN | reproduced 2026-10-26 with the real `+jk+`: after one undo error the repaired retry stops at the first, already undone, operation and the transaction stays Active (`+cmd_rollback+`, `+?+` on `+undo+`)
-| T-5 | The transaction log survives an I/O failure or a crash during save without disagreeing with memory or being corrupted | OPEN | by inspection, not reproduced: begin, add_operation and commit mutate the in-memory log before `+save()?+`, and `+save+` is a plain `+fs::write+`
+| T-4 | A rollback that fails part-way can be retried to completion | TESTED | `+rollback_resume_test+` drives the real `+jk+`: after one undo error and a repair, `+jk rollback+` skips the already undone operation and finishes (before the fix the retry stopped at it every time, reproduced 2026-10-26); fixed in `+cmd_rollback+`
+| T-5 | The transaction log is never left disagreeing with memory by a failed save, and is replaced by write, fsync and rename (a uniquely named temporary file, the old file's permissions kept) rather than overwritten in place | TESTED | `+transaction::tests::failed_save_*+`: a save that fails at the final step leaves begin, add_operation, commit and rollback unapplied in memory; mutants (memory first, plain `+fs::write+`, no temp cleanup, shared temp name, truncating open, no permission copy) each fail a test. Not claimed: crash-safety of the rename itself is by construction, not crash-injected; the directory fsync is best effort, because failing the save after the rename would leave disk new and memory old; concurrent writers are out of scope (each save's content is intact, the last rename wins)
 | T-6 | A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1; single steps are TESTED by `+execute_then_undo_is_identity+`) | ASSUMED | not checked for the failure path
 | T-7 | Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) | ASSUMED | probabilistic, not checked
+| T-8 | The operation metadata log is saved atomically, and an undo whose `+mark_undone+` fails to persist can be retried | OPEN | by inspection: `+MetadataStore::save+` is the same plain `+fs::write+`; `+undo+` runs the undo, then `+mark_undone+` persists, so a failed persist leaves the file undone but the log not
 |===
 
 Removed, with the reason recorded beside the replacement in source:
@@ -137,7 +138,7 @@ attestations undermine trust
 |Content store integrity |Content-addressed storage never returns wrong
 content |Hash collisions or bugs corrupt stored data
 
-|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the partial-rollback, I/O-failure and id-freshness gaps are T-4 to T-7)
+|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed and the metadata log, T-8, is open)
 |Partial transactions corrupt state
 
 |reversible-core |Undo/redo preserves data integrity |Core crate used by
@@ -188,13 +189,20 @@ the status table above.
 |A-4: A linearly held library handle cannot be forgotten |TESTED |`tests/reject-idris/ForgottenClose.idr::ForgottenClose` |`bash scripts/check-idris-reject.sh ForgottenClose`
 |A-5: A status code the header does not define never decodes as Ok |TESTED |`tests/reject-idris/UnknownStatusIsOk.idr::UnknownStatusIsOk` |`bash scripts/check-idris-reject.sh UnknownStatusIsOk`
 |src/abi uses no proof bypass: no believe_me, assert_total, assert_smaller, partial, postulate, sorry or holes |TESTED |`tests/aspect/cross_cutting_test.sh::No holes in proofs` |`bash tests/aspect/cross_cutting_test.sh`
+|T-4: After a rollback fails part-way and the cause is repaired, `jk rollback` skips the operations already undone and completes (the retry used to stop at the first, already undone, operation) |TESTED |`crates/januskey-cli/tests/rollback_resume_test.rs::rollback_retry_completes_after_a_partial_failure` |`cargo test --locked -p januskey --test rollback_resume_test rollback_retry_completes_after_a_partial_failure`
+|T-4: The retry does not undo an already undone operation a second time, so later edits to its file survive |TESTED |`crates/januskey-cli/tests/rollback_resume_test.rs::rollback_does_not_undo_an_operation_twice` |`cargo test --locked -p januskey --test rollback_resume_test rollback_does_not_undo_an_operation_twice`
+|T-5: A begin whose save fails is not applied in memory, and can be retried |TESTED |`crates/reversible-core/src/transaction.rs::failed_save_leaves_begin_unapplied` |`cargo test --locked -p reversible-core --lib failed_save_leaves_begin_unapplied`
+|T-5: An add_operation whose save fails is not applied in memory, and the retry records it exactly once on disk |TESTED |`crates/reversible-core/src/transaction.rs::failed_save_leaves_add_operation_unapplied` |`cargo test --locked -p reversible-core --lib failed_save_leaves_add_operation_unapplied`
+|T-5: A commit or rollback whose save fails leaves the transaction Active, and the retry settles it |TESTED |`crates/reversible-core/src/transaction.rs::failed_save_leaves_commit_and_rollback_unapplied` |`cargo test --locked -p reversible-core --lib failed_save_leaves_commit_and_rollback_unapplied`
+|T-5: A save replaces the log by rename, leaves no temporary file, and ignores a torn temporary file from an earlier crash |TESTED |`crates/reversible-core/src/transaction.rs::save_replaces_atomically_and_leaves_no_temporary_file` |`cargo test --locked -p reversible-core --lib save_replaces_atomically_and_leaves_no_temporary_file`
+|T-5: Two saves never share a temporary file, and the open refuses one that exists, so a writer cannot truncate, rename or delete another's |TESTED |`crates/reversible-core/src/transaction.rs::each_save_uses_its_own_temporary_file` |`cargo test --locked -p reversible-core --lib each_save_uses_its_own_temporary_file`
+|T-5: A save keeps the permissions of the log it replaces (rename would otherwise widen a 0640 log to the umask default) |TESTED |`crates/reversible-core/src/transaction.rs::save_preserves_the_logs_permissions` |`cargo test --locked -p reversible-core --lib save_preserves_the_logs_permissions`
 |G-2: The Idris2 IsCNO / ReversibleOp pair corresponds to the Agda ReversiblePair (by transcription) |ASSUMED |`verification/proofs/agda/Reversibility.agda` |-
 |X-1: Hash one-wayness and physical erasure (cryptographic and physical assumptions) |ASSUMED |`src/abi/JanusKey/ABI/Proofs.idr` |-
 |G-3: The FFI bridge preserves grade 𝟙 (a homomorphism; resource-algebra lists homomorphisms as OPEN) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
 |E-1: An attacker cannot recover obliterated content or use a revoked key (adversaryCannotKnow holds only by construction of the model) |OPEN |`src/abi/JanusKey/ABI/Types.idr` |-
 |The six security obligations under "What Needs Proving" (obliteration, key derivation, attestation chain, content store, transaction atomicity, reversible-core) are proved |OPEN |`PROOF-NEEDS.adoc` |-
-|T-4: A rollback that fails part-way can be retried to completion (reproduced 2026-10-26: after one undo error the repaired `jk rollback` stops at the first, already undone, operation and the transaction stays Active) |OPEN |`crates/januskey-cli/src/main.rs` |-
-|T-5: The transaction log survives an I/O failure or a crash during save without disagreeing with memory or being corrupted (by inspection: the log is mutated before `save()?`, and `save` is a plain `fs::write`) |OPEN |`crates/reversible-core/src/transaction.rs` |-
+|T-8: The operation metadata log is saved atomically, and an undo whose `+mark_undone+` fails to persist can be retried (by inspection: `+MetadataStore::save+` is a plain `+fs::write+`) |OPEN |`crates/reversible-core/src/metadata.rs` |-
 |T-6: A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1) |ASSUMED |`crates/januskey-cli/src/operations.rs` |-
 |T-7: Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) |ASSUMED |`crates/reversible-core/src/transaction.rs` |-
 |Every operation is reversible (MPR), as a theorem linked to the Rust (needs G-2 made mechanical, and G-3) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
@@ -207,7 +215,7 @@ ABI/runtime layer (ruling 2026-10-12): kernel statements live in
 `+verification/proofs/agda/+` with siblings consumed by pin
 (`+scripts/fetch-siblings.sh+`); the ABI lives in `+src/abi/+`.
 Transaction atomicity is stated there for the model
-(`+verification/proofs/agda/TransactionAtomicity.agda+`, rows T-1 to T-3);
+(`+verification/proofs/agda/TransactionAtomicity.agda+`, rows T-1 to T-3; the Rust fixes behind T-4 and T-5 are tested, not proved);
 obliteration completeness and attestation chain integrity are still to be stated. The 225 `+unwrap()+` calls should
 be systematically replaced with proven error handling.
 

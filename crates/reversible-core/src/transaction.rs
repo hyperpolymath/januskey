@@ -13,7 +13,9 @@ use crate::error::{Result, ReversibleError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use uuid::Uuid;
 
 /// Transaction state
@@ -105,6 +107,85 @@ impl TransactionLog {
     }
 }
 
+/// Distinguishes the temporary files of saves made by one process.
+static SAVE_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// Build a sibling temporary pathname using the process ID and save sequence.
+///
+/// Does not create or reserve the path; [`create_tmp`] checks for existing files.
+fn unique_tmp_path(path: &Path) -> PathBuf {
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(format!(
+        ".{}.{}.tmp",
+        std::process::id(),
+        SAVE_SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
+    PathBuf::from(tmp)
+}
+
+/// Create the temporary file, failing if it exists: never truncate or adopt a
+/// file another writer may be using.
+///
+/// # Errors
+///
+/// Returns an I/O error if the path already exists or the file cannot be created.
+fn create_tmp(tmp: &Path) -> std::io::Result<fs::File> {
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(tmp)
+}
+
+/// Replace `path` with `content` so a reader sees the old file or the new one,
+/// never a torn write: write a uniquely named sibling temporary file, flush it
+/// to disk, then rename it over `path`. Copies the existing file's permissions
+/// when its metadata can be read; otherwise keeps the new file's permissions.
+///
+/// # Errors
+///
+/// Returns temporary-file creation, write, permission-setting, sync or rename
+/// errors, attempting to remove the temporary file on failure. Metadata lookup,
+/// cleanup and parent-directory sync errors are ignored, so success does not
+/// guarantee the rename will survive a crash.
+fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    let tmp = unique_tmp_path(path);
+
+    let written = (|| {
+        let mut file = create_tmp(&tmp)?;
+        file.write_all(content)?;
+        if let Ok(existing) = fs::metadata(path) {
+            file.set_permissions(existing.permissions())?;
+        }
+        file.sync_all()?;
+        fs::rename(&tmp, path)
+    })();
+    if written.is_err() {
+        // Best effort: nothing reads a stray temporary file, but there is no
+        // reason to leave one behind.
+        let _ = fs::remove_file(&tmp);
+    }
+    written?;
+
+    // Make the rename itself durable. This is best effort, deliberately: the
+    // rename has already happened, so failing the save here would leave the
+    // disk on the new log and memory on the old one, the disagreement this
+    // function exists to prevent. Not every platform can open a directory, and
+    // some filesystems refuse to sync one.
+    if let Ok(dir) = fs::File::open(containing_dir(path)) {
+        let _ = dir.sync_all();
+    }
+    Ok(())
+}
+
+/// The directory that holds `path`. A bare filename has the empty path as its
+/// parent, which cannot be opened, so it is the current directory.
+fn containing_dir(path: &Path) -> &Path {
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    }
+}
+
 /// Manager for transaction lifecycle (data + persistence only).
 ///
 /// Filesystem-level rollback (undoing operations) is handled by
@@ -138,17 +219,66 @@ impl TransactionManager {
         Ok(Self { path, log })
     }
 
-    /// Save the log to disk
-    fn save(&self) -> Result<()> {
+    /// Persist `next` and, only once it is on disk, make it the in-memory log.
+    ///
+    /// Creates missing parent directories. A failed save leaves the in-memory
+    /// log unchanged and does not replace the existing log file (T-5).
+    ///
+    /// # Errors
+    ///
+    /// Propagates directory creation, JSON serialisation and atomic-write errors.
+    fn persist(&mut self, next: TransactionLog) -> Result<()> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let content = serde_json::to_string_pretty(&self.log)?;
-        fs::write(&self.path, content)?;
+        let content = serde_json::to_string_pretty(&next)?;
+        write_atomic(&self.path, content.as_bytes())?;
+        self.log = next;
         Ok(())
     }
 
-    /// Begin a new transaction
+    /// Apply `f` to the active transaction of a copy of the log, optionally
+    /// clear the active pointer, persist, and return the updated transaction.
+    ///
+    /// When `settle` is true, also clears the active pointer.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::NoActiveTransaction` if the active pointer is
+    /// absent or its transaction is missing. Propagates persistence errors,
+    /// leaving the in-memory log unchanged.
+    fn update_active(
+        &mut self,
+        settle: bool,
+        f: impl FnOnce(&mut Transaction),
+    ) -> Result<Transaction> {
+        let active_id = self
+            .log
+            .active_transaction_id
+            .clone()
+            .ok_or(ReversibleError::NoActiveTransaction)?;
+        let mut next = self.log.clone();
+        let transaction = next
+            .transactions
+            .iter_mut()
+            .find(|t| t.id == active_id)
+            .ok_or(ReversibleError::NoActiveTransaction)?;
+        f(transaction);
+        let result = transaction.clone();
+        if settle {
+            next.active_transaction_id = None;
+        }
+        self.persist(next)?;
+        Ok(result)
+    }
+
+    /// Begin and persist a new active transaction, returning its stored record.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::TransactionActive` if an active pointer is already
+    /// set. Propagates JSON serialisation and I/O errors without changing the
+    /// in-memory log.
     pub fn begin(&mut self, name: Option<String>) -> Result<&Transaction> {
         if let Some(ref active_id) = self.log.active_transaction_id {
             return Err(ReversibleError::TransactionActive(active_id.clone()));
@@ -156,9 +286,10 @@ impl TransactionManager {
 
         let transaction = Transaction::new(name);
         let id = transaction.id.clone();
-        self.log.transactions.push(transaction);
-        self.log.active_transaction_id = Some(id);
-        self.save()?;
+        let mut next = self.log.clone();
+        next.transactions.push(transaction);
+        next.active_transaction_id = Some(id);
+        self.persist(next)?;
 
         // SAFETY: We just pushed a transaction above, so last() is guaranteed Some
         Ok(self
@@ -182,40 +313,48 @@ impl TransactionManager {
         self.log.transactions.iter_mut().find(|t| t.id == active_id)
     }
 
-    /// Add operation to active transaction
+    /// Append an operation ID to the active transaction and persist the log.
+    ///
+    /// IDs are recorded in the supplied order without validation or deduplication.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::NoActiveTransaction` if no active transaction is
+    /// found. Propagates JSON serialisation and I/O errors without changing the
+    /// in-memory log.
     pub fn add_operation(&mut self, operation_id: String) -> Result<()> {
-        let transaction = self
-            .active_mut()
-            .ok_or(ReversibleError::NoActiveTransaction)?;
-        transaction.add_operation(operation_id);
-        self.save()
+        self.update_active(false, |t| t.add_operation(operation_id))
+            .map(|_| ())
     }
 
-    /// Commit the active transaction (marks state only — no filesystem effects)
+    /// Commit the active transaction and return its completed record.
+    ///
+    /// Persists the completion time and clears the active pointer. The recorded
+    /// file operations are left as they are.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::NoActiveTransaction` if no active transaction is
+    /// found. Propagates JSON serialisation and I/O errors without changing the
+    /// in-memory log.
     pub fn commit(&mut self) -> Result<Transaction> {
-        let transaction = self
-            .active_mut()
-            .ok_or(ReversibleError::NoActiveTransaction)?;
-        transaction.commit();
-        let result = transaction.clone();
-        self.log.active_transaction_id = None;
-        self.save()?;
-        Ok(result)
+        self.update_active(true, Transaction::commit)
     }
 
     /// Mark the active transaction as rolled back (state only).
     ///
     /// The caller is responsible for actually undoing the operations
     /// via the appropriate executor before calling this.
+    /// Persists the completion time, clears the active pointer and returns the
+    /// completed transaction record.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::NoActiveTransaction` if no active transaction is
+    /// found. Propagates JSON serialisation and I/O errors without changing the
+    /// in-memory log; any undos performed by the caller remain applied.
     pub fn mark_rolled_back(&mut self) -> Result<Transaction> {
-        let transaction = self
-            .active_mut()
-            .ok_or(ReversibleError::NoActiveTransaction)?;
-        transaction.rollback();
-        let result = transaction.clone();
-        self.log.active_transaction_id = None;
-        self.save()?;
-        Ok(result)
+        self.update_active(true, Transaction::rollback)
     }
 
     /// Get transaction by ID
@@ -318,6 +457,226 @@ mod tests {
         assert_eq!(tx.state, TransactionState::Committed);
         assert_eq!(tx.operation_ids.len(), 2);
         assert!(!manager.has_active());
+    }
+
+    /// Make the save fail at its last step, on every platform and for root too:
+    /// plant a non-empty directory where the log file goes, so the temporary
+    /// file is written but the rename over it is refused.
+    fn break_log_file(path: &std::path::Path) {
+        let _ = fs::remove_file(path);
+        fs::create_dir_all(path).expect("failed to plant a directory over the log");
+        fs::write(path.join("blocker"), b"x").expect("failed to fill the planted directory");
+    }
+
+    /// The temporary files in `dir`: anything a save could have left behind.
+    fn temporary_files(dir: &std::path::Path) -> Vec<String> {
+        fs::read_dir(dir)
+            .expect("failed to list the log directory")
+            .map(|entry| {
+                entry
+                    .expect("dir entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .filter(|name| name.ends_with(".tmp"))
+            .collect()
+    }
+
+    fn repair_log_file(path: &std::path::Path) {
+        assert_eq!(
+            temporary_files(path.parent().expect("log has a parent")),
+            Vec::<String>::new(),
+            "a failed save must not leave its temporary file behind"
+        );
+        fs::remove_dir_all(path).expect("failed to remove the planted directory");
+    }
+
+    /// A bare filename's directory is `.`, not the unopenable empty path.
+    #[test]
+    fn containing_dir_of_a_bare_filename_is_the_current_directory() {
+        assert_eq!(
+            containing_dir(Path::new("transactions.json")),
+            Path::new(".")
+        );
+        assert_eq!(
+            containing_dir(Path::new("a/transactions.json")),
+            Path::new("a")
+        );
+        assert_eq!(
+            containing_dir(Path::new("/transactions.json")),
+            Path::new("/")
+        );
+        assert!(fs::File::open(containing_dir(Path::new("transactions.json"))).is_ok());
+    }
+
+    /// T-5: a begin whose save fails changes nothing in memory and can be retried.
+    #[test]
+    fn failed_save_leaves_begin_unapplied() {
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let dir = tmp.path().join("state");
+        let mut manager = TransactionManager::new(dir.join("transactions.json"))
+            .expect("failed to create transaction manager");
+
+        break_log_file(&dir.join("transactions.json"));
+        assert!(manager.begin(Some("t".to_string())).is_err());
+        assert!(!manager.has_active(), "a failed begin must not activate");
+        assert!(manager.all().is_empty(), "a failed begin must not record");
+
+        repair_log_file(&dir.join("transactions.json"));
+        manager.begin(Some("t".to_string())).expect("retry begin");
+        assert_eq!(manager.all().len(), 1);
+    }
+
+    /// T-5: an add_operation whose save fails is not recorded in memory, and the
+    /// retry records it exactly once, in memory and on disk.
+    #[test]
+    fn failed_save_leaves_add_operation_unapplied() {
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let dir = tmp.path().join("state");
+        let path = dir.join("transactions.json");
+        let mut manager = TransactionManager::new(path.clone()).expect("new manager");
+        manager.begin(None).expect("begin");
+        manager.add_operation("op-1".to_string()).expect("op-1");
+
+        break_log_file(&dir.join("transactions.json"));
+        assert!(manager.add_operation("op-2".to_string()).is_err());
+        let ops = &manager.active().expect("still active").operation_ids;
+        assert_eq!(
+            ops,
+            &["op-1".to_string()],
+            "a failed save must not record op-2"
+        );
+
+        repair_log_file(&dir.join("transactions.json"));
+        manager
+            .add_operation("op-2".to_string())
+            .expect("retry op-2");
+        let reloaded = TransactionManager::new(path).expect("reload");
+        assert_eq!(
+            reloaded.active().expect("active on disk").operation_ids,
+            ["op-1".to_string(), "op-2".to_string()],
+            "memory and disk agree, op-2 recorded exactly once"
+        );
+    }
+
+    /// T-5: a commit or rollback whose save fails leaves the transaction Active,
+    /// and the retry settles it.
+    #[test]
+    fn failed_save_leaves_commit_and_rollback_unapplied() {
+        for commit in [true, false] {
+            let tmp = TempDir::new().expect("failed to create temp dir");
+            let dir = tmp.path().join("state");
+            let mut manager =
+                TransactionManager::new(dir.join("transactions.json")).expect("new manager");
+            manager.begin(None).expect("begin");
+            manager.add_operation("op-1".to_string()).expect("op-1");
+
+            break_log_file(&dir.join("transactions.json"));
+            let settled = if commit {
+                manager.commit()
+            } else {
+                manager.mark_rolled_back()
+            };
+            assert!(settled.is_err());
+            assert!(manager.has_active(), "a failed save must leave it Active");
+            assert_eq!(
+                manager.active().expect("active").state,
+                TransactionState::Active
+            );
+
+            repair_log_file(&dir.join("transactions.json"));
+            let tx = if commit {
+                manager.commit()
+            } else {
+                manager.mark_rolled_back()
+            }
+            .expect("retry settles");
+            assert_eq!(
+                tx.state,
+                if commit {
+                    TransactionState::Committed
+                } else {
+                    TransactionState::RolledBack
+                }
+            );
+            assert!(!manager.has_active());
+        }
+    }
+
+    /// T-5: a save replaces the log by rename, leaves no temporary file, and is
+    /// not confused by a torn temporary file left by an earlier crash.
+    #[test]
+    fn save_replaces_atomically_and_leaves_no_temporary_file() {
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let path = tmp.path().join("transactions.json");
+        // A torn temporary file left by an earlier crash must not matter, and
+        // must not be touched: it may belong to a save still in flight.
+        let stale = "transactions.json.99999.0.tmp";
+        fs::write(tmp.path().join(stale), b"{ torn").expect("plant stale tmp");
+
+        let mut manager = TransactionManager::new(path.clone()).expect("new manager");
+        manager.begin(None).expect("begin");
+        manager.add_operation("op-1".to_string()).expect("op-1");
+
+        assert_eq!(
+            temporary_files(tmp.path()),
+            [stale.to_string()],
+            "every save's own temporary file is renamed away"
+        );
+        assert_eq!(
+            fs::read(tmp.path().join(stale)).expect("stale file"),
+            b"{ torn"
+        );
+        let reloaded = TransactionManager::new(path).expect("log parses after saves");
+        assert_eq!(
+            reloaded.active().expect("active").operation_ids,
+            ["op-1".to_string()]
+        );
+    }
+
+    /// T-5: two saves never share a temporary file, so one writer cannot
+    /// truncate, rename or delete the file another is still writing.
+    #[test]
+    fn each_save_uses_its_own_temporary_file() {
+        let path = std::path::Path::new("dir/transactions.json");
+        let (a, b) = (unique_tmp_path(path), unique_tmp_path(path));
+        assert_ne!(a, b);
+        for tmp in [&a, &b] {
+            assert_eq!(
+                tmp.parent(),
+                path.parent(),
+                "a sibling, so the rename is atomic"
+            );
+            assert!(tmp.to_string_lossy().ends_with(".tmp"));
+        }
+
+        // And the open refuses to adopt a file that is already there.
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let taken = dir.path().join("taken.tmp");
+        fs::write(&taken, b"another writer's bytes").expect("plant");
+        assert!(create_tmp(&taken).is_err());
+        assert_eq!(fs::read(&taken).expect("read"), b"another writer's bytes");
+    }
+
+    /// T-5: replacing the log by rename keeps the permissions of the log it
+    /// replaces; an in-place write did, and a fresh file would silently widen them.
+    #[cfg(unix)]
+    #[test]
+    fn save_preserves_the_logs_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let path = tmp.path().join("transactions.json");
+        let mut manager = TransactionManager::new(path.clone()).expect("new manager");
+        manager.begin(None).expect("begin");
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).expect("chmod");
+        manager.add_operation("op-1".to_string()).expect("op-1");
+        manager.commit().expect("commit");
+
+        let mode = fs::metadata(&path).expect("stat").permissions().mode() & 0o777;
+        assert_eq!(mode, 0o640, "saves keep the log's mode");
     }
 
     #[test]
