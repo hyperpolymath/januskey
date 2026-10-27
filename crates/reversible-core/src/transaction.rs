@@ -13,7 +13,8 @@ use crate::error::{Result, ReversibleError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 /// Transaction state
@@ -105,6 +106,36 @@ impl TransactionLog {
     }
 }
 
+/// Replace `path` with `content` so a reader sees the old file or the new one,
+/// never a torn write: write a sibling temporary file, flush it to disk, then
+/// rename it over `path`.
+fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+
+    let written = (|| {
+        let mut file = fs::File::create(&tmp)?;
+        file.write_all(content)?;
+        file.sync_all()?;
+        fs::rename(&tmp, path)
+    })();
+    if written.is_err() {
+        // Best effort: a stale temporary file is harmless (the next save
+        // truncates it) but there is no reason to leave it behind.
+        let _ = fs::remove_file(&tmp);
+    }
+    written?;
+
+    // Make the rename itself durable. Not every platform can open a directory.
+    if let Some(parent) = path.parent() {
+        if let Ok(dir) = fs::File::open(parent) {
+            let _ = dir.sync_all();
+        }
+    }
+    Ok(())
+}
+
 /// Manager for transaction lifecycle (data + persistence only).
 ///
 /// Filesystem-level rollback (undoing operations) is handled by
@@ -138,14 +169,45 @@ impl TransactionManager {
         Ok(Self { path, log })
     }
 
-    /// Save the log to disk
-    fn save(&self) -> Result<()> {
+    /// Persist `next` and, only once it is on disk, make it the in-memory log.
+    ///
+    /// Every mutator builds its successor log on a copy and ends here, so a
+    /// failed save leaves memory and disk both at the previous log (T-5).
+    fn persist(&mut self, next: TransactionLog) -> Result<()> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let content = serde_json::to_string_pretty(&self.log)?;
-        fs::write(&self.path, content)?;
+        let content = serde_json::to_string_pretty(&next)?;
+        write_atomic(&self.path, content.as_bytes())?;
+        self.log = next;
         Ok(())
+    }
+
+    /// Apply `f` to the active transaction of a copy of the log, optionally
+    /// clear the active pointer, persist, and return the updated transaction.
+    fn update_active(
+        &mut self,
+        settle: bool,
+        f: impl FnOnce(&mut Transaction),
+    ) -> Result<Transaction> {
+        let active_id = self
+            .log
+            .active_transaction_id
+            .clone()
+            .ok_or(ReversibleError::NoActiveTransaction)?;
+        let mut next = self.log.clone();
+        let transaction = next
+            .transactions
+            .iter_mut()
+            .find(|t| t.id == active_id)
+            .ok_or(ReversibleError::NoActiveTransaction)?;
+        f(transaction);
+        let result = transaction.clone();
+        if settle {
+            next.active_transaction_id = None;
+        }
+        self.persist(next)?;
+        Ok(result)
     }
 
     /// Begin a new transaction
@@ -156,9 +218,10 @@ impl TransactionManager {
 
         let transaction = Transaction::new(name);
         let id = transaction.id.clone();
-        self.log.transactions.push(transaction);
-        self.log.active_transaction_id = Some(id);
-        self.save()?;
+        let mut next = self.log.clone();
+        next.transactions.push(transaction);
+        next.active_transaction_id = Some(id);
+        self.persist(next)?;
 
         // SAFETY: We just pushed a transaction above, so last() is guaranteed Some
         Ok(self
@@ -184,23 +247,13 @@ impl TransactionManager {
 
     /// Add operation to active transaction
     pub fn add_operation(&mut self, operation_id: String) -> Result<()> {
-        let transaction = self
-            .active_mut()
-            .ok_or(ReversibleError::NoActiveTransaction)?;
-        transaction.add_operation(operation_id);
-        self.save()
+        self.update_active(false, |t| t.add_operation(operation_id))
+            .map(|_| ())
     }
 
     /// Commit the active transaction (marks state only — no filesystem effects)
     pub fn commit(&mut self) -> Result<Transaction> {
-        let transaction = self
-            .active_mut()
-            .ok_or(ReversibleError::NoActiveTransaction)?;
-        transaction.commit();
-        let result = transaction.clone();
-        self.log.active_transaction_id = None;
-        self.save()?;
-        Ok(result)
+        self.update_active(true, Transaction::commit)
     }
 
     /// Mark the active transaction as rolled back (state only).
@@ -208,14 +261,7 @@ impl TransactionManager {
     /// The caller is responsible for actually undoing the operations
     /// via the appropriate executor before calling this.
     pub fn mark_rolled_back(&mut self) -> Result<Transaction> {
-        let transaction = self
-            .active_mut()
-            .ok_or(ReversibleError::NoActiveTransaction)?;
-        transaction.rollback();
-        let result = transaction.clone();
-        self.log.active_transaction_id = None;
-        self.save()?;
-        Ok(result)
+        self.update_active(true, Transaction::rollback)
     }
 
     /// Get transaction by ID
@@ -318,6 +364,134 @@ mod tests {
         assert_eq!(tx.state, TransactionState::Committed);
         assert_eq!(tx.operation_ids.len(), 2);
         assert!(!manager.has_active());
+    }
+
+    /// Make the save fail at its last step, on every platform and for root too:
+    /// plant a non-empty directory where the log file goes, so the temporary
+    /// file is written but the rename over it is refused.
+    fn break_log_file(path: &std::path::Path) {
+        let _ = fs::remove_file(path);
+        fs::create_dir_all(path).expect("failed to plant a directory over the log");
+        fs::write(path.join("blocker"), b"x").expect("failed to fill the planted directory");
+    }
+
+    fn repair_log_file(path: &std::path::Path) {
+        assert!(
+            !path.with_extension("json.tmp").exists(),
+            "a failed save must not leave its temporary file behind"
+        );
+        fs::remove_dir_all(path).expect("failed to remove the planted directory");
+    }
+
+    #[test]
+    fn failed_save_leaves_begin_unapplied() {
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let dir = tmp.path().join("state");
+        let mut manager = TransactionManager::new(dir.join("transactions.json"))
+            .expect("failed to create transaction manager");
+
+        break_log_file(&dir.join("transactions.json"));
+        assert!(manager.begin(Some("t".to_string())).is_err());
+        assert!(!manager.has_active(), "a failed begin must not activate");
+        assert!(manager.all().is_empty(), "a failed begin must not record");
+
+        repair_log_file(&dir.join("transactions.json"));
+        manager.begin(Some("t".to_string())).expect("retry begin");
+        assert_eq!(manager.all().len(), 1);
+    }
+
+    #[test]
+    fn failed_save_leaves_add_operation_unapplied() {
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let dir = tmp.path().join("state");
+        let path = dir.join("transactions.json");
+        let mut manager = TransactionManager::new(path.clone()).expect("new manager");
+        manager.begin(None).expect("begin");
+        manager.add_operation("op-1".to_string()).expect("op-1");
+
+        break_log_file(&dir.join("transactions.json"));
+        assert!(manager.add_operation("op-2".to_string()).is_err());
+        let ops = &manager.active().expect("still active").operation_ids;
+        assert_eq!(
+            ops,
+            &["op-1".to_string()],
+            "a failed save must not record op-2"
+        );
+
+        repair_log_file(&dir.join("transactions.json"));
+        manager
+            .add_operation("op-2".to_string())
+            .expect("retry op-2");
+        let reloaded = TransactionManager::new(path).expect("reload");
+        assert_eq!(
+            reloaded.active().expect("active on disk").operation_ids,
+            ["op-1".to_string(), "op-2".to_string()],
+            "memory and disk agree, op-2 recorded exactly once"
+        );
+    }
+
+    #[test]
+    fn failed_save_leaves_commit_and_rollback_unapplied() {
+        for commit in [true, false] {
+            let tmp = TempDir::new().expect("failed to create temp dir");
+            let dir = tmp.path().join("state");
+            let mut manager =
+                TransactionManager::new(dir.join("transactions.json")).expect("new manager");
+            manager.begin(None).expect("begin");
+            manager.add_operation("op-1".to_string()).expect("op-1");
+
+            break_log_file(&dir.join("transactions.json"));
+            let settled = if commit {
+                manager.commit()
+            } else {
+                manager.mark_rolled_back()
+            };
+            assert!(settled.is_err());
+            assert!(manager.has_active(), "a failed save must leave it Active");
+            assert_eq!(
+                manager.active().expect("active").state,
+                TransactionState::Active
+            );
+
+            repair_log_file(&dir.join("transactions.json"));
+            let tx = if commit {
+                manager.commit()
+            } else {
+                manager.mark_rolled_back()
+            }
+            .expect("retry settles");
+            assert_eq!(
+                tx.state,
+                if commit {
+                    TransactionState::Committed
+                } else {
+                    TransactionState::RolledBack
+                }
+            );
+            assert!(!manager.has_active());
+        }
+    }
+
+    #[test]
+    fn save_replaces_atomically_and_leaves_no_temporary_file() {
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let path = tmp.path().join("transactions.json");
+        // A torn temporary file left by an earlier crash must not matter.
+        fs::write(tmp.path().join("transactions.json.tmp"), b"{ torn").expect("plant stale tmp");
+
+        let mut manager = TransactionManager::new(path.clone()).expect("new manager");
+        manager.begin(None).expect("begin");
+        manager.add_operation("op-1".to_string()).expect("op-1");
+
+        assert!(
+            !tmp.path().join("transactions.json.tmp").exists(),
+            "the temporary file is renamed away"
+        );
+        let reloaded = TransactionManager::new(path).expect("log parses after saves");
+        assert_eq!(
+            reloaded.active().expect("active").operation_ids,
+            ["op-1".to_string()]
+        );
     }
 
     #[test]
