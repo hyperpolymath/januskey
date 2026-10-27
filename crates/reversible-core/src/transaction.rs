@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use uuid::Uuid;
 
 /// Transaction state
@@ -107,62 +106,85 @@ impl TransactionLog {
     }
 }
 
-/// Distinguishes the temporary files of saves made by one process.
-static SAVE_SEQ: AtomicU64 = AtomicU64::new(0);
-
-/// Build a sibling temporary pathname using the process ID and save sequence.
+/// Build a sibling temporary pathname that is unique to this save.
 ///
-/// Does not create or reserve the path; [`create_tmp`] checks for existing files.
+/// A random component, not a process id, so writers in different PID
+/// namespaces that share the repository cannot pick the same name. Does not
+/// create or reserve the path; [`create_tmp`] refuses one that exists.
 fn unique_tmp_path(path: &Path) -> PathBuf {
     let mut tmp = path.as_os_str().to_owned();
-    tmp.push(format!(
-        ".{}.{}.tmp",
-        std::process::id(),
-        SAVE_SEQ.fetch_add(1, Ordering::Relaxed)
-    ));
+    tmp.push(format!(".{}.tmp", Uuid::new_v4().simple()));
     PathBuf::from(tmp)
 }
 
-/// Create the temporary file, failing if it exists: never truncate or adopt a
-/// file another writer may be using.
+/// Open the temporary file, failing if it exists: never truncate or adopt a
+/// file another writer may be using. On Unix, if `like` exists the file is
+/// created with its mode (less whatever the umask clears), so at no instant is
+/// it more readable than `like`; a descriptor opened in some earlier window
+/// could otherwise outlive a later `chmod` and read the content written after.
+fn open_tmp(tmp: &Path, like: &Path) -> std::io::Result<fs::File> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    if let Ok(existing) = fs::metadata(like) {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        options.mode(existing.permissions().mode() & 0o7777);
+    }
+    #[cfg(not(unix))]
+    let _ = like;
+    options.open(tmp)
+}
+
+/// Create the temporary file with the permissions of `like`, exactly, before
+/// any content is written (see [`open_tmp`]).
 ///
 /// # Errors
 ///
-/// Returns an I/O error if the path already exists or the file cannot be created.
-fn create_tmp(tmp: &Path) -> std::io::Result<fs::File> {
-    fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(tmp)
+/// Returns an I/O error if the path already exists, the file cannot be created
+/// or its permissions cannot be set. On a permissions error the file created
+/// here is removed.
+fn create_tmp(tmp: &Path, like: &Path) -> std::io::Result<fs::File> {
+    let file = open_tmp(tmp, like)?;
+    if let Ok(existing) = fs::metadata(like) {
+        if let Err(e) = file.set_permissions(existing.permissions()) {
+            let _ = fs::remove_file(tmp);
+            return Err(e);
+        }
+    }
+    Ok(file)
 }
 
 /// Replace `path` with `content` so a reader sees the old file or the new one,
 /// never a torn write: write a uniquely named sibling temporary file, flush it
-/// to disk, then rename it over `path`. Copies the existing file's permissions
-/// when its metadata can be read; otherwise keeps the new file's permissions.
+/// to disk, then rename it over `path`. The file keeps the permissions of the
+/// one it replaces, from the moment it is created.
 ///
 /// # Errors
 ///
-/// Returns temporary-file creation, write, permission-setting, sync or rename
-/// errors, attempting to remove the temporary file on failure. Metadata lookup,
-/// cleanup and parent-directory sync errors are ignored, so success does not
-/// guarantee the rename will survive a crash.
+/// Returns temporary-file creation, write, sync or rename errors. A temporary
+/// file this call created is removed on failure; one it did not create is left
+/// alone. Cleanup and parent-directory sync errors are ignored, so success does
+/// not guarantee the rename will survive a crash.
 fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
-    let tmp = unique_tmp_path(path);
+    write_atomic_via(path, &unique_tmp_path(path), content)
+}
+
+/// [`write_atomic`] with the temporary file named by the caller.
+fn write_atomic_via(path: &Path, tmp: &Path, content: &[u8]) -> std::io::Result<()> {
+    // If this fails the name may belong to another writer's live file, so
+    // nothing is removed: only a file created by this call is cleaned up.
+    let mut file = create_tmp(tmp, path)?;
 
     let written = (|| {
-        let mut file = create_tmp(&tmp)?;
         file.write_all(content)?;
-        if let Ok(existing) = fs::metadata(path) {
-            file.set_permissions(existing.permissions())?;
-        }
         file.sync_all()?;
-        fs::rename(&tmp, path)
+        drop(file);
+        fs::rename(tmp, path)
     })();
     if written.is_err() {
         // Best effort: nothing reads a stray temporary file, but there is no
         // reason to leave one behind.
-        let _ = fs::remove_file(&tmp);
+        let _ = fs::remove_file(tmp);
     }
     written?;
 
@@ -655,8 +677,67 @@ mod tests {
         let dir = TempDir::new().expect("failed to create temp dir");
         let taken = dir.path().join("taken.tmp");
         fs::write(&taken, b"another writer's bytes").expect("plant");
-        assert!(create_tmp(&taken).is_err());
+        assert!(create_tmp(&taken, &dir.path().join("transactions.json")).is_err());
         assert_eq!(fs::read(&taken).expect("read"), b"another writer's bytes");
+    }
+
+    /// T-5: the temporary file is created with the log's mode at the `open`
+    /// itself, so a restricted log is never exposed through its copy even for
+    /// an instant. This sees the file before any permissions call. It tells the
+    /// two apart only when the umask leaves owner read-write (the usual 022).
+    #[cfg(unix)]
+    #[test]
+    fn the_temporary_file_is_opened_with_the_logs_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().join("transactions.json");
+        fs::write(&path, b"{}").expect("existing log");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).expect("chmod");
+
+        let file = open_tmp(&dir.path().join("transactions.json.new.tmp"), &path).expect("open");
+
+        let mode = file.metadata().expect("stat").permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "owner-only from the open, before any chmod");
+    }
+
+    /// T-5: a save that cannot create its temporary file (the name is another
+    /// writer's live file) fails without deleting that file or touching the log.
+    #[test]
+    fn a_save_never_removes_a_temporary_file_it_did_not_create() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().join("transactions.json");
+        let theirs = dir.path().join("transactions.json.theirs.tmp");
+        fs::write(&theirs, b"another writer's bytes").expect("plant");
+
+        assert!(write_atomic_via(&path, &theirs, b"mine").is_err());
+
+        assert_eq!(
+            fs::read(&theirs).expect("their file survives"),
+            b"another writer's bytes"
+        );
+        assert!(!path.exists(), "the failed save wrote nothing");
+    }
+
+    /// T-5: the temporary file has the log's permissions the moment it exists,
+    /// before any content is written, so a restricted log is never exposed
+    /// through its copy.
+    #[cfg(unix)]
+    #[test]
+    fn the_temporary_file_is_restricted_before_any_content_is_written() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().join("transactions.json");
+        fs::write(&path, b"{}").expect("existing log");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).expect("chmod");
+
+        let tmp = dir.path().join("transactions.json.new.tmp");
+        let file = create_tmp(&tmp, &path).expect("create");
+
+        let mode = file.metadata().expect("stat").permissions().mode() & 0o777;
+        assert_eq!(mode, 0o640, "restricted at creation");
+        assert_eq!(file.metadata().expect("stat").len(), 0, "and still empty");
     }
 
     /// T-5: replacing the log by rename keeps the permissions of the log it
