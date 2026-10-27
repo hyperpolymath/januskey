@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use uuid::Uuid;
 
 /// Transaction state
@@ -106,28 +107,57 @@ impl TransactionLog {
     }
 }
 
-/// Replace `path` with `content` so a reader sees the old file or the new one,
-/// never a torn write: write a sibling temporary file, flush it to disk, then
-/// rename it over `path`.
-fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
+/// Distinguishes the temporary files of saves made by one process.
+static SAVE_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// A sibling of `path` that no other save, in this or another process, uses.
+fn unique_tmp_path(path: &Path) -> PathBuf {
     let mut tmp = path.as_os_str().to_owned();
-    tmp.push(".tmp");
-    let tmp = PathBuf::from(tmp);
+    tmp.push(format!(
+        ".{}.{}.tmp",
+        std::process::id(),
+        SAVE_SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
+    PathBuf::from(tmp)
+}
+
+/// Create the temporary file, failing if it exists: never truncate or adopt a
+/// file another writer may be using.
+fn create_tmp(tmp: &Path) -> std::io::Result<fs::File> {
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(tmp)
+}
+
+/// Replace `path` with `content` so a reader sees the old file or the new one,
+/// never a torn write: write a uniquely named sibling temporary file, flush it
+/// to disk, then rename it over `path`. The file keeps the permissions of the
+/// one it replaces.
+fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    let tmp = unique_tmp_path(path);
 
     let written = (|| {
-        let mut file = fs::File::create(&tmp)?;
+        let mut file = create_tmp(&tmp)?;
         file.write_all(content)?;
+        if let Ok(existing) = fs::metadata(path) {
+            file.set_permissions(existing.permissions())?;
+        }
         file.sync_all()?;
         fs::rename(&tmp, path)
     })();
     if written.is_err() {
-        // Best effort: a stale temporary file is harmless (the next save
-        // truncates it) but there is no reason to leave it behind.
+        // Best effort: nothing reads a stray temporary file, but there is no
+        // reason to leave one behind.
         let _ = fs::remove_file(&tmp);
     }
     written?;
 
-    // Make the rename itself durable. Not every platform can open a directory.
+    // Make the rename itself durable. This is best effort, deliberately: the
+    // rename has already happened, so failing the save here would leave the
+    // disk on the new log and memory on the old one, the disagreement this
+    // function exists to prevent. Not every platform can open a directory, and
+    // some filesystems refuse to sync one.
     if let Ok(dir) = fs::File::open(containing_dir(path)) {
         let _ = dir.sync_all();
     }
@@ -382,9 +412,25 @@ mod tests {
         fs::write(path.join("blocker"), b"x").expect("failed to fill the planted directory");
     }
 
+    /// The temporary files in `dir`: anything a save could have left behind.
+    fn temporary_files(dir: &std::path::Path) -> Vec<String> {
+        fs::read_dir(dir)
+            .expect("failed to list the log directory")
+            .map(|entry| {
+                entry
+                    .expect("dir entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .filter(|name| name.ends_with(".tmp"))
+            .collect()
+    }
+
     fn repair_log_file(path: &std::path::Path) {
-        assert!(
-            !path.with_extension("json.tmp").exists(),
+        assert_eq!(
+            temporary_files(path.parent().expect("log has a parent")),
+            Vec::<String>::new(),
             "a failed save must not leave its temporary file behind"
         );
         fs::remove_dir_all(path).expect("failed to remove the planted directory");
@@ -508,22 +554,73 @@ mod tests {
     fn save_replaces_atomically_and_leaves_no_temporary_file() {
         let tmp = TempDir::new().expect("failed to create temp dir");
         let path = tmp.path().join("transactions.json");
-        // A torn temporary file left by an earlier crash must not matter.
-        fs::write(tmp.path().join("transactions.json.tmp"), b"{ torn").expect("plant stale tmp");
+        // A torn temporary file left by an earlier crash must not matter, and
+        // must not be touched: it may belong to a save still in flight.
+        let stale = "transactions.json.99999.0.tmp";
+        fs::write(tmp.path().join(stale), b"{ torn").expect("plant stale tmp");
 
         let mut manager = TransactionManager::new(path.clone()).expect("new manager");
         manager.begin(None).expect("begin");
         manager.add_operation("op-1".to_string()).expect("op-1");
 
-        assert!(
-            !tmp.path().join("transactions.json.tmp").exists(),
-            "the temporary file is renamed away"
+        assert_eq!(
+            temporary_files(tmp.path()),
+            [stale.to_string()],
+            "every save's own temporary file is renamed away"
+        );
+        assert_eq!(
+            fs::read(tmp.path().join(stale)).expect("stale file"),
+            b"{ torn"
         );
         let reloaded = TransactionManager::new(path).expect("log parses after saves");
         assert_eq!(
             reloaded.active().expect("active").operation_ids,
             ["op-1".to_string()]
         );
+    }
+
+    /// T-5: two saves never share a temporary file, so one writer cannot
+    /// truncate, rename or delete the file another is still writing.
+    #[test]
+    fn each_save_uses_its_own_temporary_file() {
+        let path = std::path::Path::new("dir/transactions.json");
+        let (a, b) = (unique_tmp_path(path), unique_tmp_path(path));
+        assert_ne!(a, b);
+        for tmp in [&a, &b] {
+            assert_eq!(
+                tmp.parent(),
+                path.parent(),
+                "a sibling, so the rename is atomic"
+            );
+            assert!(tmp.to_string_lossy().ends_with(".tmp"));
+        }
+
+        // And the open refuses to adopt a file that is already there.
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let taken = dir.path().join("taken.tmp");
+        fs::write(&taken, b"another writer's bytes").expect("plant");
+        assert!(create_tmp(&taken).is_err());
+        assert_eq!(fs::read(&taken).expect("read"), b"another writer's bytes");
+    }
+
+    /// T-5: replacing the log by rename keeps the permissions of the log it
+    /// replaces; an in-place write did, and a fresh file would silently widen them.
+    #[cfg(unix)]
+    #[test]
+    fn save_preserves_the_logs_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let path = tmp.path().join("transactions.json");
+        let mut manager = TransactionManager::new(path.clone()).expect("new manager");
+        manager.begin(None).expect("begin");
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).expect("chmod");
+        manager.add_operation("op-1".to_string()).expect("op-1");
+        manager.commit().expect("commit");
+
+        let mode = fs::metadata(&path).expect("stat").permissions().mode() & 0o777;
+        assert_eq!(mode, 0o640, "saves keep the log's mode");
     }
 
     #[test]
