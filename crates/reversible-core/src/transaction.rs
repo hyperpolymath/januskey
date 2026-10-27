@@ -110,7 +110,9 @@ impl TransactionLog {
 /// Distinguishes the temporary files of saves made by one process.
 static SAVE_SEQ: AtomicU64 = AtomicU64::new(0);
 
-/// A sibling of `path` that no other save, in this or another process, uses.
+/// Build a sibling temporary pathname using the process ID and save sequence.
+///
+/// Does not create or reserve the path; [`create_tmp`] checks for existing files.
 fn unique_tmp_path(path: &Path) -> PathBuf {
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(format!(
@@ -123,6 +125,10 @@ fn unique_tmp_path(path: &Path) -> PathBuf {
 
 /// Create the temporary file, failing if it exists: never truncate or adopt a
 /// file another writer may be using.
+///
+/// # Errors
+///
+/// Returns an I/O error if the path already exists or the file cannot be created.
 fn create_tmp(tmp: &Path) -> std::io::Result<fs::File> {
     fs::OpenOptions::new()
         .write(true)
@@ -132,8 +138,15 @@ fn create_tmp(tmp: &Path) -> std::io::Result<fs::File> {
 
 /// Replace `path` with `content` so a reader sees the old file or the new one,
 /// never a torn write: write a uniquely named sibling temporary file, flush it
-/// to disk, then rename it over `path`. The file keeps the permissions of the
-/// one it replaces.
+/// to disk, then rename it over `path`. Copies the existing file's permissions
+/// when its metadata can be read; otherwise keeps the new file's permissions.
+///
+/// # Errors
+///
+/// Returns temporary-file creation, write, permission-setting, sync or rename
+/// errors, attempting to remove the temporary file on failure. Metadata lookup,
+/// cleanup and parent-directory sync errors are ignored, so success does not
+/// guarantee the rename will survive a crash.
 fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
     let tmp = unique_tmp_path(path);
 
@@ -208,8 +221,12 @@ impl TransactionManager {
 
     /// Persist `next` and, only once it is on disk, make it the in-memory log.
     ///
-    /// Every mutator builds its successor log on a copy and ends here, so a
-    /// failed save leaves memory and disk both at the previous log (T-5).
+    /// Creates missing parent directories. A failed save leaves the in-memory
+    /// log unchanged and does not replace the existing log file (T-5).
+    ///
+    /// # Errors
+    ///
+    /// Propagates directory creation, JSON serialisation and atomic-write errors.
     fn persist(&mut self, next: TransactionLog) -> Result<()> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
@@ -222,6 +239,14 @@ impl TransactionManager {
 
     /// Apply `f` to the active transaction of a copy of the log, optionally
     /// clear the active pointer, persist, and return the updated transaction.
+    ///
+    /// When `settle` is true, also clears the active pointer.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::NoActiveTransaction` if the active pointer is
+    /// absent or its transaction is missing. Propagates persistence errors,
+    /// leaving the in-memory log unchanged.
     fn update_active(
         &mut self,
         settle: bool,
@@ -247,7 +272,13 @@ impl TransactionManager {
         Ok(result)
     }
 
-    /// Begin a new transaction
+    /// Begin and persist a new active transaction, returning its stored record.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::TransactionActive` if an active pointer is already
+    /// set. Propagates JSON serialisation and I/O errors without changing the
+    /// in-memory log.
     pub fn begin(&mut self, name: Option<String>) -> Result<&Transaction> {
         if let Some(ref active_id) = self.log.active_transaction_id {
             return Err(ReversibleError::TransactionActive(active_id.clone()));
@@ -282,13 +313,30 @@ impl TransactionManager {
         self.log.transactions.iter_mut().find(|t| t.id == active_id)
     }
 
-    /// Add operation to active transaction
+    /// Append an operation ID to the active transaction and persist the log.
+    ///
+    /// IDs are recorded in the supplied order without validation or deduplication.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::NoActiveTransaction` if no active transaction is
+    /// found. Propagates JSON serialisation and I/O errors without changing the
+    /// in-memory log.
     pub fn add_operation(&mut self, operation_id: String) -> Result<()> {
         self.update_active(false, |t| t.add_operation(operation_id))
             .map(|_| ())
     }
 
-    /// Commit the active transaction (marks state only — no filesystem effects)
+    /// Commit the active transaction and return its completed record.
+    ///
+    /// Persists the completion time and clears the active pointer. The recorded
+    /// file operations are left as they are.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::NoActiveTransaction` if no active transaction is
+    /// found. Propagates JSON serialisation and I/O errors without changing the
+    /// in-memory log.
     pub fn commit(&mut self) -> Result<Transaction> {
         self.update_active(true, Transaction::commit)
     }
@@ -297,6 +345,14 @@ impl TransactionManager {
     ///
     /// The caller is responsible for actually undoing the operations
     /// via the appropriate executor before calling this.
+    /// Persists the completion time, clears the active pointer and returns the
+    /// completed transaction record.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ReversibleError::NoActiveTransaction` if no active transaction is
+    /// found. Propagates JSON serialisation and I/O errors without changing the
+    /// in-memory log; any undos performed by the caller remain applied.
     pub fn mark_rolled_back(&mut self) -> Result<Transaction> {
         self.update_active(true, Transaction::rollback)
     }

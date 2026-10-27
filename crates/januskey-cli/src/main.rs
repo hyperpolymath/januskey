@@ -800,6 +800,16 @@ fn cmd_commit(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Undo the active transaction in `dir` in reverse order, then mark it rolled back.
+///
+/// Operations already recorded as undone are skipped on retry. On success,
+/// print a summary; its operation count includes those skipped operations.
+///
+/// # Errors
+///
+/// Propagates errors opening the repository, undoing operations or saving the
+/// final transaction state, and errors if no transaction is active. An undo or
+/// final save error leaves the transaction active; completed undos remain applied.
 fn cmd_rollback(dir: &Path) -> Result<()> {
     let mut jk = JanusKey::open(dir).context("Failed to open JanusKey directory")?;
 
