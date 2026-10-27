@@ -128,12 +128,19 @@ fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
     written?;
 
     // Make the rename itself durable. Not every platform can open a directory.
-    if let Some(parent) = path.parent() {
-        if let Ok(dir) = fs::File::open(parent) {
-            let _ = dir.sync_all();
-        }
+    if let Ok(dir) = fs::File::open(containing_dir(path)) {
+        let _ = dir.sync_all();
     }
     Ok(())
+}
+
+/// The directory that holds `path`. A bare filename has the empty path as its
+/// parent, which cannot be opened, so it is the current directory.
+fn containing_dir(path: &Path) -> &Path {
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    }
 }
 
 /// Manager for transaction lifecycle (data + persistence only).
@@ -383,6 +390,25 @@ mod tests {
         fs::remove_dir_all(path).expect("failed to remove the planted directory");
     }
 
+    /// A bare filename's directory is `.`, not the unopenable empty path.
+    #[test]
+    fn containing_dir_of_a_bare_filename_is_the_current_directory() {
+        assert_eq!(
+            containing_dir(Path::new("transactions.json")),
+            Path::new(".")
+        );
+        assert_eq!(
+            containing_dir(Path::new("a/transactions.json")),
+            Path::new("a")
+        );
+        assert_eq!(
+            containing_dir(Path::new("/transactions.json")),
+            Path::new("/")
+        );
+        assert!(fs::File::open(containing_dir(Path::new("transactions.json"))).is_ok());
+    }
+
+    /// T-5: a begin whose save fails changes nothing in memory and can be retried.
     #[test]
     fn failed_save_leaves_begin_unapplied() {
         let tmp = TempDir::new().expect("failed to create temp dir");
@@ -400,6 +426,8 @@ mod tests {
         assert_eq!(manager.all().len(), 1);
     }
 
+    /// T-5: an add_operation whose save fails is not recorded in memory, and the
+    /// retry records it exactly once, in memory and on disk.
     #[test]
     fn failed_save_leaves_add_operation_unapplied() {
         let tmp = TempDir::new().expect("failed to create temp dir");
@@ -430,6 +458,8 @@ mod tests {
         );
     }
 
+    /// T-5: a commit or rollback whose save fails leaves the transaction Active,
+    /// and the retry settles it.
     #[test]
     fn failed_save_leaves_commit_and_rollback_unapplied() {
         for commit in [true, false] {
@@ -472,6 +502,8 @@ mod tests {
         }
     }
 
+    /// T-5: a save replaces the log by rename, leaves no temporary file, and is
+    /// not confused by a torn temporary file left by an earlier crash.
     #[test]
     fn save_replaces_atomically_and_leaves_no_temporary_file() {
         let tmp = TempDir::new().expect("failed to create temp dir");

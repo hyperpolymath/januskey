@@ -46,6 +46,8 @@ fn repo_with_two_operations() -> TempDir {
     tmp
 }
 
+/// After one undo fails and the cause is repaired, `jk rollback` finishes the
+/// operations that are left instead of stopping at the one already undone.
 #[test]
 fn rollback_retry_completes_after_a_partial_failure() {
     let tmp = repo_with_two_operations();
@@ -83,6 +85,8 @@ fn rollback_retry_completes_after_a_partial_failure() {
         .stderr(predicate::str::contains("No active transaction"));
 }
 
+/// The retry leaves an already undone operation alone, so later edits to its
+/// file are not overwritten.
 #[test]
 fn rollback_does_not_undo_an_operation_twice() {
     let tmp = repo_with_two_operations();
