@@ -67,6 +67,13 @@ tables must agree.
 | G-3 | The FFI bridge preserves grade 𝟙 (homomorphism) | OPEN | resource-algebra lists homomorphisms OPEN; to file from JNK-01
 | E-1 | An attacker cannot recover obliterated content or use a revoked key | OPEN | `+Types.adversaryCannotKnow+` holds only because `+Knows+` has no Adversary constructor (#145 item 3)
 | X-1 | Hash one-wayness; physical erasure (cryptographic and physical assumptions, external to this repository) | ASSUMED | not theorems of this repo
+| T-1 | Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute (the sequential Theorem 3.4) | PROVEN | `+TransactionAtomicity.rollback-restores+`; `+tests/reject-agda/ForwardRollback.agda+` refused
+| T-2 | begin, add_operation, commit and mark_rolled_back each preserve the log invariant (given a fresh id for begin) and rewrite only the Active transaction, so a completed one is never modified | PROVEN | `+TransactionAtomicity.lifecycle-preserves-good+`; `+tests/reject-agda/CommitWhenIdle.agda+` refused
+| T-3 | At most one transaction is Active, and exactly one when the active pointer is set | PROVEN | `+TransactionAtomicity.at-most-one-active+`
+| T-4 | A rollback that fails part-way can be retried to completion | OPEN | reproduced 2026-10-26 with the real `+jk+`: after one undo error the repaired retry stops at the first, already undone, operation and the transaction stays Active (`+cmd_rollback+`, `+?+` on `+undo+`)
+| T-5 | The transaction log survives an I/O failure or a crash during save without disagreeing with memory or being corrupted | OPEN | by inspection, not reproduced: begin, add_operation and commit mutate the in-memory log before `+save()?+`, and `+save+` is a plain `+fs::write+`
+| T-6 | A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1; single steps are TESTED by `+execute_then_undo_is_identity+`) | ASSUMED | not checked for the failure path
+| T-7 | Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) | ASSUMED | probabilistic, not checked
 |===
 
 Removed, with the reason recorded beside the replacement in source:
@@ -130,7 +137,7 @@ attestations undermine trust
 |Content store integrity |Content-addressed storage never returns wrong
 content |Hash collisions or bugs corrupt stored data
 
-|Transaction atomicity |Delta application is atomic and reversible
+|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the partial-rollback, I/O-failure and id-freshness gaps are T-4 to T-7)
 |Partial transactions corrupt state
 
 |reversible-core |Undo/redo preserves data integrity |Core crate used by
@@ -173,6 +180,9 @@ the status table above.
 |C-4: Replacing an attestation-chain entry by one with a different hash breaks the link |PROVEN |`src/abi/JanusKey/ABI/Proofs.idr::tamperBreaksLink` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
 |C-5: The 32-, 16- and 112-byte ABI structs are 8-byte aligned (divisibility at the literals) |PROVEN |`src/abi/JanusKey/ABI/Layout.idr::oblitAligned` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
 |G-1: Reversibility as a Loss grade: a trace is lossless only if every step is, and an obliterating step absorbs |PROVEN |`verification/proofs/agda/Reversibility.agda::lossless-trace-all` |`bash scripts/check-agda.sh`
+|T-1: Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute |PROVEN |`verification/proofs/agda/TransactionAtomicity.agda::rollback-restores` |`bash scripts/check-agda.sh`
+|T-2: begin, add_operation, commit and mark_rolled_back each preserve the log invariant (given a fresh id for begin) and rewrite only the Active transaction |PROVEN |`verification/proofs/agda/TransactionAtomicity.agda::lifecycle-preserves-good` |`bash scripts/check-agda.sh`
+|T-3: At most one transaction is Active, and exactly one when the active pointer is set |PROVEN |`verification/proofs/agda/TransactionAtomicity.agda::at-most-one-active` |`bash scripts/check-agda.sh`
 |A-3: Idris2 struct sizes, status codes, enums and exported symbols agree with januskey.h and ffi/zig |TESTED |`scripts/check-abi-layout.sh::check-abi-layout` |`bash scripts/check-abi-layout.sh`
 |A-4: A linearly held library handle cannot be closed twice |TESTED |`tests/reject-idris/DoubleClose.idr::DoubleClose` |`bash scripts/check-idris-reject.sh DoubleClose`
 |A-4: A linearly held library handle cannot be forgotten |TESTED |`tests/reject-idris/ForgottenClose.idr::ForgottenClose` |`bash scripts/check-idris-reject.sh ForgottenClose`
@@ -183,6 +193,10 @@ the status table above.
 |G-3: The FFI bridge preserves grade 𝟙 (a homomorphism; resource-algebra lists homomorphisms as OPEN) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
 |E-1: An attacker cannot recover obliterated content or use a revoked key (adversaryCannotKnow holds only by construction of the model) |OPEN |`src/abi/JanusKey/ABI/Types.idr` |-
 |The six security obligations under "What Needs Proving" (obliteration, key derivation, attestation chain, content store, transaction atomicity, reversible-core) are proved |OPEN |`PROOF-NEEDS.adoc` |-
+|T-4: A rollback that fails part-way can be retried to completion (reproduced 2026-10-26: after one undo error the repaired `jk rollback` stops at the first, already undone, operation and the transaction stays Active) |OPEN |`crates/januskey-cli/src/main.rs` |-
+|T-5: The transaction log survives an I/O failure or a crash during save without disagreeing with memory or being corrupted (by inspection: the log is mutated before `save()?`, and `save` is a plain `fs::write`) |OPEN |`crates/reversible-core/src/transaction.rs` |-
+|T-6: A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1) |ASSUMED |`crates/januskey-cli/src/operations.rs` |-
+|T-7: Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) |ASSUMED |`crates/reversible-core/src/transaction.rs` |-
 |Every operation is reversible (MPR), as a theorem linked to the Rust (needs G-2 made mechanical, and G-3) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
 |===
 
@@ -192,8 +206,9 @@ the status table above.
 ABI/runtime layer (ruling 2026-10-12): kernel statements live in
 `+verification/proofs/agda/+` with siblings consumed by pin
 (`+scripts/fetch-siblings.sh+`); the ABI lives in `+src/abi/+`.
-Obliteration completeness, attestation chain integrity and transaction
-atomicity are still to be stated there. The 225 `+unwrap()+` calls should
+Transaction atomicity is stated there for the model
+(`+verification/proofs/agda/TransactionAtomicity.agda+`, rows T-1 to T-3);
+obliteration completeness and attestation chain integrity are still to be stated. The 225 `+unwrap()+` calls should
 be systematically replaced with proven error handling.
 
 === Priority
