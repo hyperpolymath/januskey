@@ -8,7 +8,7 @@ standards/testing-and-benchmarking/TESTING-TAXONOMY.adoc v1.0
 
 === CRG Grade: D (Alpha — Unstable)
 
-*Justification:* 132 tests declared (`cargo test --workspace --locked -- --list`; rust-ci runs them); the
+*Justification:* 134 tests declared (`cargo test --workspace --locked -- --list`; rust-ci runs them); the
 Idris2 ABI typechecks and 11 proofs are checked (PROVEN ledger rows: ABI, grade and transaction-model lemmas, not the
 security obligations); benchmarks exist (5 Criterion groups). But: no
 fuzz testing, no mutation testing, 225 unwrap() calls, E2E mostly skips,
@@ -65,7 +65,7 @@ handling
 (run by idris-abi.yml, agda-proofs.yml and dashboard-check)
 |===
 
-*Total declared:* 132 tests + 5 benchmark groups; 11 proofs checked (PROVEN ledger rows) *Total
+*Total declared:* 134 tests + 5 benchmark groups; 11 proofs checked (PROVEN ledger rows) *Total
 missing:* Fuzz, mutation, chaos, compatibility
 
 === Aspect Matrix
