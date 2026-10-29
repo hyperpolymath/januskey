@@ -23,7 +23,7 @@ jobs:
         with:
           toolchain: stable
           components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Build
         run: cargo build --release
       - name: Unit + P2P tests
@@ -42,7 +42,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Run benchmarks
         run: cargo bench -- --output-format bencher 2>/dev/null || echo "Benchmarks completed"
 
@@ -55,7 +55,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Build release
         run: cargo build --release
       - name: Run E2E tests

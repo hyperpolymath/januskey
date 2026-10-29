@@ -28,7 +28,7 @@ workflows:
     '.github/workflows/e2e.yml':
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@v1'
-        - 'swatinem/rust-cache@v2.9.2'
+        - 'swatinem/rust-cache@v2.9.3'
     '.github/workflows/governance.yml':
         - 'hyperpolymath/standards@a85aa8e70326cceedae169013a47daee554918b7'
     '.github/workflows/hypatia-scan.yml':
@@ -47,7 +47,7 @@ workflows:
         - 'hyperpolymath/standards@a85aa8e70326cceedae169013a47daee554918b7'
     '.github/workflows/squabble.yml':
         - 'actions/checkout@v7.0.1'
-        - 'hyperpolymath/cicd-squabbler@14f853fde902ab2d7631070d87a9dc9122e01013'
+        - 'hyperpolymath/cicd-squabbler@b625e05da04c0b72fe2ca19bd009841ff982f43d'
 dependencies:
     'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9':
         ref: 'v6.1.0'
@@ -141,9 +141,9 @@ dependencies:
         commit: 'sha1-0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d'
         owner_id: 75048950
         repo_id: 623796603
-    'hyperpolymath/cicd-squabbler@14f853fde902ab2d7631070d87a9dc9122e01013':
+    'hyperpolymath/cicd-squabbler@b625e05da04c0b72fe2ca19bd009841ff982f43d':
         ref: 'main'
-        commit: 'sha1-14f853fde902ab2d7631070d87a9dc9122e01013'
+        commit: 'sha1-b625e05da04c0b72fe2ca19bd009841ff982f43d'
         owner_id: 6759885
         repo_id: 1284026967
     'hyperpolymath/deed-ecosystem@main':
@@ -190,9 +190,9 @@ dependencies:
         commit: 'sha1-6323deb102c322ba6fcbdcafc7e3dddab59af2b6'
         owner_id: 580492
         repo_id: 298565987
-    'swatinem/rust-cache@v2.9.2':
-        ref: 'v2.9.2'
-        commit: 'sha1-6323deb102c322ba6fcbdcafc7e3dddab59af2b6'
+    'swatinem/rust-cache@v2.9.3':
+        ref: 'v2.9.3'
+        commit: 'sha1-d1527c8f67ef9af357290475d4af4b0fab8f12e0'
         owner_id: 580492
         repo_id: 298565987
     'webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555':
