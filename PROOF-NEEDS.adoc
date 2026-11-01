@@ -135,9 +135,12 @@ Idris2); no Creusot contract exists in this tree, which is why no Rust row is
 graded.
 
 No row of this ledger is Grade 2i, Grade 2ii or Grade 1, and none is claimed to
-be. The row-by-row mapping, the receipt in full, and the one recorded
-divergence from PROOF-POLICY §2.1's canonical Agda invocation are in
-`+docs/theory/PROOF-GRADES.adoc+`.
+be. The row-by-row mapping and the receipt in full are in
+`+docs/theory/PROOF-GRADES.adoc+`. Since 2026-11-01 the gate runs
+PROOF-POLICY §2.1's canonical invocation
+(`+--safe --without-K --cubical-compatible …+`), which was verified locally
+with Agda 2.6.4.3 before being committed; the CI receipt for that flag set is
+the next `+agda-proofs.yml+` run, not the older one.
 
 === Current State
 

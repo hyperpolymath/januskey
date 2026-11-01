@@ -609,3 +609,32 @@ Nothing is claimed at Grade 2i, 2ii or 1. Two obligations are recorded rather
 than skipped: the canonical invocation's `--cubical-compatible` is absent
 because the flag is infectious and the pinned sibling is `--without-K`; and CI
 pins Agda twice, at 2.6.4.3 (the receipt) and 2.6.3 (the dashboard job).
+
+**Toolchains, and what that changed.** The sandbox's egress allowlist decides
+which prover can be run at all. Measured, with the exact failures, in
+`docs/estate/environment-toolchains.md`: Agda (2.6.4.3, the CI pin) and Zig
+(0.13.0, the e2e pin) install from PyPI wheels and both gates now run here —
+`check-agda.sh` green, `ffi/zig` building with 15/15 integration tests passing —
+while Rust, Creusot and Idris2 cannot be installed, because
+`static.rust-lang.org`, `crates.io`, `deb.debian.org` and the GitHub release-asset
+host are all outside the allowlist. Idris2 is anyway already pinned at its latest
+release (v0.8.0). Running the Agda gate locally is what turned the §2.1 question
+from an inference into a measurement: the canonical invocation
+(`--safe --without-K --cubical-compatible`) type-checks both modules, so the gate
+now uses it and the earlier prediction that it would fail on the pinned
+`--without-K` sibling is withdrawn.
+
+**Out-of-scope findings, written as separate prompts.** Four, in
+`docs/estate/prompts/`, one per repository, none of them touching januskey:
+`standards` (four gaps in PROOF-POLICY §2.1/§2.2 that implementing it exposed),
+`mathesis` (whether a Grade 3 receipt may be local, how to record non-axiom
+caveats, what a checker change does to an existing grade), `resource-algebra`
+(the OPEN homomorphism that blocks row G-3, plus `--cubical-compatible` in its
+pragmas), and `the-metadatastician` (whether it ingests A2ML manifests — the
+question behind ledger row V-2). Two of the three repositories named in the
+request do not resolve: `hyperpolymath/stuff-of-awesome` and
+`hyperpolymath/catachresis-colloquium` both return 404 to an authenticated
+`gh api`, and neither name appears among the owner's 360 public repositories; the
+nearest match for the third is `the-metadatastician`. No prompt was written for a
+repository that could not be found and read.
+

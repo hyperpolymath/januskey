@@ -88,7 +88,8 @@ the ledger's recorded checker for rows G-1, T-1, T-2 and T-3. The receipt:
   (`@sha256:a29215f6…`), asserted by a passing step:
   `test "$(agda --version)" = 'Agda version 2.6.4.3'`
 | Flags | `--safe --without-K --no-libraries --ignore-interfaces --double-check`
-  (see §Divergence below for the one difference from PROOF-POLICY §2.1)
+  at the receipt commit; the gate now runs PROOF-POLICY §2.1's canonical form
+  with `--cubical-compatible` added (see §The §2.1 invocation below)
 | Sibling | `resource-algebra` at
   `cf9235c532712a783a404c359a1055f40134794a`, fetched by
   `scripts/fetch-siblings.sh`; consumed by pin, not re-declared here
@@ -120,42 +121,61 @@ and would not change what these modules prove: §2.2 is explicit that compiling
 in a second prover does not establish the same proposition unless the
 correspondence is checked too.
 
-== Divergence from PROOF-POLICY §2.1, recorded not skipped
+== The §2.1 invocation: adopted, and measured (2026-11-01)
 
-PROOF-POLICY §2.1's canonical invocation is
-`agda --safe --without-K --cubical-compatible <module.agda>`. januskey's gate
-runs:
+PROOF-POLICY §2.1's canonical form is
+`agda --safe --without-K --cubical-compatible <module.agda>`. Until this branch
+the gate ran `--safe --without-K --no-libraries --ignore-interfaces
+--double-check` without the cubical flag, and an earlier revision of this page
+predicted that adding it would fail, because the flag is *infectious* (direct
+imports must use it too) and every module of the pinned sibling opens with
+`{-# OPTIONS --safe --without-K #-}`.
 
-[source,bash]
+**That prediction was wrong and is withdrawn.** With Agda 2.6.4.3 installed in
+the sandbox (PyPI wheel `agda==2.6.4.3.post1`, reporting
+`Agda version 2.6.4.3-56f5f56`, the same version CI pins), the canonical
+invocation type-checks both modules:
+
+[source,text]
 ----
---safe --without-K --no-libraries --ignore-interfaces --double-check \
-  -i verification/proofs/agda -i _build/dependencies/resource-algebra/src
+$ agda --safe --without-K --cubical-compatible --no-libraries \
+       --ignore-interfaces --double-check \
+       -i verification/proofs/agda -i _build/dependencies/resource-algebra/src \
+       verification/proofs/agda/Reversibility.agda
+   → exit 0, 14 × warning: -W[no]UnsupportedIndexedMatch
+
+$ … verification/proofs/agda/TransactionAtomicity.agda
+   → exit 0, 16 × warning: -W[no]UnsupportedIndexedMatch
+
+$ AGDA=/tmp/tc/bin/agda bash scripts/check-agda.sh
+   → [PASS] refused as expected: tests/reject-agda/{CommitWhenIdle,ForwardRollback,HiddenLoss,ReviveAfterObliterate}
+   → [check-agda] OK
 ----
 
-so it is **stricter in two respects** — `--ignore-interfaces` re-checks the
-sibling's sources rather than trusting compiled interfaces, and `--double-check`
-re-verifies the type-checker's own work — and **different in one**:
-`--cubical-compatible` is absent.
+Agda warns where the earlier reading expected it to refuse: a `--without-K`
+import is accepted, and what it reports is that particular clauses — the
+sibling's `≤-trans`, and `obliterate-absorbs` here — will not compute when
+applied to cubical transports. That is a statement about computation under
+transport, not about the propositions these modules prove, so the gate keeps the
+warnings visible rather than silencing them with `-WnoUnsupportedIndexedMatch`.
 
-The flag is absent for a reason that is checkable in the tree, not for
-convenience. `--cubical-compatible` is *infectious*: Agda's option-consistency
-rule requires every directly imported module to use it too
-(https://hackage.haskell.org/package/Agda-2.6.3/changelog[Agda 2.6.3 release
-notes]; the flag was split out of `--without-K` in that release and implies
-it). Both modules import
-`ResourceAlgebra.Prelude`, `.Core` and `.Instances.Loss` from the pinned
-sibling, and every module in `resource-algebra@cf9235c` opens with
-`{-# OPTIONS --safe --without-K #-}`. Adding the flag here would therefore fail
-the gate on the sibling, and the sibling is not this repository's to change
-(PROOF-POLICY §1.1: a dependency is relied on as pinned, never edited or
-annotated from the dependent).
+`scripts/check-agda.sh` now runs the canonical invocation, so januskey matches
+§2.1 exactly and is still stricter in two other respects (`--ignore-interfaces`
+re-checks the sibling from source instead of trusting compiled interfaces;
+`--double-check` re-verifies the type-checker's own work).
 
-Unblocking condition, named so it can be checked rather than believed: when
-`resource-algebra` adopts `--cubical-compatible` across its modules, bump
-`RESOURCE_ALGEBRA_COMMIT` in `scripts/fetch-siblings.sh` and add the flag to
-`scripts/check-agda.sh`. Until then the shipped invocation is the one the
-receipt above was produced under, and this page states the difference instead
-of presenting the gate as policy-identical.
+=== Receipt bookkeeping for that change
+
+The CI receipt in the table above was produced **before** the flag changed.
+Changing a graded artefact's checker invalidates its receipt's exactness, so:
+
+* the local run above is recorded as **reproduction** — same prover version,
+  PyPI provenance instead of Debian, and no CI provenance at all (PROOF-POLICY
+  §2.3: receipts of execution come from CI);
+* the next `agda-proofs.yml` run on `main` is the new receipt, and this page
+  must cite it in place of the local run once it exists. Until then the rows
+  stay `AGDA-VERIFIED` on the strength of the four artefacts being unchanged
+  plus a matching local run, and that is the strongest claim available.
 
 One related inconsistency is an open obligation, not a claim: the Agda version
 is pinned twice in CI and the two pins differ — `agda-proofs.yml` installs
@@ -163,6 +183,18 @@ is pinned twice in CI and the two pins differ — `agda-proofs.yml` installs
 Idris2 image so it can run the PROVEN rows' checkers. A green dashboard
 therefore does not extend the receipt at 2.6.4.3. One version, one receipt:
 pinning the dashboard job to the same Agda is the fix.
+
+=== Upgrade path, measured
+
+`agda==2.7.0.1` runs in the sandbox once its wheel's missing `data/lib` is
+supplied (bare install dies with "The lib directory … does not exist"), and
+under 2.7.0.1 **both modules also type-check, exit 0**. The latest upstream
+release is 2.8.0.2 (2026-09-13), which has not been tried. None of this is a
+recommendation to move: the CI pin is Debian trixie's 2.6.4.3, and an upgrade
+means a new container, a new pin and a new receipt.
+
+The sandbox's installable set, and the exact hosts that block Rust, Creusot and
+Idris2, are recorded in `docs/estate/environment-toolchains.md`.
 
 == Grades, ledger row by ledger row
 

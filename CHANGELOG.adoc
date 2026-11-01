@@ -35,6 +35,9 @@ benchmarks, READINESS.md
 * fix(reversible-core): the operation metadata log saves through the shared
 atomic writer (`write_atomic`), with `save_replaces_the_log_atomically`; ledger
 row T-8 stays OPEN until the unbuilt test runs
+* fix(proofs): the Agda gate runs PROOF-POLICY §2.1's canonical invocation
+(`--safe --without-K --cubical-compatible`); measured green locally with Agda
+2.6.4.3 before the change, replacing an unverified prediction that it would fail
 * fix(ci): bump a2ml/k9-validate-action pins to canonical (#33)
 * fix(ci): sync hypatia-scan.yml to canonical (#32)
 * fix(ci): adopt canonical hypatia-scan.yml (#31)
@@ -72,6 +75,10 @@ human sign-off)
 * docs: add checkpoint files for state tracking
 
 ==== CI
+
+* ci(proofs): record what the agent sandbox can and cannot install (Agda and Zig
+from PyPI wheels; Rust, Creusot and Idris2 blocked by egress),
+`docs/estate/environment-toolchains.md`
 
 * ci(rust): convert rust-ci.yml to thin wrapper (standards#174) (#39)
 * ci: redistribute concurrency-cancel guard to read-only check workflows

@@ -53,9 +53,9 @@ total = "136 tests + 5 benchmark groups + 11 PROVEN ledger rows — as declared 
 grade-3 = "G-1, T-1, T-2, T-3 — Agda theory modules under verification/proofs/agda; AGDA-VERIFIED"
 receipt-commit = "4afb710e86646658f667f10bd6274ee47416bfc7 (agda-proofs.yml run 40867211509, success)"
 receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); resource-algebra pinned at cf9235c"
-receipt-flags = "--safe --without-K --no-libraries --ignore-interfaces --double-check"
+receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (canonical per PROOF-POLICY §2.1 since 2026-11-01; the 4afb710 CI receipt predates the flag, so the next agda-proofs.yml run is its receipt)"
 not-graded = "the 7 Idris2 PROVEN rows (ABI/interface contracts, PROOF-POLICY §1); all 23 TESTED rows (observed behaviour); ASSUMED/DESIGNED/OPEN rows"
-open-obligations = "add --cubical-compatible once resource-algebra adopts it (the flag is infectious and the pinned sibling is --without-K); one Agda version across CI (agda-proofs pins 2.6.4.3, dashboard-check installs 2.6.3); no Creusot contract on the Rust, so no Rust behaviour is graded"
+open-obligations = "re-earn the Agda receipt in CI under the canonical flag set; one Agda version across CI (agda-proofs pins 2.6.4.3, dashboard-check installs 2.6.3); no Creusot contract on the Rust, and neither rustc nor crates.io is reachable from the agent sandbox (docs/estate/environment-toolchains.md), so no Rust behaviour is graded"
 claimed-higher = "none — no Grade 2i, 2ii or 1 is claimed"
 
 [test-categories-complete]
