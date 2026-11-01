@@ -601,8 +601,9 @@ PROVEN rows, the four whose artefact is Agda (G-1, T-1, T-2, T-3) type-check
 in Agda and have not been translated to another foundational system, which is
 mathesis's definition of Grade 3. The receipt is a green `agda-proofs.yml` run
 (40867211509) at commit `4afb710` with Agda 2.6.4.3 and `resource-algebra`
-pinned at `cf9235c`; the modules, the gate script, the sibling fetch and the
-workflow are byte-identical at that commit and here. The other seven PROVEN
+pinned at `cf9235c`; the modules, the sibling fetch and the workflow are
+byte-identical at that commit and here. The gate script is not: it gained
+`--cubical-compatible` after the receipt. The other seven PROVEN
 rows are Idris2 interface/ABI theorems, which PROOF-POLICY §1 classifies as
 engineering rather than theory, so the grade ladder does not apply to them.
 Nothing is claimed at Grade 2i, 2ii or 1. Two obligations are recorded rather
