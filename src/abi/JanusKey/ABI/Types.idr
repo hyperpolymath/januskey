@@ -402,7 +402,15 @@ data PostObliteration : ContentHash -> Type where
 ||| `Knows Adversary a` is uninhabited because `Knows` has no Adversary
 ||| constructor: a property of this model, not a security proof. What a real
 ||| attacker can recover after obliteration is OPEN in the claims ledger
-||| (PROOF-NEEDS.adoc).
+||| (PROOF-NEEDS.adoc, row E-1).
+|||
+||| The *model-level* statements this constructor family cannot make — that an
+||| adversary whose observation excludes the store does not know its contents,
+||| that obliteration leaves nothing to recover, and that rotation makes the old
+||| key unusable for every agent — are proved in Agda over a world model with an
+||| observation channel: verification/proofs/agda/Epistemic.agda (ledger row
+||| E-1m). This module is unchanged by that; the epistemic theory lives there,
+||| under the kernel gate, and the cryptographic claim stays OPEN here.
 public export
 adversaryCannotKnow : Knows Adversary a -> Void
 adversaryCannotKnow _ impossible

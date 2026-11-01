@@ -93,14 +93,16 @@ the ledger's recorded checker for rows G-1, T-1, T-2 and T-3. The receipt:
 | Sibling | `resource-algebra` at
   `cf9235c532712a783a404c359a1055f40134794a`, fetched by
   `scripts/fetch-siblings.sh`; consumed by pin, not re-declared here
-| Result | Both modules type-check; the four fixtures under `tests/reject-agda/`
-  are refused *with the message each fixture names*, so a fixture that starts
-  passing, or starts failing for the wrong reason, fails the gate
-| Transfer | The two modules, `scripts/check-agda.sh`,
+| Result | The two modules in this receipt type-check; the fixtures under
+  `tests/reject-agda/` are refused *with the message each fixture names*, so a
+  fixture that starts passing, or starts failing for the wrong reason, fails the
+  gate
+| Transfer | `Reversibility.agda`, `TransactionAtomicity.agda`,
   `scripts/fetch-siblings.sh` and `agda-proofs.yml` are byte-identical at that
-  commit and at this branch's HEAD (blobs `0d30206…`, `38c9b06…`, `98b9f0d…`,
-  `9b66a48…`, `7c7e653…`), so the receipt covers these rows as they stand, not
-  a previous draft of them
+  commit and at this branch's HEAD (blobs `0d30206…`, `38c9b06…`, `9b66a48…`,
+  `7c7e653…`), so the receipt covers those two rows as they stand. It does
+  **not** cover `Epistemic.agda` (new) or the changed `check-agda.sh`: their
+  first CI evidence is the run on this branch's pull request
 |===
 
 That is a Grade 3 receipt in mathesis terms: the propositions type-check in
@@ -198,8 +200,8 @@ Idris2, are recorded in `docs/estate/environment-toolchains.md`.
 
 == Grades, ledger row by ledger row
 
-The 46 ledger rows fall into three classes under PROOF-POLICY §1. Counts are
-from `PROOF-NEEDS.adoc` at this commit and are `PROVEN` 11, `TESTED` 23,
+The 47 ledger rows fall into three classes under PROOF-POLICY §1. Counts are
+from `PROOF-NEEDS.adoc` at this commit and are `PROVEN` 12, `TESTED` 23,
 `ASSUMED` 4, `DESIGNED` 3, `OPEN` 5.
 
 === Grade 3 — theory, proved in Agda
@@ -218,13 +220,19 @@ from `PROOF-NEEDS.adoc` at this commit and are `PROVEN` 11, `TESTED` 23,
   only the Active transaction | `TransactionAtomicity.agda::lifecycle-preserves-good`
 | T-3 | At most one transaction is Active, exactly one when the pointer is set |
   `TransactionAtomicity.agda::at-most-one-active`
+| E-1m | In a world model, an agent whose observation excludes the store does not
+  know what the store holds; obliteration leaves nothing to recover; rotation
+  leaves no agent — the system included — able to use the old key |
+  `Epistemic.agda::adversary-ignorant`, `obliterate-cuts-recovery`,
+  `obliterate-ignorance`, `rotate-forgets-old`
 |===
 
-These four are the only rows in this repository with a mathesis grade. Each
+These five are the only rows in this repository with a mathesis grade. Each
 rests on a premise it names rather than assumes silently — the per-step
 cancellation law (`undoes`, TESTED as `execute_then_undo_is_identity`), the
-freshness of the transaction id (T-7, `ASSUMED`, probabilistic), and the
-absence of I/O. §6 asks for the axioms to be tracked; they are, in the modules'
+freshness of the transaction id (T-7, `ASSUMED`, probabilistic), the absence of
+I/O, and, for E-1m, that the modelled channels are the only ones an attacker
+has (X-1). §6 asks for the axioms to be tracked; they are, in the modules'
 own "What is NOT claimed" blocks and in the ledger's T-6, T-7, G-2, X-1 rows.
 
 === Engineering contracts — no mathesis grade applies
@@ -249,6 +257,14 @@ observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) i
 |===
 | Rows | Today | What moves them
 
+| E-1 (`OPEN`) — the cryptographic claim that an attacker cannot recover
+  obliterated content or use a revoked key
+| Its model-level shadow is proved as E-1m, and the row stays OPEN because a
+  model of channels is not a statement about cryptography.
+| Nothing in Agda: recovering from ciphertext is the assumption X-1. Only a
+  different kind of evidence (a cryptanalysis, or a reduction) would move it, and
+  this repository would record that as an external assumption with its source.
+
 | `TESTED` rows describing Rust behaviour (T-4, T-5, the property tests)
 | Claimed, tested. No Creusot annotation exists and Creusot is not installed in
   the session that wrote this file.
@@ -271,6 +287,47 @@ observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) i
 | The new test `metadata::tests::save_replaces_the_log_atomically` green in CI.
   Its half of the row — retry after a failed `mark_undone` — is untouched.
 |===
+
+== The epistemic rewrite: E-1 becomes E-1m
+
+The one claim with an inheritance, rather than an invention, behind it. januskey's
+Idris2 ABI carries `Knows : Agent → Type → Type` (`Types.idr` §Level 12), a
+discrete epistemic modality inherited from the estate's epistemic-types work. It
+could not state the security claims the ledger attributed to it:
+
+* `Knows Adversary a` is uninhabited **by construction** — there is no Adversary
+  constructor — so "an attacker cannot recover …" (E-1) was a property of a
+  datatype. The repository's own comment says as much: "a property of this
+  model, not a security proof".
+* "The system forgets the old key" was **unstateable**, because `Knows` has no
+  negative form. The lemma was deleted rather than repaired, and the ledger
+  records the deletion.
+
+`verification/proofs/agda/Epistemic.agda` replaces the modality with one whose
+ignorance is a proposition. Knowledge is indiscriminability over an observation
+— an agent knows φ in *x* when φ holds in every world it cannot tell apart from
+*x* — so:
+
+* ignorance is `¬ Knows`, proved by exhibiting a world that looks the same and is
+  not (`adversary-ignorant`, over two worlds that differ only in the store);
+* obliteration is a change to the store channel, and recovery is a `Σ` that
+  becomes empty (`obliterate-cuts-recovery`), with the adversary's ignorance
+  surviving the operation because its observation did not change
+  (`obliterate-ignorance`);
+* rotation is an update to a `usable` predicate, so "no agent can use the old
+  key" is a theorem with a Bool on the right (`rotate-forgets-old`), and the
+  deleted Idris lemma now has a proved counterpart.
+
+Two fixtures pin the refusals: `AdversaryKnows.agda` (asserting the two stores
+are identical — refused, `2 != 1`) and `OldKeyStillUsable.agda` (asserting the
+old key survives rotation — refused, `!= true`).
+
+What this does **not** do is move E-1. A model of channels is not a model of
+cryptography: that the store channel is the only one an attacker has, and that a
+key which is not `usable` cannot decrypt, are assumptions (X-1), and E-1 stays
+`OPEN`. The Idris module is unchanged — its typecheck status, its deleted lemma
+and its comments now pointing here — because the theory belongs in Agda under
+PROOF-POLICY §1 and the ABI belongs in Idris2.
 
 == Reporting rules this repository follows
 

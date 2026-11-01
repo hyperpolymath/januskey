@@ -38,7 +38,7 @@ in CI:
    receipt with the old one superseded, or the same grade with a re-earned
    receipt? I have written it as the latter and flagged the difference.
 
-What I can offer: a real ledger with 46 rows in five statuses, four Grade 3 rows
+What I can offer: a real ledger with 47 rows in five statuses, five Grade 3 rows
 with an artefact-per-row discipline and expected-rejection fixtures, a page
 (`docs/theory/PROOF-GRADES.adoc`) that maps every row onto §1 and §5 and records
 what is *not* graded — the seven Idris2 ABI rows, which PROOF-POLICY §1 classes

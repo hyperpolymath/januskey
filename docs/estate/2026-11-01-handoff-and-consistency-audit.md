@@ -594,7 +594,7 @@ persist — is untouched. Declared test count moves 135 → 136 in `STATE.a2ml`,
 measures with `cargo test -- --list`.
 
 **The proof claims are now graded, and the grade is Grade 3 for four rows.**
-`docs/theory/PROOF-GRADES.adoc` maps the 46-row ledger onto
+`docs/theory/PROOF-GRADES.adoc` maps the 47-row ledger onto
 `hyperpolymath/mathesis` §5/§6 and `hyperpolymath/standards`
 `3-practice/PROOF-POLICY.adoc` §1/§2. The result is not a relabel: of the 11
 PROVEN rows, the four whose artefact is Agda (G-1, T-1, T-2, T-3) type-check
@@ -637,4 +637,18 @@ request do not resolve: `hyperpolymath/stuff-of-awesome` and
 `gh api`, and neither name appears among the owner's 360 public repositories; the
 nearest match for the third is `the-metadatastician`. No prompt was written for a
 repository that could not be found and read.
+
+**The epistemic inheritance is rewritten, not relabelled.** The Idris `Knows`
+modality (§5.6 below) could not state either of the two obligations attributed
+to it, so it has been replaced on the theory side rather than annotated:
+`verification/proofs/agda/Epistemic.agda` models knowledge as
+indiscriminability over a per-agent observation, which makes ignorance a
+proposition to be proved (`adversary-ignorant`), makes obliteration a store
+operation with an empty recovery set (`obliterate-cuts-recovery`,
+`obliterate-ignorance`) and makes forgetting a Bool-valued statement that is
+false after rotation (`rotate-forgets-old`). Two new fixtures pin the refusals.
+Ledger row E-1m is `PROVEN` and Grade 3; row E-1 stays `OPEN`, because a model
+of channels is not a model of cryptography. The Idris module is unchanged apart
+from comments pointing at the Agda record, and it keeps its deleted
+`systemForgetsOldKey` — the gap is now visible in two places instead of one.
 

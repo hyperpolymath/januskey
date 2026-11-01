@@ -17,6 +17,10 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Added
 
+* feat(proofs): `Epistemic.agda` replaces the vacuous Idris `Knows` modality with
+knowledge as indiscriminability: ignorance, obliteration and rotation-forgetting
+become propositions, with two expected-rejection fixtures; new ledger row E-1m
+(PROVEN, Grade 3), E-1 stays OPEN
 * feat(crg): add crg-grade and crg-badge justfile recipes
 * feat(crg): add Current Grade badge anchor to READINESS.md
 * feat: add idrisiser Idris2 proof wrappers for JanusKey cryptographic
