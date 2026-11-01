@@ -146,7 +146,8 @@ The difference that matters for design, not marketing:
 - **Shared blobs.** Deduplication means one blob can back several paths.
   Obliterating one path keeps a blob another path still references — correct
   for reversibility, but it means "obliterated" is not "gone from the store".
-  Use `--dry-run` to see what a command would touch.
+  `--dry-run` lists only the target paths. It does not report the shared
+  blobs that will be kept or the history entries that will be purged.
 - **The ledger is unkeyed.** `obliterations.json` is not HMAC-chained. An
   attacker with write access to the store can edit it. The keyed `AuditLog`
   covers other operations and requires an unlocked key; joining the two is
