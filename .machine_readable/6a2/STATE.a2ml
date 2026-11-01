@@ -50,7 +50,8 @@ total = "136 tests + 5 benchmark groups + 12 PROVEN ledger rows — as declared 
 # mathesis (estate-mathematical-architecture §5/§6) + standards
 # 3-practice/PROOF-POLICY.adoc. A grade is a second axis over the PROVEN/TESTED
 # ledger vocabulary, never a percentage. Detail: docs/theory/PROOF-GRADES.adoc.
-grade-3 = "G-1, T-1, T-2, T-3, E-1m — Agda theory modules under verification/proofs/agda; AGDA-VERIFIED"
+grade-3 = "G-1, T-1, T-2, T-3 — Agda theory modules under verification/proofs/agda; AGDA-VERIFIED"
+grade-3-pending = "E-1m — Epistemic.agda; no receipt yet, because the receipt-commit predates this module"
 receipt-commit = "4afb710e86646658f667f10bd6274ee47416bfc7 (agda-proofs.yml run 40867211509, success)"
 receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); resource-algebra pinned at cf9235c"
 receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (canonical per PROOF-POLICY §2.1 since 2026-11-01; the 4afb710 CI receipt predates the flag, so the next agda-proofs.yml run is its receipt)"
