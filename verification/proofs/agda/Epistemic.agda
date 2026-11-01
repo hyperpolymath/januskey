@@ -209,7 +209,7 @@ obliterate-ignorance k =
     adversary-so-blind = just≢nothing
 
 ----------------------------------------------------------------------
--- Theorem 6. Rotation forgets: after rotating old -> new, no agent can use the
+-- Theorem 6. Rotation forgets: after rotating old -> new with old ≠ new, no agent can use the
 -- old key, including the system. This is the statement the Idris model could
 -- not make at all, because `Knows` had no negative form.
 ----------------------------------------------------------------------
