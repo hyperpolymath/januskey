@@ -66,8 +66,9 @@ pub struct ObliterationProof {
 ```
 
 What the commitment is: a SHA-256 binding of *the claim being made* — which
-content hash, at what time, with which nonce. It makes the record
-tamper-evident and hard to backdate. It is **not** a proof that the content
+content hash, at what time, with which nonce. It detects accidental changes
+to the record. It does not resist a writer who edits the record, because the
+commitment has no secret key. It is **not** a proof that the content
 is gone, and `storage_cleared` is an assertion written by the same code path
 that performed the overwrite, not an independent check.
 
