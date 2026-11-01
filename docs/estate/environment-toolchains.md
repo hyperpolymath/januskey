@@ -75,7 +75,8 @@ Consequences for this repository's rows, in the ledger's vocabulary:
 The allowlist entries, smallest first:
 
 1. `static.rust-lang.org` + `index.crates.io` + `static.crates.io` → `rustup
-   default stable`, `cargo test --workspace --locked`, and then Creusot.
+   default stable`, `cargo test --workspace --locked`. Creusot also needs `why3`
+   from step 2 or step 3.
 2. `deb.debian.org` → `agda-bin` (2.6.4.3 on trixie, i.e. the pinned prover from
    a signed archive rather than a PyPI wheel), `idris2`, `why3`.
 3. `opam.ocaml.org` + `hackage.haskell.org` → why3 and GHC from source, if the
