@@ -155,7 +155,7 @@ Reversibility is the default. Secure obliteration (`jk obliterate`) is the delib
 | Show current status
 
 | `jk gc`
-| Prune old operations and unreferenced content
+| Prune old operations
 |===
 
 == Architecture
