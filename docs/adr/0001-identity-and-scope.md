@@ -119,7 +119,7 @@ Applied now (verifiable by inspection, no build required):
 
 - `crates/januskey-cli/Cargo.toml`: `[features] key-lifecycle = []`; `[[bin]] jk-keys`
   gains `required-features = ["key-lifecycle"]`. Default `cargo build --workspace`
-  therefore produces `jk` only.
+  therefore produces `jk` and `dashboard-check`, and omits `jk-keys`.
 - Identity corrected in `README.adoc`, `PROOF-NEEDS.adoc`, `ARCHITECTURE.adoc`,
   `crates/januskey-cli/src/lib.rs`, `docs/security/KEY_LIFECYCLE.adoc`,
   `.machine_readable/6a2/STATE.a2ml`.
