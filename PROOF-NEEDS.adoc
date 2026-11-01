@@ -74,7 +74,7 @@ tables must agree.
 | T-5 | The transaction log is never left disagreeing with memory by a failed save, and is replaced by write, fsync and rename (a randomly named temporary file opened with the old file's mode, removed only if this save created it) rather than overwritten in place | TESTED | `+transaction::tests::failed_save_*+`: a save that fails at the final step leaves begin, add_operation, commit and rollback unapplied in memory; mutants (memory first, plain `+fs::write+`, no temp cleanup, shared temp name, truncating open, no permission copy) each fail a test. Not claimed: crash-safety of the rename itself is by construction, not crash-injected; the directory fsync is best effort, because failing the save after the rename would leave disk new and memory old; concurrent writers are out of scope (each save's content is intact, the last rename wins)
 | T-6 | A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1; single steps are TESTED by `+execute_then_undo_is_identity+`) | ASSUMED | not checked for the failure path
 | T-7 | Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) | ASSUMED | probabilistic, not checked
-| T-8 | The operation metadata log is saved atomically, and an undo whose `+mark_undone+` fails to persist can be retried | OPEN | by inspection: `+MetadataStore::save+` is the same plain `+fs::write+`; `+undo+` runs the undo, then `+mark_undone+` persists, so a failed persist leaves the file undone but the log not
+| T-8 | The operation metadata log is saved atomically, and an undo whose `+mark_undone+` fails to persist can be retried | OPEN | by inspection: the log now takes the same write, sync, rename path as the transaction log (`+crate::transaction::write_atomic+`), and `+metadata::tests::save_replaces_the_log_atomically+` asserts it, but the crate has not been built since that edit, so the row stays OPEN until the test is green in CI. Retry is unchanged: `+undo+` still runs the undo before `+mark_undone+` persists, so a failed persist still leaves the file undone and the log not
 | V-1 | valence-shell depends on `+reversible-core+` for reversible operation data | DESIGNED | ARCHITECTURE.adoc §Consumption status — no repository outside this workspace depends on the crate; Phase 2 is unstarted
 | V-2 | ochrance verifies januskey A2ML manifests | DESIGNED | `+crates/reversible-core/src/manifest.rs+` — `+ManifestEmitter+` has never been parsed by ochrance; the SHA-256/BLAKE3 boundary mismatch is unresolved
 | V-3 | aletheia consumes `+reversible-core+` | DESIGNED | ARCHITECTURE.adoc §Deferred — Phase 0 research, no operation types yet
@@ -104,6 +104,40 @@ IO do-notation at all.
 
 The dashboards (README, TOPOLOGY, READINESS) carry the proof count that
 `+dashboard-check+` measures from the PROVEN rows of the ledger below.
+
+=== Proof grades under mathesis (2026-11-01)
+
+The five statuses above are this repository's claim vocabulary — the estate's
+README-EXPLAINME ledger, as used across it. A *proof grade* is a second,
+orthogonal axis, governed by `+hyperpolymath/mathesis+`
+(`+estate-mathematical-architecture+` §5 and §6) and by
+`+hyperpolymath/standards+` `+3-practice/PROOF-POLICY.adoc+`. Neither uses a
+confidence percentage and this repository does not publish one.
+
+Of the 11 PROVEN rows, four are the theory rows — **G-1, T-1, T-2, T-3** — and
+their artefact is Agda (`+verification/proofs/agda/+`). They are **Grade 3**:
+each type-checks in Agda and none has been translated to an independent
+foundational system, which is mathesis §5's definition as written. The receipt
+is a green `+agda-proofs.yml+` run
+(https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509])
+at commit `+4afb710e86646658f667f10bd6274ee47416bfc7+`, Agda 2.6.4.3, with
+`+resource-algebra+` pinned at `+cf9235c+`. The modules, the gate script, the
+sibling fetch and the workflow are byte-identical at that commit and at this
+one, so the receipt covers these rows as they stand. Mathesis status for them:
+`+AGDA-VERIFIED+`.
+
+The other seven PROVEN rows — A-1, A-2, C-1 to C-5 — are Idris2 theorems. Under
+PROOF-POLICY §1 those are interface and ABI contracts, so the theory ladder does
+not grade them: they are PROVEN in the vocabulary above and nothing more. The
+same holds for the 23 TESTED rows, which record observed behaviour and never
+grading. First-party Rust behaviour belongs to **Creusot** (not SPARK, and not
+Idris2); no Creusot contract exists in this tree, which is why no Rust row is
+graded.
+
+No row of this ledger is Grade 2i, Grade 2ii or Grade 1, and none is claimed to
+be. The row-by-row mapping, the receipt in full, and the one recorded
+divergence from PROOF-POLICY §2.1's canonical Agda invocation are in
+`+docs/theory/PROOF-GRADES.adoc+`.
 
 === Current State
 
@@ -144,7 +178,7 @@ attestations undermine trust
 |Content store integrity |Content-addressed storage never returns wrong
 content |Hash collisions or bugs corrupt stored data
 
-|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed and the metadata log, T-8, is open)
+|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed; the metadata log, T-8, now saves by rename but that is unverified)
 |Partial transactions corrupt state
 
 |reversible-core |Undo/redo preserves data integrity |Core crate used by
@@ -211,7 +245,7 @@ the status table above.
 |G-3: The FFI bridge preserves grade 𝟙 (a homomorphism; resource-algebra lists homomorphisms as OPEN) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
 |E-1: An attacker cannot recover obliterated content or use a revoked key (adversaryCannotKnow holds only by construction of the model) |OPEN |`src/abi/JanusKey/ABI/Types.idr` |-
 |The six security obligations under "What Needs Proving" (obliteration, key derivation, attestation chain, content store, transaction atomicity, reversible-core) are proved |OPEN |`PROOF-NEEDS.adoc` |-
-|T-8: The operation metadata log is saved atomically, and an undo whose `+mark_undone+` fails to persist can be retried (by inspection: `+MetadataStore::save+` is a plain `+fs::write+`) |OPEN |`crates/reversible-core/src/metadata.rs` |-
+|T-8: The operation metadata log is saved atomically, and an undo whose `+mark_undone+` fails to persist can be retried (by inspection: `+MetadataStore::save+` calls `+crate::transaction::write_atomic+`, the path `+transaction.rs+` already tests in T-5; `+metadata::tests::save_replaces_the_log_atomically+` covers the log itself and has not been run) |OPEN |`crates/reversible-core/src/metadata.rs` |-
 |T-6: A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1) |ASSUMED |`crates/januskey-cli/src/operations.rs` |-
 |T-7: Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) |ASSUMED |`crates/reversible-core/src/transaction.rs` |-
 |Every operation is reversible (MPR), as a theorem linked to the Rust (needs G-2 made mechanical, and G-3) |OPEN |`verification/proofs/agda/Reversibility.agda` |-

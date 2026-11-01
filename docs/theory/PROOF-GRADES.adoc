@@ -1,0 +1,258 @@
+= Proof grades under mathesis and PROOF-POLICY
+:toc: preamble
+:icons: font
+
+This page grades januskey's proof claims in the vocabulary its owner's estate
+mathematics architecture uses, and records the receipt for every grade. It is
+the answer to a single question a reader of `PROOF-NEEDS.adoc` should not have
+to reconstruct: *which of these claims is a proof, and how good a proof is it?*
+
+It grades nothing by confidence. There is no percentage anywhere in this
+repository, and none is introduced here.
+
+== What governs the grades
+
+Two owner documents, both read at HEAD on 2026-11-01:
+
+[cols="1,2,3",options="header"]
+|===
+| Source | Section | Rule taken from it
+
+| `hyperpolymath/mathesis`,
+  file `estate-mathematical-architecture`
+| §5 grades
+| **Grade 3** — "a proof is Grade 3 if it type-checks locally in Agda but has
+  not been translated to an independent foundational system". Grade 2i adds one
+  translation, Grade 2ii two *foundationally distinct* ones (Agda, Rocq and
+  Lean are all dependent type theory, so 2ii needs Isabelle/HOL), Grade 1 is a
+  check served to headless CI tooling (AXLE, isabelle server, coq-lsp REST).
+
+| mathesis, same file
+| §6 reporting
+| No percentage; every axiom the development relies on is tracked; a grade
+  receipt records the **commit hash** it was produced at; a grade that stops
+  applying is marked `Superseded` or `Regressed`, never quietly deleted.
+
+| `hyperpolymath/standards`,
+  `3-practice/PROOF-POLICY.adoc`
+| §1 mapping
+| Theory is proved in **Agda** and rechecked in Rocq and Lean; the behaviour of
+  first-party Rust is **Creusot** on that code; API, ABI and wire-format
+  contracts are **Idris2**. The earlier "Rust always means Rust/SPARK" note is
+  withdrawn (owner ruling 2026-04-10): Rust is Creusot.
+
+| PROOF-POLICY
+| §2.1 invocation
+| `agda --safe --without-K --cubical-compatible <module.agda>`; pin and record
+  the Agda version and the library set per commit; a missing tool is an open
+  obligation, never a silent skip.
+
+| PROOF-POLICY
+| §2.3 execution
+| The policy text records policy; CI receipts establish the executions. §2.2's
+  statuses (`AGDA-PENDING`, `AGDA-VERIFIED`, `COQ-CHECKED`, `LEAN-CHECKED`,
+  `BRIDGE-PENDING`, `RECONCILED`, `COUNTEREXAMPLE`, `QUARANTINED`) name what
+  happened to one proposition.
+|===
+
+januskey's own five-status ledger vocabulary (`PROVEN`, `TESTED`, `ASSUMED`,
+`DESIGNED`, `OPEN`) is the estate's claim vocabulary and is unchanged by any of
+this. A grade is a second axis laid over it, not a replacement: a row is
+`PROVEN` *because* a named artefact checks it, and separately has (or has not) a
+mathesis grade.
+
+== The Grade 3 receipt
+
+The theory artefacts are two Agda modules:
+
+* `verification/proofs/agda/Reversibility.agda` — the Loss grade algebra:
+  lossless traces have only lossless steps, obliteration absorbs, and a
+  wrap/unwrap pair with a cancellation premise is a grade-𝟙 two-step trace.
+* `verification/proofs/agda/TransactionAtomicity.agda` — rollback restores the
+  state the transaction began in; the `TransactionManager` lifecycle keeps its
+  log invariant under begin, add_operation, commit and mark_rolled_back, and at
+  most one transaction is Active.
+
+Both are checked by `scripts/check-agda.sh` (`just test-agda`), which is also
+the ledger's recorded checker for rows G-1, T-1, T-2 and T-3. The receipt:
+
+[cols="1,3",options="header"]
+|===
+| Field | Value
+
+| Workflow, run | `agda-proofs.yml`, run
+  https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509],
+  branch `main`, conclusion **success**
+| Commit | `4afb710e86646658f667f10bd6274ee47416bfc7` (started 2026-10-29T11:40:36Z)
+| Prover | `agda-bin=2.6.4.3-1+b2` on Debian trixie-slim
+  (`@sha256:a29215f6…`), asserted by a passing step:
+  `test "$(agda --version)" = 'Agda version 2.6.4.3'`
+| Flags | `--safe --without-K --no-libraries --ignore-interfaces --double-check`
+  (see §Divergence below for the one difference from PROOF-POLICY §2.1)
+| Sibling | `resource-algebra` at
+  `cf9235c532712a783a404c359a1055f40134794a`, fetched by
+  `scripts/fetch-siblings.sh`; consumed by pin, not re-declared here
+| Result | Both modules type-check; the four fixtures under `tests/reject-agda/`
+  are refused *with the message each fixture names*, so a fixture that starts
+  passing, or starts failing for the wrong reason, fails the gate
+| Transfer | The two modules, `scripts/check-agda.sh`,
+  `scripts/fetch-siblings.sh` and `agda-proofs.yml` are byte-identical at that
+  commit and at this branch's HEAD (blobs `0d30206…`, `38c9b06…`, `98b9f0d…`,
+  `9b66a48…`, `7c7e653…`), so the receipt covers these rows as they stand, not
+  a previous draft of them
+|===
+
+That is a Grade 3 receipt in mathesis terms: the propositions type-check in
+Agda, in CI, at a named commit, with the prover version pinned and recorded.
+mathesis §5 illustrates "strict solver flags" with `--safe --erasure`;
+januskey's strictness is `--safe --without-K` plus `--double-check`, which is
+the same family and stricter than bare `--safe` (no K, no trusted compiled
+interfaces, a second checking pass).
+Nothing here has been translated to Rocq, Lean or Isabelle, so it is not
+Grade 2i, and no headless proof service is involved, so it is not Grade 1.
+
+=== Why it stops at Grade 3
+
+Grade 2i and above would require an Agda → Dedukti → Rocq/Lean transport or a
+re-proof, with the outcome recorded as `transported`, `re-proved` or
+`unavailable` (PROOF-POLICY §2). That work has not been done, is not claimed,
+and would not change what these modules prove: §2.2 is explicit that compiling
+in a second prover does not establish the same proposition unless the
+correspondence is checked too.
+
+== Divergence from PROOF-POLICY §2.1, recorded not skipped
+
+PROOF-POLICY §2.1's canonical invocation is
+`agda --safe --without-K --cubical-compatible <module.agda>`. januskey's gate
+runs:
+
+[source,bash]
+----
+--safe --without-K --no-libraries --ignore-interfaces --double-check \
+  -i verification/proofs/agda -i _build/dependencies/resource-algebra/src
+----
+
+so it is **stricter in two respects** — `--ignore-interfaces` re-checks the
+sibling's sources rather than trusting compiled interfaces, and `--double-check`
+re-verifies the type-checker's own work — and **different in one**:
+`--cubical-compatible` is absent.
+
+The flag is absent for a reason that is checkable in the tree, not for
+convenience. `--cubical-compatible` is *infectious*: Agda's option-consistency
+rule requires every directly imported module to use it too
+(https://hackage.haskell.org/package/Agda-2.6.3/changelog[Agda 2.6.3 release
+notes]; the flag was split out of `--without-K` in that release and implies
+it). Both modules import
+`ResourceAlgebra.Prelude`, `.Core` and `.Instances.Loss` from the pinned
+sibling, and every module in `resource-algebra@cf9235c` opens with
+`{-# OPTIONS --safe --without-K #-}`. Adding the flag here would therefore fail
+the gate on the sibling, and the sibling is not this repository's to change
+(PROOF-POLICY §1.1: a dependency is relied on as pinned, never edited or
+annotated from the dependent).
+
+Unblocking condition, named so it can be checked rather than believed: when
+`resource-algebra` adopts `--cubical-compatible` across its modules, bump
+`RESOURCE_ALGEBRA_COMMIT` in `scripts/fetch-siblings.sh` and add the flag to
+`scripts/check-agda.sh`. Until then the shipped invocation is the one the
+receipt above was produced under, and this page states the difference instead
+of presenting the gate as policy-identical.
+
+One related inconsistency is an open obligation, not a claim: the Agda version
+is pinned twice in CI and the two pins differ — `agda-proofs.yml` installs
+2.6.4.3 (the receipt above), while `dashboard-check.yml` installs 2.6.3 on the
+Idris2 image so it can run the PROVEN rows' checkers. A green dashboard
+therefore does not extend the receipt at 2.6.4.3. One version, one receipt:
+pinning the dashboard job to the same Agda is the fix.
+
+== Grades, ledger row by ledger row
+
+The 46 ledger rows fall into three classes under PROOF-POLICY §1. Counts are
+from `PROOF-NEEDS.adoc` at this commit and are `PROVEN` 11, `TESTED` 23,
+`ASSUMED` 4, `DESIGNED` 3, `OPEN` 5.
+
+=== Grade 3 — theory, proved in Agda
+
+[cols="1,3,2",options="header"]
+|===
+| Row | Proposition | Theorem
+
+| G-1 | A lossless trace has only lossless steps; an obliterating step absorbs;
+  wrap/unwrap is grade 𝟙 given cancellation | `Reversibility.agda::lossless-trace-all`,
+  `obliterate-absorbs`, `wrap-unwrap-id`
+| T-1 | Undoing a fully executed transaction in reverse order restores the state
+  it began in, given each step's undo restores its execute |
+  `TransactionAtomicity.agda::rollback-restores`
+| T-2 | The four lifecycle transitions preserve the log invariant and rewrite
+  only the Active transaction | `TransactionAtomicity.agda::lifecycle-preserves-good`
+| T-3 | At most one transaction is Active, exactly one when the pointer is set |
+  `TransactionAtomicity.agda::at-most-one-active`
+|===
+
+These four are the only rows in this repository with a mathesis grade. Each
+rests on a premise it names rather than assumes silently — the per-step
+cancellation law (`undoes`, TESTED as `execute_then_undo_is_identity`), the
+freshness of the transaction id (T-7, `ASSUMED`, probabilistic), and the
+absence of I/O. §6 asks for the axioms to be tracked; they are, in the modules'
+own "What is NOT claimed" blocks and in the ledger's T-6, T-7, G-2, X-1 rows.
+
+=== Engineering contracts — no mathesis grade applies
+
+Seven `PROVEN` rows are Idris2 theorems about this ABI: A-1, A-2, C-1, C-2,
+C-3, C-4, C-5, checked by
+`idris2 --typecheck src/abi/januskey-abi.ipkg`. Under PROOF-POLICY §1 these
+are interface and wire-format contracts, so the theory ladder does not grade
+them — they are `PROVEN` in the ledger's own vocabulary and that is the whole
+of the claim. The `Rust/SPARK` shorthand is withdrawn; the mapping that
+replaces it is Rust → **Creusot**, Ada → SPARK, API/ABI → Idris2, theory →
+Agda.
+
+The same heading covers every `TESTED` row (23): a test proves behaviour was
+observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) is
+`ASSUMED` by transcription and would have to become mechanical before any
+"every operation is reversible" theorem could cite both halves.
+
+=== Not graded, and what would grade them
+
+[cols="1,2,3",options="header"]
+|===
+| Rows | Today | What moves them
+
+| `TESTED` rows describing Rust behaviour (T-4, T-5, the property tests)
+| Claimed, tested. No Creusot annotation exists and Creusot is not installed in
+  the session that wrote this file.
+| Creusot contracts on the Rust functions, run in CI: PROOF-POLICY §1 sends
+  first-party Rust behaviour to Creusot, not to Idris2 and not to Agda.
+
+| T-6, T-7, X-1, G-2, E-1, G-3 (`ASSUMED` / `OPEN`)
+| Premises, external assumptions, or filed obligations.
+| Each names its own gap in `PROOF-NEEDS.adoc`; none may be counted as proved
+  by the grade of a neighbouring row (README-EXPLAINME: "a row is only as
+  strong as its weakest step").
+
+| V-1, V-2, V-3 (`DESIGNED`)
+| Downstream consumption designed, never exercised.
+| A dependency edge in the consumer's manifest and a green test there.
+
+| T-8 (`OPEN`)
+| The metadata log now saves through the same write → sync → rename path as the
+  transaction log, but the crate has not been built since that change.
+| The new test `metadata::tests::save_replaces_the_log_atomically` green in CI.
+  Its half of the row — retry after a failed `mark_undone` — is untouched.
+|===
+
+== Reporting rules this repository follows
+
+* No percentage, ever. Where a "completion" figure exists elsewhere in the
+  tree it is a project-plan measure, not a proof measure, and it is not a grade.
+* Every grade names its receipt: commit, prover, prover version, flags,
+  sibling pin. The receipt above is the only one of its kind here.
+* A receipt is invalidated by a change to a graded artefact, to its checker or
+  to its pin, and is then re-earned by the next run, not carried forward. The
+  blob comparison in §The Grade 3 receipt exists precisely to show which
+  changes do and do not invalidate it.
+* When a graded artefact is replaced, the grade is marked `Superseded`; when a
+  green receipt goes red and is not immediately fixed, `Regressed`. Neither is
+  deleted from the history.
+* `AGDA-PENDING` is the correct status for a module committed but not yet
+  checked. No row in this repository is in that state today: the four graded
+  rows are `AGDA-VERIFIED` at the commit above.

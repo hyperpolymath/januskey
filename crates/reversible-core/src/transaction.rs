@@ -165,7 +165,7 @@ fn create_tmp(tmp: &Path, like: &Path) -> std::io::Result<fs::File> {
 /// file this call created is removed on failure; one it did not create is left
 /// alone. Cleanup and parent-directory sync errors are ignored, so success does
 /// not guarantee the rename will survive a crash.
-fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_atomic(path: &Path, content: &[u8]) -> std::io::Result<()> {
     write_atomic_via(path, &unique_tmp_path(path), content)
 }
 

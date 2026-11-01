@@ -79,7 +79,7 @@ statement about bytes on a device.
 | Commit/rollback settle a group of operations | yes — `TransactionManager`, states `Active`/`Committed`/`RolledBack`; at most one active (T-3, PROVEN) |
 | A rollback that fails part-way can be retried | yes (T-4, TESTED — `rollback_resume_test`, driving the real `jk`) |
 | A failed save leaves memory and disk agreeing | yes for the transaction log (T-5, TESTED, write→fsync→rename with permission preservation) |
-| The **operation metadata** log has the same guarantee | **no** — `MetadataStore::save` is a plain `fs::write` (T-8, **OPEN**); an undo whose `mark_undone` fails to persist leaves the file undone and the log unchanged |
+| The **operation metadata** log has the same guarantee | **unverified** — `MetadataStore::save` now calls `crate::transaction::write_atomic` (write → sync → rename), but that edit has not been built or run (T-8, **OPEN**); an undo whose `mark_undone` fails to persist still leaves the file undone and the log unchanged |
 | A failed execute leaves the filesystem unchanged | assumed, not checked (T-6) |
 | Intermediate states are invisible to other processes | **false** — operations are applied to the filesystem one at a time as they are executed. A transaction gives you a recorded, resumable rollback, not isolation. Nothing in this tool locks, stages, or hides the working tree |
 
@@ -155,7 +155,7 @@ fn undo(operation_id: &str) -> Result<()> {
     let content = content_store.retrieve(&metadata.content_hash)?;
     let inverse = construct_inverse(&metadata, content);
     inverse.perform()?;
-    metadata_store.mark_undone(operation_id)?;   // T-8: this save is not atomic
+    metadata_store.mark_undone(operation_id)?;   // T-8: save atomic since 2026-11-01, unbuilt
     Ok(())
 }
 ```
@@ -195,7 +195,7 @@ present one until it exists. What exists, by ledger row:
 | T-5 | The transaction log is replaced atomically, with permissions preserved | **TESTED** |
 | T-6 | A failed execute leaves the filesystem unchanged; each undo restores its execute's pre-state | **ASSUMED** |
 | T-7 | Transaction ids never collide | **ASSUMED** |
-| T-8 | The operation metadata log is saved atomically | **OPEN** |
+| T-8 | The operation metadata log is saved atomically | **OPEN** — saves by rename since 2026-11-01, not yet built or run |
 | — | "Every operation is reversible" as a theorem linked to the Rust | **OPEN** |
 | G-2 | The Idris2 and Agda presentations correspond | **ASSUMED** — "by transcription, no mechanical link claimed" |
 
@@ -233,7 +233,7 @@ shared-blob rule in [RMO](rmo-primitive.md).
 impl MetadataStore {
     pub fn append(&mut self, metadata: OperationMetadata) -> Result<()> {
         self.log.operations.push(metadata);
-        self.save()?;                                  // T-8: plain fs::write
+        self.save()?;                                  // T-8: write→sync→rename, unbuilt
         Ok(())
     }
 
@@ -244,9 +244,11 @@ impl MetadataStore {
 }
 ```
 
-The transaction log (`TransactionLog::save`) already uses the atomic path with a
-per-save temporary file, mode preservation, fsync and rename. The operation
-metadata log does not — that asymmetry is row T-8.
+The transaction log (`TransactionLog::save`) uses the atomic path in
+`transaction.rs`: a per-save temporary file, mode preservation, fsync and
+rename. The operation metadata log now calls the same helper, so the asymmetry
+is closed in source and still open in evidence — nothing has built or run the
+change, which is why row T-8 stays OPEN.
 
 ## Performance
 
@@ -265,7 +267,7 @@ their results are unbaselined (`READINESS.adoc` §Benchmark Classification).
 
 1. **The store is the whole guarantee.** Lose `.januskey/` and undo is gone.
 2. **Metadata consistency is weaker than it looks** — T-8 is open; the
-   metadata log is written non-atomically.
+   metadata log now saves by rename, but that change is unverified.
 3. **Not everything captured is restored** — ownership, mtime and symlink
    identity are recorded but not applied (§2).
 4. **No isolation.** Operations touch the live filesystem as they execute.

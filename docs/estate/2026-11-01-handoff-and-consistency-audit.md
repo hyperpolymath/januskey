@@ -63,7 +63,7 @@ That is the single most important sentence in the repo: **the headline claim is 
 | Concern | Where | Why it is mine |
 |---|---|---|
 | Reversibility semantics (`execute ∘ undo ≡ CNO`) in the Rust | `crates/reversible-core`, `crates/januskey-cli/operations.rs`, `delta.rs` | Only januskey can change its own executor |
-| Metadata/transaction atomicity (T-5 done, **T-8 open**: `metadata.rs:288-293` is still a plain `fs::write` while `transaction.rs:168` uses write→fsync→rename) | `reversible-core` | Internal invariant, and the concrete asymmetry I would fix next |
+| Metadata/transaction atomicity (T-5 done, **T-8 open**: `metadata.rs:288-293` was a plain `fs::write` when this was measured; it now calls `write_atomic`, unbuilt — see the Addendum) | `reversible-core` | Internal invariant, and the concrete asymmetry I would fix next |
 | Attestation chain, now a real HMAC-SHA256 (`attestation.rs:9,189-212`; STATE marks `homerolled-hmac` RESOLVED — `threat-model.a2ml` §primitives.mac is stale on this point) | `januskey-cli/attestation.rs` | Internal |
 | Obliteration / CAS scrubbing (TESTED end-to-end, `tests/obliteration_cas_test.rs`) | `januskey-cli/obliteration.rs` | Internal |
 | Key store (AES-256-GCM + Argon2id; Ed25519/X25519 refused at the CLI, `keys_cli.rs:282-291`) | `januskey-cli/keys.rs`, `keys_cli.rs` | Internal, and *scope-adjacent* — see audit §7 |
@@ -216,7 +216,7 @@ Ranked by hazard. Each is fixable here, by me, without touching any sibling.
 | D10 | `threat-model.a2ml` still describes a home-rolled HMAC as the live state | `.machine_readable/threat-model.a2ml §primitives.mac` vs `attestation.rs:9,189-212`, `STATE.a2ml §blockers` (RESOLVED) | **Low** — stale in the security-critical direction (harmless, but wrong) |
 | D11 | Ledger says "265" and "225" `unwrap()` calls in two places in the *same file* | `PROOF-NEEDS.adoc §Current State` / `§Recommended Prover` | **Low** |
 
-Open technical gap I would take next after the surfaces: **T-8** — `MetadataStore::save` is a plain `fs::write` (`metadata.rs:288-293`) while `TransactionLog::save` already has the tested write→permission-copy→fsync→rename path (`transaction.rs:159-193`). Porting that one function closes a ledger row and removes an asymmetry no reader would guess from the module names.
+Open technical gap I would take next after the surfaces: **T-8** — `MetadataStore::save` is a plain `fs::write` (`metadata.rs:288-293`) while `TransactionLog::save` already has the tested write→permission-copy→fsync→rename path (`transaction.rs:159-193`). Porting that one function closes a ledger row and removes an asymmetry no reader would guess from the module names. *(Done later the same day — see the Addendum. The row stays OPEN until the test runs.)*
 
 ### 4.1 Corrections applied (same day)
 
@@ -280,7 +280,7 @@ carries a scope banner).
 
 | Item | Blocked on |
 |---|---|
-| **T-8** (atomic metadata log) — the one open ledger row a second implementor would inherit | No `rustc`/`cargo`/crates.io in this sandbox: the change moves `write_atomic` out of `transaction.rs` into a shared path and touches six T-5 tests. Unverifiable here, so not attempted |
+| **T-8** (atomic metadata log) — the one open ledger row a second implementor would inherit | No `rustc`/`cargo`/crates.io in this sandbox. **Attempted later the same day** (Addendum): `write_atomic` need not move — it became `pub(crate)` and `save` calls it — so no T-5 test moved. Still unbuilt, so still OPEN |
 | **D10** (`threat-model.a2ml` still describes the removed home-rolled HMAC) | Agent-denied: Trustfile `@trust-deny: modify-threat-model` |
 | **Trustfile's "key-management tool" sentence** (its lines 8–10 contradict ADR-0001) | Agent-denied: Trustfile `@trust-deny: modify-trustfile`. Owner edit, ADR-0001 §6 |
 | D5 (`hexad` feed in an octad estate) | Needs VeriSimDB's answer on whether `hexad` is a live format (prompt §5.5) |
@@ -570,3 +570,42 @@ Boundary: I have not read boj-server's source; the above is januskey's own block
 **Next, in this repo, in order:** (1) ~~the three over-claims D1–D3~~ — **done, see §4.1**; (2) the stale surfaces D4–D8; (3) T-8 — point `MetadataStore::save` at the already-tested atomic path — because it is the one open ledger row that a second implementor (valence-shell, ochrance) would inherit; (4) reword the two sibling "pattern" citations so a citation cannot be read as a dependency.
 
 **Cross-repo posture.** One hard proof dependency (`resource-algebra`), one intended verifier (`ochrance`), one intended consumer (`valence-shell`), one inert data feed (`VeriSimDB`), one blocked cartridge (`boj-server`). Everything else in the invariant list is a sibling I read about and do not depend on — which is, on this evidence, the correct relationship.
+
+---
+
+## Addendum — same day, later, on this branch
+
+The body above is left as the record of what was true when it was measured.
+Two things changed afterwards.
+
+**T-8 is attempted, and still OPEN.** `MetadataStore::save`
+(`crates/reversible-core/src/metadata.rs`) now calls
+`crate::transaction::write_atomic`, the write → sync → rename path that
+`transaction.rs` already used and that T-5 already tests; `write_atomic` became
+`pub(crate)` for the purpose, so nothing moved out of `transaction.rs` and no
+T-5 test changed. A new test,
+`metadata::tests::save_replaces_the_log_atomically`, asserts that a save leaves
+no temporary file behind, ignores a torn one planted from an earlier crash, and
+that the log parses on reopen. The ledger row stays **OPEN**: no toolchain in
+this session built or ran the test, so the evidence is "written" and not
+"observed". The retry half of the row — an undo whose `mark_undone` fails to
+persist — is untouched. Declared test count moves 135 → 136 in `STATE.a2ml`,
+`READINESS.adoc` and `TOPOLOGY.adoc`, which is the figure `dashboard-check`
+measures with `cargo test -- --list`.
+
+**The proof claims are now graded, and the grade is Grade 3 for four rows.**
+`docs/theory/PROOF-GRADES.adoc` maps the 46-row ledger onto
+`hyperpolymath/mathesis` §5/§6 and `hyperpolymath/standards`
+`3-practice/PROOF-POLICY.adoc` §1/§2. The result is not a relabel: of the 11
+PROVEN rows, the four whose artefact is Agda (G-1, T-1, T-2, T-3) type-check
+in Agda and have not been translated to another foundational system, which is
+mathesis's definition of Grade 3. The receipt is a green `agda-proofs.yml` run
+(40867211509) at commit `4afb710` with Agda 2.6.4.3 and `resource-algebra`
+pinned at `cf9235c`; the modules, the gate script, the sibling fetch and the
+workflow are byte-identical at that commit and here. The other seven PROVEN
+rows are Idris2 interface/ABI theorems, which PROOF-POLICY §1 classifies as
+engineering rather than theory, so the grade ladder does not apply to them.
+Nothing is claimed at Grade 2i, 2ii or 1. Two obligations are recorded rather
+than skipped: the canonical invocation's `--cubical-compatible` is absent
+because the flag is infectious and the pinned sibling is `--without-K`; and CI
+pins Agda twice, at 2.6.4.3 (the receipt) and 2.6.3 (the dashboard job).

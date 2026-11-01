@@ -32,6 +32,9 @@ benchmarks, READINESS.md
 
 ==== Fixed
 
+* fix(reversible-core): the operation metadata log saves through the shared
+atomic writer (`write_atomic`), with `save_replaces_the_log_atomically`; ledger
+row T-8 stays OPEN until the unbuilt test runs
 * fix(ci): bump a2ml/k9-validate-action pins to canonical (#33)
 * fix(ci): sync hypatia-scan.yml to canonical (#32)
 * fix(ci): adopt canonical hypatia-scan.yml (#31)
@@ -53,6 +56,10 @@ placeholder
 * refactor: migrate 6SCM → 6A2 (.scm → .a2ml format)
 
 ==== Documentation
+
+* docs(theory): proof grades under mathesis and PROOF-POLICY — four Agda rows
+are Grade 3 with a receipt at 4afb710; one recorded divergence from the
+canonical Agda invocation (`docs/theory/PROOF-GRADES.adoc`)
 
 * docs(security): draft MCP-exposure threat model (AI-authored, pending
 human sign-off)
