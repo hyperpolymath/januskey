@@ -286,11 +286,15 @@ impl MetadataStore {
 
     /// Save the log to disk.
     ///
-    /// Uses the same write → sync → rename path as the transaction log
-    /// (`crate::transaction::write_atomic`), so a reader sees the old log or the
-    /// new one, never a torn write, and the file keeps the mode of the log it
-    /// replaces. Before this, the operation metadata log was the one store in
-    /// the crate written with a plain `fs::write` (ledger row T-8).
+    /// Replaces the log using [`crate::transaction::write_atomic`]. Parent
+    /// directory sync is best effort, so success does not guarantee that the
+    /// rename will survive a crash.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors from creating the parent directory, serialising the log,
+    /// or creating, setting permissions on, writing, syncing or renaming the
+    /// temporary file.
     fn save(&self) -> Result<()> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
