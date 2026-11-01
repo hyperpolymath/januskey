@@ -2,7 +2,7 @@
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 //
-// reversible-core: Shared types for provably reversible operations
+// reversible-core: Shared types for reversible operations (proofs pending)
 //
 // Extracted from JanusKey — the development proof-of-concept for
 // reversibility theory established in absolute-zero (maa-framework).

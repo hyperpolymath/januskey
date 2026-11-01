@@ -5,7 +5,7 @@
 
 ## Welcome to JanusKey
 
-JanusKey is a reversible file operations utility (formal proofs pending) that pursues complete reversibility through architectural design rather than logging or backups. Unlike traditional backup systems that restore from external state, JanusKey operations carry sufficient information for inversion — the goal is to make data loss architecturally impossible. 30 Idris2 ABI proofs are landed; the reversibility theorems themselves are a target, not yet complete.
+JanusKey is a reversible file operations utility (formal proofs pending) that pursues complete reversibility through architectural design rather than logging or backups. Unlike traditional backup systems that restore from external state, JanusKey operations carry sufficient information for inversion — the goal is to make data loss architecturally impossible. The Idris2 ABI typechecks and 11 ledger rows are PROVEN — ABI, grade and transaction-model lemmas, not the security obligations; the reversibility theorem itself is an OPEN row (`PROOF-NEEDS.adoc`).
 
 ### Project Status (2026-06-12)
 

@@ -5,7 +5,11 @@
 
 ## Definition
 
-**Maximal Principle Reduction (MPR)** is a design philosophy and engineering methodology that achieves security and correctness guarantees through structural constraints rather than runtime verification.
+**Maximal Principle Reduction (MPR)** is a design philosophy: prefer removing a
+code path over defending it, and prefer a structural constraint over a runtime
+check. It is vocabulary in this repository, not a formal method with tooling —
+`README.adoc` says so explicitly, and no claim below is linked to the Rust by a
+machine-checked proof (ledger row G-2 is ASSUMED).
 
 > If a vulnerability cannot exist in the design space, it cannot exist in the implementation. Reduce the design space to exclude vulnerabilities entirely.
 >
@@ -135,7 +139,9 @@ pub fn execute_delete(&mut self, path: &Path) -> Result<OperationMetadata> {
         .with_content_hash(content_hash)
         .with_original_metadata(file_metadata);
 
-    // NOW safe to delete - reversal is guaranteed possible
+    // The inverse now exists in memory; it does not yet exist on disk.
+    // If the append below fails, or the process dies before it runs, this
+    // delete cannot be undone (ledger rows T-6, T-8).
     fs::remove_file(path)?;
 
     self.metadata_store.append(metadata)?;
@@ -192,11 +198,15 @@ This ensures that any reachable state has complete reversal information by const
 
 ### Storage Overhead
 
-Content must be stored before deletion. This trades: \* Storage space (more) for reversibility (guaranteed) \* Mitigated by: compression, deduplication, garbage collection
+Content must be stored before deletion. This trades storage space for the
+*possibility* of reversal — not for a guarantee: the reversal also needs the
+metadata append to succeed and the store to survive (rows T-6, T-8). Mitigated
+by compression, deduplication and `jk gc`.
 
 ### Performance Overhead
 
-Additional I/O for metadata capture. This trades: \* Latency (higher) for safety (guaranteed) \* Mitigated by: async operations, batching, transactions
+Additional I/O for metadata capture: latency for recoverability, again subject
+to the same two open rows. Mitigated by batching and transactions.
 
 ### Complexity Shift
 

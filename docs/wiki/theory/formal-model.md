@@ -5,7 +5,12 @@
 
 ## Introduction
 
-This document defines the formal model underlying JanusKey’s reversibility guarantees. We establish mathematical definitions for file system state, operations, and the conditions for reversibility.
+This document defines the formal model that JanusKey's reversibility claims are
+stated over: file-system state, operations, and the conditions under which a
+composition of them is reversible. Writing a model down is not proving anything
+about the implementation; where a lemma in it is checked, the corresponding
+ledger row in `PROOF-NEEDS.adoc` says so, and where the model and the Rust are
+only related by reading, the row is marked ASSUMED (G-2).
 
 ## Definitions
 

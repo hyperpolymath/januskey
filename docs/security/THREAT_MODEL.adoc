@@ -10,8 +10,10 @@
 == Executive Summary
 
 This document defines the threat model for JanusKey's cryptographic key management subsystem.
-Following the **Maximal Principle Reduction (MPR)** methodology, security guarantees are achieved
-through architectural design rather than operational procedures.
+It is written under the **Maximal Principle Reduction (MPR)** design philosophy — eliminate a
+vulnerability by removing the code path that would create it, rather than by procedure. MPR is
+design vocabulary in this repository, not a formal method, and no security guarantee below has
+been mechanically proved (`PROOF-NEEDS.adoc` §Claims ledger).
 
 == Scope
 
@@ -235,6 +237,10 @@ Residual Risk:: LOW - Reversibility enables recovery
 
 == Cryptographic Primitives
 
+What is in the tree, as opposed to what is planned. Two rows here were
+previously written as if the planned algorithm were present; both are now
+marked.
+
 [cols="2,2,2"]
 |===
 | Purpose | Algorithm | Rationale
@@ -248,12 +254,12 @@ Residual Risk:: LOW - Reversibility enables recovery
 | Memory-hard, resistant to GPU/ASIC attacks
 
 | Asymmetric Keys
-| Ed25519 / X25519
-| Modern elliptic curves, constant-time, compact
+| **Not implemented** (Ed25519 / X25519 exist as enum variants only)
+| `KeyAlgorithm::Ed25519` / `X25519` are retained so historical serialized metadata deserializes; `jk-keys generate --type ed25519` and `--type x25519` are refused (no dalek dependency, no keypair is produced)
 
 | Hashing
-| SHA-256, BLAKE3
-| SHA-256 for compatibility, BLAKE3 for performance
+| SHA-256
+| The only hash in the tree. BLAKE3 is **not** a dependency; it is mentioned in `ARCHITECTURE.adoc` only as what ochrance is believed to use, which is unresolved
 
 | Random Generation
 | OS CSPRNG
@@ -278,26 +284,36 @@ Residual Risk:: LOW - Reversibility enables recovery
 
 == Compliance Mapping
 
-[cols="1,2,2"]
+This table maps *design intent* to published requirements. It is not a
+certification, an attestation, or a statement of compliance: no assessment has
+been performed by anyone, and several rows describe mechanisms that cover only
+part of the requirement named. Read the third column as "what exists", not as
+"what is satisfied".
+
+[cols="1,2,3"]
 |===
-| Standard | Requirement | JanusKey Implementation
+| Standard | Requirement | What exists in this repository
 
 | NIST SP 800-57
 | Key lengths appropriate for security strength
-| 256-bit symmetric, 256-bit ECC
+| 256-bit symmetric only (AES-256). No asymmetric algorithm is implemented: Ed25519 and X25519 are enum variants that the CLI refuses to generate
 
 | NIST SP 800-132
 | Password-based key derivation
-| Argon2id with recommended parameters
+| Argon2id, 64 MiB / 3 iterations / 4 lanes / 16-byte salt, as literals in `keys.rs`. OWASP-recommended values; not a maintained policy and not checked against a published revision
 
 | GDPR Article 32
 | Appropriate technical measures
-| Encryption at rest, access controls
+| Key *material* wrapped with AES-256-GCM (per-key nonce, key UUID as AAD); key store protected by file permissions. The content store itself is **not** encrypted. Whether these measures are "appropriate" is a controller-level determination, not one this repository can make
 
 | SOC 2
 | Logical access controls
-| File permissions, key encryption
+| File permissions and key-store encryption. No SOC 2 audit has been performed, and no control has been mapped to a TSC criterion
 |===
+
+Related: `docs/wiki/theory/rmo-primitive.md` records that obliteration is an
+engineering primitive, not an erasure guarantee, and that no GDPR Article 17
+determination follows from it.
 
 == References
 

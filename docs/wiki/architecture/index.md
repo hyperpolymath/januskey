@@ -45,7 +45,7 @@ The CLI provides the user interface for JanusKey operations:
 ``` rust
 #[derive(Parser)]
 #[command(name = "jk")]
-#[command(about = "JanusKey: Provably Reversible File Operations")]
+#[command(about = "JanusKey: reversible file operations with inversion metadata")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

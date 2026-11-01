@@ -4,7 +4,7 @@
 [package]
 name = "januskey"
 version = "1.0.0"
-description = "Provably reversible file operations through Maximal Principle Reduction"
+description = "Reversible file operations with inversion metadata (formal proofs pending)"
 keywords = ["reversible", "filesystem", "transactions", "undo", "backup"]
 categories = ["command-line-utilities", "filesystem"]
 edition.workspace = true

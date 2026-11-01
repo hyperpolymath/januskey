@@ -465,10 +465,15 @@ The following features exist in the codebase but lack dedicated tests:
    * Block-based diff computation
    * Delta application
 
-2. **Obliteration Module** (`src/obliteration.rs`)
+2. **Obliteration Module** (`crates/januskey-cli/src/obliteration.rs`)
    * Secure file overwrite
-   * GDPR Article 17 compliance proofs
+   * Obliteration records (commitment, pass count, `storage_cleared`)
    * Batch obliteration
+
+   (Overwrite and store-scrub behaviour is exercised by
+   `tests/obliteration_cas_test.rs`; what is untested is the record's
+   verification surface. There are no "compliance proofs" to test — see
+   `PROOF-NEEDS.adoc` row X-1.)
 
 3. **Garbage Collection** (`jk gc` command)
    * Cleanup of old operations

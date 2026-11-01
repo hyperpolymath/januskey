@@ -3,86 +3,119 @@
 
 # RMR: Reversible Transaction Primitive
 
+> **Status: an engineering mechanism with a partially proved model.**
+> JanusKey records the inverse of each operation and can replay it. Three
+> lemmas about the transaction *model* are proved in Agda; the step-level
+> premise, two failure-path premises and the atomicity of the metadata log are
+> not, and the headline claim "every operation is reversible" is an OPEN row in
+> `PROOF-NEEDS.adoc`. This page previously stated the property as a theorem
+> with a proof sketch and a `∎`; the correction is recorded in
+> `../../../docs/estate/2026-11-01-handoff-and-consistency-audit.md` (D1).
+
 ## Definition
 
-**RMR (Reversible Transaction)** is a data primitive that guarantees the existence of a mathematically sound inverse function for every state change.
+**RMR (Reversible Transaction)** is the property JanusKey aims at: for every
+operation `F` it applies to state `S`, it records enough to apply an inverse
+`F⁻¹` with `F⁻¹(F(S)) = S`.
 
-> For every operation $F$ applied to state $S$, there exists an inverse $F^{-1}$ such that $F^{-1}(F(S)) = S$.
+Whether that holds in general is **open**. What holds today, concretely:
 
-## Core Properties
+- each operation type has a named inverse (`OperationType::inverse`:
+  `Delete↔Create`, `Modify↔Modify`, `Move↔Move`, `Copy→Delete`, `Chmod`,
+  `Chown` self-inverse);
+- the information needed for that inverse is captured *before* the mutation
+  (content into the store, file metadata into the log);
+- `execute` then `undo` restores the prior state under property testing
+  (`property_tests::execute_then_undo_is_identity`);
+- rolling back a whole transaction in reverse order restores the state it
+  began in, **given** that each step's undo restores its execute. That
+  conditional is a proved Agda lemma (T-1); the premise itself is tested, not
+  proved (T-6).
 
-### Property 1: Deterministic Reversal
+## Core properties, at the strength the code supports
 
-Given an operation and its metadata, the reversal is uniquely determined:
+### 1. Reversal is determined, not searched
 
-$$\text{undo}: (\text{Operation}, \text{Metadata}) \to \text{Operation}^{-1}$$
+The inverse is a function of the recorded metadata, not of a filesystem scan:
+undo is a lookup in the append-only log followed by the operation-specific
+inverse in `delta.rs` / `operations.rs`. "Determined" is the honest word — the
+metadata is the sole input, and if it is lost the reversal is not merely
+ambiguous, it is unavailable.
 
-There is no ambiguity in how to reverse an operation.
+### 2. What a reversal restores
 
-### Property 2: State Preservation
+Capture and restore are **not** the same set, and the difference matters:
 
-The reversal restores *complete* original state, including:
+| Aspect | Captured? | Restored on undo? |
+|---|---|---|
+| File content | yes — content store, SHA-256 | yes, verified against the hash on read |
+| Permissions | yes (`FileMetadata.permissions`) | yes — `FileMetadata::apply` sets the mode |
+| Owner / group | yes (`owner`, `group`) | **no** — no `chown` call exists; values are recorded for the record's sake |
+| Modification time | yes (`modified`) | **no** — no `utimensat`/`set_times` call exists |
+| Symlink target | yes (`is_symlink`, `symlink_target` via `read_link`) | **no** — no `symlink()` call exists, so a deleted symlink is not recreated as a symlink |
+| Directory structure | per-file: a recursive delete logs one operation per entry | recreated only as far as the individual file undos recreate their parents |
 
-- File content (byte-for-byte identical)
+So "complete original state, byte-for-byte" is not true of this
+implementation. It is true of content and permissions on Unix; the rest is
+recorded but not applied.
 
-- File metadata (permissions, ownership, timestamps)
+### 3. Sequential composition
 
-- Directory structure
+Undo runs in reverse order, and composition is the proved model statement:
 
-- Symbolic link targets
+```
+undo(Oₙ) ∘ ⋯ ∘ undo(O₁) ∘ O₁ ∘ ⋯ ∘ Oₙ(S₀) = S₀
+```
 
-### Property 3: Sequential Composition
+This is ledger row **T-1** (`TransactionAtomicity.rollback-restores`, PROVEN in
+Agda over the log model) plus the rejected fixture
+`tests/reject-agda/ForwardRollback.agda`. It is conditional on T-6; it is not a
+statement about bytes on a device.
 
-For a sequence of operations, reversals compose correctly:
+### 4. Transaction semantics: recorded and resumable, not isolated
 
-$$(O_2 \circ O_1)^{-1} = O_1^{-1} \circ O_2^{-1}$$
+| Claim | Reality |
+|---|---|
+| Commit/rollback settle a group of operations | yes — `TransactionManager`, states `Active`/`Committed`/`RolledBack`; at most one active (T-3, PROVEN) |
+| A rollback that fails part-way can be retried | yes (T-4, TESTED — `rollback_resume_test`, driving the real `jk`) |
+| A failed save leaves memory and disk agreeing | yes for the transaction log (T-5, TESTED, write→fsync→rename with permission preservation) |
+| The **operation metadata** log has the same guarantee | **no** — `MetadataStore::save` is a plain `fs::write` (T-8, **OPEN**); an undo whose `mark_undone` fails to persist leaves the file undone and the log unchanged |
+| A failed execute leaves the filesystem unchanged | assumed, not checked (T-6) |
+| Intermediate states are invisible to other processes | **false** — operations are applied to the filesystem one at a time as they are executed. A transaction gives you a recorded, resumable rollback, not isolation. Nothing in this tool locks, stages, or hides the working tree |
 
-Operations are undone in reverse order.
+## Protocol, as a sketch
 
-### Property 4: Transaction Atomicity
+The phases below are the intended shape, not the call surface: `PreCaptureData`
+and `StorageReceipt` are illustrative types, and the real API is
+`ReversibleExecutor` in `crates/reversible-core/src/lib.rs` plus
+`OperationExecutor` in `crates/januskey-cli/src/operations.rs`. Read them as
+prose with braces.
 
-Operations grouped in a transaction satisfy:
+### Phase 1: Pre-capture
 
-- All-or-nothing execution
-
-- All-or-nothing reversal
-
-- Intermediate states are not externally visible
-
-## RMR Protocol
-
-### Phase 1: Pre-Capture
-
-Before any modification, capture everything needed for reversal:
-
-``` rust
+```rust
 // For a DELETE operation
 fn pre_capture_delete(path: &Path) -> PreCaptureData {
     PreCaptureData {
-        content: fs::read(path),           // Full file content
-        metadata: FileMetadata::from_path(path), // All metadata
-        content_hash: sha256(content),     // For verification
+        content: fs::read(path),
+        metadata: FileMetadata::from_path(path),
+        content_hash: sha256(content),
     }
 }
 ```
 
-### Phase 2: Secure Storage
+### Phase 2: Content-addressed storage
 
-Store captured data in content-addressed storage:
-
-``` rust
+```rust
 fn secure_store(data: PreCaptureData) -> StorageReceipt {
     let hash = content_store.store(data.content)?;
-    // Content is now safely stored with deduplication
     StorageReceipt { hash, verified: true }
 }
 ```
 
-### Phase 3: Metadata Recording
+### Phase 3: Metadata recording
 
-Create complete operation metadata:
-
-``` rust
+```rust
 fn record_metadata(op: Operation, receipt: StorageReceipt) -> OperationMetadata {
     OperationMetadata {
         id: uuid::new_v4(),
@@ -92,221 +125,157 @@ fn record_metadata(op: Operation, receipt: StorageReceipt) -> OperationMetadata 
         path: op.path(),
         content_hash: Some(receipt.hash),
         original_metadata: Some(op.original_metadata()),
-        // Everything needed for reversal
     }
 }
 ```
 
 ### Phase 4: Execute
 
-Only after all safety measures are in place:
-
-``` rust
+```rust
 fn execute(op: Operation) -> Result<()> {
-    // At this point, reversal is guaranteed possible
+    // The recorded metadata is now the only thing between this operation
+    // and unrecoverability. If the append below fails, the inverse is lost.
     op.perform()?;
     metadata_store.append(metadata)?;
     Ok(())
 }
 ```
 
+Ordering note, because this is where the guarantee is thinnest: in
+`execute_delete` the content is stored **before** the unlink and the metadata is
+appended **after** it (`operations.rs`). A crash between the unlink and the
+append loses the ability to undo that delete. T-6 and T-8 are the ledger rows
+that would have to close to remove that window.
+
 ### Phase 5: Reversal
 
-When undo is requested:
-
-``` rust
+```rust
 fn undo(operation_id: &str) -> Result<()> {
     let metadata = metadata_store.get(operation_id)?;
-
-    // Retrieve original content
     let content = content_store.retrieve(&metadata.content_hash)?;
-
-    // Reconstruct inverse operation
     let inverse = construct_inverse(&metadata, content);
-
-    // Execute reversal
     inverse.perform()?;
-
-    // Record the undo
-    metadata_store.mark_undone(operation_id)?;
+    metadata_store.mark_undone(operation_id)?;   // T-8: this save is not atomic
     Ok(())
 }
 ```
 
-## Operation-Specific RMR
+## Operation-specific inverses
 
-### DELETE → CREATE
+Taken from `OperationType::inverse` (`crates/reversible-core/src/metadata.rs`).
+There is no `Mkdir`/`Rmdir` operation type: a directory is deleted by walking it
+and logging one `Delete` per entry.
 
-| Forward (Delete)      | Reverse (Create)            |
-|-----------------------|-----------------------------|
-| Read content → Store  | Retrieve content from store |
-| Read metadata → Store | Apply stored metadata       |
-| Remove file           | Write file with content     |
-| Log operation         | Log undo operation          |
+| Forward | Inverse | What is stored for the inverse |
+|---|---|---|
+| `Delete` | `Create` | content hash + original metadata |
+| `Create` | `Delete` | nothing (the file did not exist) |
+| `Modify` | `Modify` | original hash + new hash; `delta.rs` stores a full copy or a line/block delta |
+| `Move` | `Move` | source and destination paths; the inverse swaps them |
+| `Copy` | `Delete` | destination path; the inverse removes the copy |
+| `Chmod` | `Chmod` | original mode |
+| `Chown` | `Chown` | original owner/group |
 
-### MODIFY → MODIFY
+`Chmod` and `Chown` exist in the model and the operation layer but are **not**
+exposed as `jk` subcommands; the CLI surface is `init, delete, modify, move,
+copy, rename, obliterate, undo, begin, commit, rollback, preview, history,
+status, gc`.
 
-| Forward (Modify)              | Reverse (Modify back)       |
-|-------------------------------|-----------------------------|
-| Read original content → Store | Retrieve original content   |
-| Write new content             | Write original content back |
-| Log with both hashes          | Log undo                    |
+## Formal status
 
-### MOVE → MOVE
+There is no single "RMR correctness" theorem here, and this page should not
+present one until it exists. What exists, by ledger row:
 
-| Forward (Move A→B)      | Reverse (Move B→A)               |
-|-------------------------|----------------------------------|
-| Record source path      | Use stored source as destination |
-| Record destination path | Use stored destination as source |
-| Perform rename          | Perform rename back              |
-| Log operation           | Log undo                         |
+| Row | Statement | Status |
+|---|---|---|
+| T-1 | Undoing a fully executed transaction in reverse order restores the state it began in, given each step's undo restores its execute | **PROVEN** (Agda, model) |
+| T-2 | The lifecycle preserves the log invariant and rewrites only the Active transaction | **PROVEN** (Agda, model) |
+| T-3 | At most one transaction is Active | **PROVEN** (Agda, model) |
+| T-4 | A partially failed rollback can be retried to completion | **TESTED** |
+| T-5 | The transaction log is replaced atomically, with permissions preserved | **TESTED** |
+| T-6 | A failed execute leaves the filesystem unchanged; each undo restores its execute's pre-state | **ASSUMED** |
+| T-7 | Transaction ids never collide | **ASSUMED** |
+| T-8 | The operation metadata log is saved atomically | **OPEN** |
+| — | "Every operation is reversible" as a theorem linked to the Rust | **OPEN** |
+| G-2 | The Idris2 and Agda presentations correspond | **ASSUMED** — "by transcription, no mechanical link claimed" |
 
-### MKDIR → RMDIR
+## Implementation details
 
-| Forward (Mkdir)       | Reverse (Rmdir)         |
-|-----------------------|-------------------------|
-| Create directory      | Remove directory        |
-| Log path              | Use logged path         |
-| (No content to store) | (No content to restore) |
+### Content store
 
-### RMDIR (recursive) → Restore
-
-| Forward (Rmdir -r)      | Reverse (Full restore) |
-|-------------------------|------------------------|
-| Walk directory tree     | Read manifest          |
-| Store each file content | Restore each file      |
-| Store manifest          | Recreate directories   |
-| Remove directory tree   | Apply metadata         |
-
-## Formal Verification
-
-### Theorem: RMR Correctness
-
-For all operations $O$ and states $S$:
-
-$$\text{undo}(\text{execute}(O, S)) = S$$
-
-#### Proof Sketch
-
-1.  **Pre-capture completeness**: By construction, pre-capture stores all information needed to reconstruct original state.
-
-2.  **Storage integrity**: Content-addressed storage with SHA256 verification ensures stored content is retrieved exactly.
-
-3.  **Metadata sufficiency**: Operation metadata contains path, original metadata, and content hash—sufficient for reconstruction.
-
-4.  **Inverse construction**: Each operation type has a defined inverse that uses stored information.
-
-5.  **Composition**: Undo operations are themselves operations that can be tracked. ∎
-
-### Theorem: Sequential Reversibility (Theorem 3.4)
-
-For operations $O_1, O_2, \ldots, O_n$:
-
-$$\text{undo}(O_n) \circ \cdots \circ \text{undo}(O_1) \circ O_1 \circ \cdots \circ O_n(S) = S$$
-
-#### Proof
-
-By induction on $n$:
-
-**Base case** ($n=1$): Direct application of RMR correctness.
-
-**Inductive step**: Assume true for $n-1$. Then:
-
-$$\text{undo}(O_n)(O_n(O_{n-1}(\cdots O_1(S)))) = O_{n-1}(\cdots O_1(S))$$
-
-By inductive hypothesis, the remaining undos restore $S$. ∎
-
-## Implementation Details
-
-### Content Store
-
-``` rust
-pub struct ContentStore {
-    root: PathBuf,
-    compression: bool,
-}
+```rust
+pub struct ContentStore { root: PathBuf, compression: bool }
 
 impl ContentStore {
-    // Store content, return hash
     pub fn store(&self, content: &[u8]) -> Result<ContentHash> {
-        let hash = ContentHash::from_bytes(content);
+        let hash = ContentHash::from_bytes(content);   // sha256:<hex>
         let path = self.content_path(&hash);
-
-        // Deduplication: skip if already stored
-        if path.exists() {
-            return Ok(hash);
-        }
-
-        // Write (optionally compressed)
+        if path.exists() { return Ok(hash); }          // dedup
         self.write_content(&path, content)?;
         Ok(hash)
     }
 
-    // Retrieve with integrity verification
     pub fn retrieve(&self, hash: &ContentHash) -> Result<Vec<u8>> {
         let content = self.read_content(&self.content_path(hash))?;
-
-        // Verify integrity
-        if !hash.verify(&content) {
-            return Err(JanusError::ContentIntegrityError);
-        }
-
+        if !hash.verify(&content) { return Err(JanusError::ContentIntegrityError); }
         Ok(content)
     }
 }
 ```
 
-### Metadata Store
+Deduplication has a consequence worth knowing: a blob can back several paths, so
+"delete the blob" is not the same as "delete this file's history" — see the
+shared-blob rule in [RMO](rmo-primitive.md).
 
-``` rust
-pub struct MetadataStore {
-    path: PathBuf,
-    log: OperationLog,
-}
+### Metadata store
 
+```rust
 impl MetadataStore {
-    // Append-only operation logging
     pub fn append(&mut self, metadata: OperationMetadata) -> Result<()> {
         self.log.operations.push(metadata);
-        self.save()?;
+        self.save()?;                                  // T-8: plain fs::write
         Ok(())
     }
 
-    // Mark operation as undone
-    pub fn mark_undone(&mut self, id: &str, undo_id: &str) -> Result<()> {
-        if let Some(op) = self.get_mut(id) {
-            op.undone = true;
-            op.undo_operation_id = Some(undo_id.to_string());
-            self.save()?;
-        }
+    pub fn mark_undone(&mut self, id: &str) -> Result<()> {
+        if let Some(op) = self.get_mut(id) { op.undone = true; self.save()?; }
         Ok(())
     }
 }
 ```
 
-## Performance Characteristics
+The transaction log (`TransactionLog::save`) already uses the atomic path with a
+per-save temporary file, mode preservation, fsync and rename. The operation
+metadata log does not — that asymmetry is row T-8.
 
-| Metric            | Value                | Notes                  |
-|-------------------|----------------------|------------------------|
-| Storage overhead  | O(content size)      | With deduplication     |
-| Capture latency   | O(file size)         | Single read operation  |
-| Undo latency      | O(file size)         | Single write operation |
-| Metadata overhead | ~500 bytes/operation | JSON serialized        |
+## Performance
+
+The table below is *expected* cost derived from the algorithm, not a
+measurement. No baseline has been recorded; the five Criterion groups exist but
+their results are unbaselined (`READINESS.adoc` §Benchmark Classification).
+
+| Metric | Expected | Notes |
+|---|---|---|
+| Storage overhead | O(content size) | with deduplication |
+| Capture latency | O(file size) | one read |
+| Undo latency | O(file size) | one write |
+| Metadata overhead | ~500 bytes/operation | JSON serialized |
 
 ## Limitations
 
-1.  **Requires disk space**: Original content must be stored
+1. **The store is the whole guarantee.** Lose `.januskey/` and undo is gone.
+2. **Metadata consistency is weaker than it looks** — T-8 is open; the
+   metadata log is written non-atomically.
+3. **Not everything captured is restored** — ownership, mtime and symlink
+   identity are recorded but not applied (§2).
+4. **No isolation.** Operations touch the live filesystem as they execute.
+5. **Local filesystem only.** No network or external side effects are reversed.
+6. **Not proved against the Rust** — G-2 is ASSUMED, so the Agda model and the
+   implementation are linked by review, not by machine.
 
-2.  **Not instantaneous**: Pre-capture adds latency to operations
-
-3.  **Single-system**: RMR operates on local file system only
-
-4.  **No external side effects**: Cannot reverse network operations, etc.
-
-## Further Reading
+## Further reading
 
 - [RMO: Obliterative Wipe Primitive](rmo-primitive.md)
-
 - [Formal Model of File System State](formal-model.md)
-
-- [Content Store Implementation](../architecture/content-store.md)
+- `../../../PROOF-NEEDS.adoc` — the claims ledger, rows T-1..T-8
+- [Architecture](../architecture/index.md)

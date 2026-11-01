@@ -1,5 +1,5 @@
 == JanusKey — Project Topology
-// Last updated: 2026-10-13 (proof count reconciled to the PROOF-NEEDS claims ledger by dashboard-check)
+// Last updated: 2026-11-01 (diagram label de-claimed; proof/test counts unchanged — see the PROOF-NEEDS claims ledger)
 
 === System Architecture
 
@@ -35,7 +35,7 @@
                                             ▼
                         ┌─────────────────────────────────────────┐
                         │           TARGET FILESYSTEM             │
-                        │      (Provably Reversible State)        │
+                        │      (Reversible, proofs pending)       │
                         └─────────────────────────────────────────┘
 
                         ┌─────────────────────────────────────────┐

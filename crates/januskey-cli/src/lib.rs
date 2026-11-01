@@ -2,7 +2,7 @@
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 //
-// JanusKey CLI: Provably Reversible File Operations
+// JanusKey CLI: reversible file operations with inversion metadata
 // Through Maximal Principle Reduction (MPR)
 //
 // Core types are provided by reversible-core. This crate adds:

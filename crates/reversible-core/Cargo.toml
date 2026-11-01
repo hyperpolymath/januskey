@@ -4,7 +4,7 @@
 [package]
 name = "reversible-core"
 version = "0.1.0"
-description = "Core types for provably reversible operations — content-addressed storage, operation metadata, and transaction management"
+description = "Core types for reversible operations — content-addressed storage, operation metadata, and transaction management (proofs pending)"
 keywords = ["reversible", "content-addressed", "transactions", "undo", "formal-verification"]
 categories = ["data-structures", "filesystem"]
 edition.workspace = true

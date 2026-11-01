@@ -2,8 +2,7 @@
 // Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 // SPDX-FileCopyrightText: 2025 Jonathan D.A. Jewell
 //
-// JanusKey CLI: Provably Reversible File Operations
-// "Never lose data again"
+// JanusKey CLI: reversible file operations with inversion metadata
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -22,10 +21,13 @@ use std::path::{Path, PathBuf};
     name = "jk",
     version = "1.0.0",
     author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>",
-    about = "JanusKey: Provably reversible file operations",
-    long_about = "JanusKey makes every file operation reversible through Maximal Principle Reduction.\n\
-                  Delete files, modify content, move things around—and always be able to undo.\n\n\
-                  Data loss is architecturally impossible."
+    about = "JanusKey: reversible file operations with inversion metadata",
+    long_about = "JanusKey stores the inverse of each file operation in an append-only, \
+                  content-addressed log, so a delete, modify, move or copy can be undone by \
+                  metadata lookup rather than restored from a backup.\n\n\
+                  Reversibility is an engineering mechanism here, not a proved theorem: the \
+                  obligations in PROOF-NEEDS.adoc are still open, and obliteration is \
+                  best-effort on modern media."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -108,8 +110,9 @@ enum Commands {
         new_name: PathBuf,
     },
 
-    /// Obliterate a file: securely overwrite then remove it (NOT reversible).
-    /// Implements GDPR Article 17 "right to erasure".
+    /// Obliterate a file: overwrite then remove it (NOT reversible).
+    /// Best-effort erasure, not a guarantee of physical erasure and not a
+    /// compliance determination. See PROOF-NEEDS.adoc row X-1.
     Obliterate {
         /// File(s) to obliterate
         #[arg(required = true)]
