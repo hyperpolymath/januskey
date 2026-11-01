@@ -77,8 +77,9 @@ impl std::fmt::Display for ContentHash {
 /// Stores content by SHA256 hash with optional gzip compression.
 /// Automatic deduplication: identical content is stored once.
 ///
-/// This is the shared storage backend that both januskey-cli and
-/// valence-shell use for reversible operation data.
+/// Used by januskey-cli for its undo data. valence-shell is an *intended*
+/// consumer and does not depend on this crate yet; see
+/// docs/adr/0001-identity-and-scope.md §4.
 pub struct ContentStore {
     /// Root directory for content storage
     root: PathBuf,

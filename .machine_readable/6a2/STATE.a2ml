@@ -20,6 +20,9 @@ session-date = "2026-06-12"
 work = "Estate standardization merged (flat contractiles, bot_directives, 6a2/anchor, self-validating, GOVERNANCE/MAINTAINERS/CODEOWNERS, flake.nix removed); CodeQL cron weekly→monthly cherry-picked; governance checkpoint layer (STATE refresh, bot_directives trio, Dust/Bust flat port, k9 template set)"
 
 [recent-work.since-2026-11-01]
+identity = "ADR-0001 (docs/adr/0001-identity-and-scope.md): identity resolved from code. The product is `jk`; measured coupling between the reversibility path and the key subsystem is zero in both directions, and the audit chain is library-only (main.rs never builds an AuditLog). Applied: `key-lifecycle` feature gates the jk-keys binary out of the default build; identity statements corrected in README, PROOF-NEEDS, ARCHITECTURE, januskey-cli/src/lib.rs, KEY_LIFECYCLE; V-1..V-3 ledger rows pin downstream consumption (valence-shell, ochrance, aletheia) as DESIGNED, since no repository outside this workspace depends on reversible-core. Not applied: the module move into crates/januskey-keys, which needs a toolchain this session does not have (no rustc, no crates.io) — steps and acceptance criteria in ADR-0001 §5."
+human-action = "Two files contradict ADR-0001 and are agent-denied by the Trustfile (@trust-deny: modify-trustfile, modify-threat-model): contractiles/Trustfile.a2ml line 8 calls januskey \"a key-management tool\"; threat-model.a2ml [primitives.mac] still describes the removed home-rolled HMAC. Both need an owner edit."
+
 claim-surfaces = "Estate consistency audit (docs/estate/2026-11-01-handoff-and-consistency-audit.md) found the structural model intact and the drift in this repo's own published surfaces. Corrected for over-claim only: wiki theory pages (rmo, rmr, mpr, maa-framework, formal-model, index) restated at the strength of the claims ledger; security/THREAT_MODEL.adoc compliance mapping rewritten and its '256-bit ECC' and BLAKE3 rows removed (neither is in the tree); CLI about/long_about and the Obliterate help no longer claim provable reversibility or a GDPR determination; crate descriptions and module headers aligned; TOPOLOGY diagram label de-claimed. No ledger row changed status and no test or proof count changed."
 
 [recent-work.since-2026-04-04]
@@ -31,15 +34,17 @@ docs = "CHANGELOG.md seeded, Keep-a-Changelog (#45); tech-debt audit recorded (#
 structure = "contractiles: bust/ added + k9 → svc/ per ADR-001 2026-04-18 (4094646, 9f05e98); 6SCM → 6A2 metadata migration"
 
 [test-coverage]
-# As assessed in READINESS.md (2026-04-03); no test-suite changes landed since.
-unit-tests = "36"
-p2p-property-tests = "8"
+# Reconciled 2026-11-01. The per-category counts are the 2026-04-03 assessment and
+# have NOT been re-derived; the two aggregates below are the figures READINESS.adoc
+# declares and dashboard-check measures. Quote the aggregates, not the categories.
+unit-tests = "36 (2026-04-03 assessment, not re-derived)"
+p2p-property-tests = "8 (2026-04-03 assessment, not re-derived)"
 e2e-integration-tests = "1 script (mostly skips without pre-built binary)"
-property-tests = "9"
-regression-tests = "5"
-idris2-proofs = "30"
-benchmarks = "5 Criterion groups"
-total = "67 tests + 5 benchmark groups + 30 Idris2 proofs (READINESS.md matrix)"
+property-tests = "9 (2026-04-03 assessment, not re-derived)"
+regression-tests = "5 (2026-04-03 assessment, not re-derived)"
+idris2-proofs = "11 PROVEN ledger rows (the former 30 counted lemmas before the tautology purge; PROOF-NEEDS.adoc is authoritative)"
+benchmarks = "5 Criterion groups (no baseline recorded)"
+total = "135 tests + 5 benchmark groups + 11 PROVEN ledger rows — as declared in READINESS.adoc and measured by dashboard-check"
 
 [test-categories-complete]
 unit = true

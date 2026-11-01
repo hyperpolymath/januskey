@@ -5,17 +5,26 @@
 // JanusKey CLI: reversible file operations with inversion metadata
 // Through Maximal Principle Reduction (MPR)
 //
-// Core types are provided by reversible-core. This crate adds:
-// - Filesystem operation execution (operations.rs)
-// - Key management (keys.rs)
-// - Audit trail (attestation.rs)
-// - Secure deletion (obliteration.rs, delta.rs)
-// - CLI interface (main.rs, keys_cli.rs)
+// Identity: reversible file operations. The `jk` binary is the product. Its whole
+// implementation is main.rs + lib.rs + operations.rs + delta.rs + obliteration.rs
+// over reversible-core; nothing else is on that path.
+//
+// Also in this crate, but NOT on the `jk` path (docs/adr/0001-identity-and-scope.md):
+// - keys.rs / keys_cli.rs — a key store with lifecycle management (Argon2id,
+//   AES-256-GCM key wrapping, rotate/revoke/backup), built as the separate
+//   `jk-keys` binary behind the `key-lifecycle` feature. There is no call edge in
+//   either direction between it and `jk`, and it protects no file content: the
+//   content store is plaintext. Candidate for extraction.
+// - attestation.rs — an HMAC-SHA256-chained audit log. Library-only: `jk` never
+//   constructs an AuditLog, and the key it needs is an opaque `[u8; 32]` handed in
+//   by the caller, never derived from keys.rs.
 
 #![forbid(unsafe_code)]
 
 pub mod attestation;
 pub mod delta;
+/// Key store and lifecycle manager. Not used by the `jk` reversibility path —
+/// see the module map at the top of this file and docs/adr/0001-identity-and-scope.md.
 pub mod keys;
 pub mod obliteration;
 pub mod operations;

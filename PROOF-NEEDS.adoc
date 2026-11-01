@@ -75,6 +75,9 @@ tables must agree.
 | T-6 | A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1; single steps are TESTED by `+execute_then_undo_is_identity+`) | ASSUMED | not checked for the failure path
 | T-7 | Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) | ASSUMED | probabilistic, not checked
 | T-8 | The operation metadata log is saved atomically, and an undo whose `+mark_undone+` fails to persist can be retried | OPEN | by inspection: `+MetadataStore::save+` is the same plain `+fs::write+`; `+undo+` runs the undo, then `+mark_undone+` persists, so a failed persist leaves the file undone but the log not
+| V-1 | valence-shell depends on `+reversible-core+` for reversible operation data | DESIGNED | ARCHITECTURE.adoc §Consumption status — no repository outside this workspace depends on the crate; Phase 2 is unstarted
+| V-2 | ochrance verifies januskey A2ML manifests | DESIGNED | `+crates/reversible-core/src/manifest.rs+` — `+ManifestEmitter+` has never been parsed by ochrance; the SHA-256/BLAKE3 boundary mismatch is unresolved
+| V-3 | aletheia consumes `+reversible-core+` | DESIGNED | ARCHITECTURE.adoc §Deferred — Phase 0 research, no operation types yet
 |===
 
 Removed, with the reason recorded beside the replacement in source:
@@ -114,9 +117,11 @@ NOT the security proofs listed below.
 * **generated/idrisiser/**: removed 2026-10-14 (owner decision). It never
 typechecked (lowercase generated module names), so nothing in it was
 verified; no ledger row depended on it.
-* *Dangerous patterns*: *265* `+unwrap()+` calls across the Rust
-codebase.
-* *LOC*: ~12,200 (Rust)
+* *Dangerous patterns*: *241* `+unwrap()+` calls across the Rust codebase
+  (measured 2026-11-01; the previous 265 and 225 figures in this file and
+  READINESS agreed with neither the code nor each other).
+* *LOC*: 11,160 Rust lines in the tree (8,495 in `crates/*/src`; measured 2026-11-01).
+  The previous figure, ~12,200, was not reproducible.
 * *ABI layer*: present (`+src/abi/JanusKey/ABI/{Types,Foreign,Layout,Proofs}.idr+`, package `+src/abi/januskey-abi.ipkg+`)
 but carries no load-bearing security proof yet — the real obligations
 below are still open.
@@ -130,7 +135,8 @@ below are still open.
 |Core feature: must guarantee data is unrecoverable
 
 |Key derivation |Key generation produces cryptographically sound keys
-|Weak keys break entire security model
+|Weak keys break the key store's security model. **Off the `jk` path** — tracked
+here only while `+keys.rs+` remains in this tree (ADR-0001)
 
 |Attestation chain |Chain of custody proofs are unforgeable |Tampered
 attestations undermine trust
@@ -209,6 +215,9 @@ the status table above.
 |T-6: A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1) |ASSUMED |`crates/januskey-cli/src/operations.rs` |-
 |T-7: Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) |ASSUMED |`crates/reversible-core/src/transaction.rs` |-
 |Every operation is reversible (MPR), as a theorem linked to the Rust (needs G-2 made mechanical, and G-3) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
+|V-1: valence-shell depends on reversible-core for reversible operation data (ARCHITECTURE Phase 2) |DESIGNED |`ARCHITECTURE.adoc` |-
+|V-2: ochrance verifies januskey A2ML manifests (ARCHITECTURE Phase 3) |DESIGNED |`crates/reversible-core/src/manifest.rs` |-
+|V-3: aletheia consumes reversible-core (ARCHITECTURE, deferred) |DESIGNED |`ARCHITECTURE.adoc` |-
 |===
 
 === Recommended Prover
@@ -219,12 +228,19 @@ ABI/runtime layer (ruling 2026-10-12): kernel statements live in
 (`+scripts/fetch-siblings.sh+`); the ABI lives in `+src/abi/+`.
 Transaction atomicity is stated there for the model
 (`+verification/proofs/agda/TransactionAtomicity.agda+`, rows T-1 to T-3; the Rust fixes behind T-4 and T-5 are tested, not proved);
-obliteration completeness and attestation chain integrity are still to be stated. The 225 `+unwrap()+` calls should
+obliteration completeness and attestation chain integrity are still to be stated. The 241 `+unwrap()+` calls should
 be systematically replaced with proven error handling.
 
 === Priority
 
-*HIGH* — JanusKey handles cryptographic key management, attestation
-chains, and data obliteration. Any correctness bug in obliteration or
-key derivation is a critical security vulnerability. The ABI layer now
-typechecks, but none of the security obligations above is proved.
+*HIGH* — reversibility is the product, and its exceptions are destructive:
+obliteration destroys data on purpose, and the operation log is the only thing
+that makes undo possible (row T-8 is open). Any correctness bug in either is a
+critical vulnerability. The ABI layer now typechecks, but none of the security
+obligations above is proved.
+
+The workspace also contains a key store with lifecycle management
+(`+keys.rs+`, `+jk-keys+`). It is **not on the `jk` path**, has no call edge to or
+from it, protects no file content, and is not part of this repository's identity;
+its obligations are tracked here only while the module remains in this tree. See
+`link:docs/adr/0001-identity-and-scope.md[ADR-0001]`.

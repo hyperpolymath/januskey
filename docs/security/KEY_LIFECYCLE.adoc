@@ -7,11 +7,29 @@
 :sectnums:
 :icons: font
 
+== Scope — read this first
+
+This document describes the key store in `crates/januskey-cli/src/keys.rs`, built as
+the `jk-keys` binary. **It is not part of JanusKey's identity and is not on the `jk`
+reversibility path.** There is no call edge in either direction between the two, the
+binary is behind the opt-in `key-lifecycle` feature so a default build produces `jk`
+only, and the module is scheduled to move out of this repository
+(`link:../../docs/adr/0001-identity-and-scope.md[ADR-0001]`).
+
+**Accuracy note.** Everything below is a *specification*. The implemented `jk-keys`
+subcommands are `init, list, generate, show, rotate, revoke, backup, status, audit,
+export, verify, history`. Examples that use `restore`, `recover`,
+`obliterate` or `verify-obliteration` describe behaviour that does not exist in the
+CLI yet; they are marked where they appear.
+
 == Overview
 
-This document specifies the complete lifecycle for cryptographic keys managed by JanusKey,
-from generation through destruction. Following MPR principles, key lifecycle transitions
-are enforced through type-state patterns, making invalid state transitions impossible.
+This document specifies the lifecycle for the keys held in that store, from generation
+through destruction. The type-state discipline it describes is the design intent: the
+implemented state machine is the `KeyState` sum
+(`Generated, Active, Rotating, Suspended, Revoked, Obliterated`), which makes an
+unenumerated state unrepresentable but does not by itself forbid every invalid
+transition.
 
 == Key Hierarchy
 
@@ -461,18 +479,30 @@ fn obliterate_key(key_id: Uuid) -> Result<ObliterationProof, Error> {
 
 === Destruction CLI
 
+Implemented:
+
 [source,bash]
 ----
 # Revoke a key (retain for audit)
 jk-keys revoke --key-id <uuid> --reason "scheduled rotation"
 
-# Obliterate a key (GDPR erasure)
-jk-keys obliterate --key-id <uuid> --confirm
-# Output: Obliteration proof (for compliance records)
-
-# Verify obliteration proof
-jk-keys verify-obliteration --proof <base64-proof>
+# Inspect the audit log
+jk-keys audit
+jk-keys verify
 ----
+
+Specified but **not implemented** in the CLI (the library has
+`KeyManager::retrieve`, and `KeyState::Obliterated` exists, but no command reaches
+either):
+
+[source,bash]
+----
+jk-keys obliterate --key-id <uuid> --confirm    # not implemented
+jk-keys verify-obliteration --proof <b64>       # not implemented
+----
+
+Note that key destruction is not an erasure claim about anything outside the store:
+the same caveat as `jk obliterate` applies (`../wiki/theory/rmo-primitive.md`).
 
 == Audit Trail
 

@@ -44,7 +44,7 @@ Transaction manager::
 == Exceptions
 
 [[secure-obliteration]]
-Secure obliteration (`jk shred`)::
+Secure obliteration (`jk obliterate`)::
   The deliberate exception to reversibility. Attempts overwrite-in-place to destroy file contents. Best-effort only: cannot guarantee physical erasure on SSD (wear leveling), CoW (ZFS, Btrfs), or journaling filesystems. Physical destruction is the only guaranteed obliteration on modern media.
   *Classification:* **project-specific** (operation).
 

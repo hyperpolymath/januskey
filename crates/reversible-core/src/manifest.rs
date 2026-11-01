@@ -5,10 +5,15 @@
 // A2ML Manifest Emitter
 //
 // Generates A2ML (Attestation & Audit Markup Language) manifests from
-// operation logs. These manifests can be consumed by ochrance's
-// VerifiedSubsystem::verify to produce VerificationProof witnesses.
+// operation logs. These manifests are *intended* to be consumed by ochrance's
+// VerifiedSubsystem::verify, which would produce VerificationProof witnesses.
+// It has never happened: nothing in this repository has been verified by
+// ochrance, the crate is not consumed outside this workspace, and the hash
+// algorithm at this boundary is unresolved (SHA-256 here, BLAKE3 believed
+// there). Do not describe the manifest as an interoperability result.
+// See docs/adr/0001-identity-and-scope.md §4.
 //
-// Format follows ochrance-core/Ochrance/A2ML/Types.idr:
+// Format is written against ochrance-core/Ochrance/A2ML/Types.idr:
 //   Manifest { manifestData, refs, attestation, policy }
 
 use crate::content_store::ContentHash;
@@ -22,10 +27,12 @@ use sha2::{Digest, Sha256};
 /// - Refs: one entry per operation, keyed by operation ID with content hash
 /// - Merkle root: SHA256 hash chain of all operation hashes in order
 ///
-/// Ochrance can parse this manifest and verify:
+/// Ochrance is *designed* to parse this manifest and verify:
 /// - Lax: manifest is well-formed
 /// - Checked: all content hashes match the content store
 /// - Attested: manifest is signed (requires external signing step)
+///
+/// None of those three checks has been run by ochrance.
 pub struct ManifestEmitter;
 
 impl ManifestEmitter {

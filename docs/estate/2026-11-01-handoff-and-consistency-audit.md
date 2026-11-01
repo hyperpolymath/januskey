@@ -234,12 +234,57 @@ changed, so `dashboard-check`'s dashboards/ledger reconciliation is unaffected.
 | D4 | EXPLAINME rewritten: the phantom "100% Reversible — every operation can be undone, always" heading (a claim the README does not actually make) became the mechanism it can defend; the file map now points at the files that exist (`reversible-core` for store/log/transaction, `operations.rs` for the executors); the audit-trail claim states what is purged by `obliterate`/`gc` and that the obliteration ledger is unkeyed; the phantom CRG "C (Beta)" line now matches STATE/READINESS (D) and says the checker enforces it | `EXPLAINME.adoc` |
 | D5-adjacent | TOPOLOGY's diagram label `(Provably Reversible State)` → `(Reversible, proofs pending)`, width preserved; STATE records this session's work; the TOPOLOGY date is bumped so it does not predate STATE | `TOPOLOGY.adoc`, `.machine_readable/6a2/STATE.a2ml` |
 
-Still open from §4, unchanged: **D6/D7** (three `unwrap()` counts; STATE's test-coverage
-block), **D8** (the AI manifest's `.bot_directives/` and `README.md` paths),
-**D9** (README documents a `jk shred` command that does not exist; `KEY_LIFECYCLE`
-documents `jk-keys obliterate` and `jk-keys verify-obliteration`, which do not
-exist either), **D10** (threat-model.a2ml's stale home-rolled-HMAC finding), and
-**T-8** (the non-atomic metadata log).
+Superseded by §4.2: D6, D7, D8 and D9 are closed; D10, the Trustfile
+sentence, T-8 and the module move are blocked for the reasons tabulated there.
+
+### 4.2 Identity resolved, and the mechanical defects (same day, second pass)
+
+**ADR-0001 (`docs/adr/0001-identity-and-scope.md`)** resolves the identity from code
+rather than from the name, the README or the Trustfile:
+
+- The `jk` binary's implementation is `main.rs + lib.rs + operations.rs + delta.rs +
+  obliteration.rs` over `reversible-core`. That is the product.
+- Measured coupling to the key subsystem is **zero in both directions** (`main.rs`
+  contains no `keys::`, `KeyManager` or `keys_cli` reference; `keys.rs` imports only
+  `attestation::AuditLog`). The audit chain is **library-only** — `main.rs` never
+  constructs an `AuditLog` — and the content store is plaintext, so the key store
+  protects no file content.
+- Decision: key lifecycle is not part of the product. The `jk-keys` binary is gated
+  behind the opt-in `key-lifecycle` feature (default `cargo build --workspace`
+  produces `jk` only); the module move to `crates/januskey-keys` is specified in
+  ADR-0001 §5 with acceptance criteria, and is **not** applied because this session
+  has no toolchain to build or test it.
+- The invariant "not a cryptographic key system" is therefore satisfied for the
+  *product* and not yet for the *module*; ADR-0001 §7 says so rather than claiming
+  the win.
+
+**Consumption claims pinned.** `reversible-core`'s "shared foundation that all three
+applications use" was false. Ledger rows **V-1** (valence-shell), **V-2** (ochrance
+verification) and **V-3** (aletheia) now carry status `DESIGNED` with a one-line
+condition for changing it, the `ContentStore`/`ManifestEmitter`/`ReversibleExecutor`
+doc comments say "intended, not consumed", and ARCHITECTURE has a
+§Consumption status table. The ledger re-parses clean (46 rows, 4 cells each, all
+non-run rows `-`, all artefacts present) and the PROVEN count is unchanged at 11.
+
+**Mechanical defects closed:** **D6** (241 `unwrap()` calls, one number in both
+files, with the measurement command; Rust LOC corrected from "~12,200" to the
+measured 11,160), **D7** (STATE's test-coverage block rewritten to the reconciled
+135 tests / 11 PROVEN rows, per-category figures marked as the un-re-derived
+2026-04-03 assessment), **D8** (AI manifest paths: `.machine_readable/bot_directives/`,
+`README.adoc`), **D9** (README and GLOSSARY now say `jk obliterate`; `rename`,
+`obliterate`, `gc` documented; `KEY_LIFECYCLE` marks `obliterate`,
+`verify-obliteration`, `restore` and `recover` as specified-but-not-implemented and
+carries a scope banner).
+
+**Still blocked, with the reason recorded rather than worked around:**
+
+| Item | Blocked on |
+|---|---|
+| **T-8** (atomic metadata log) — the one open ledger row a second implementor would inherit | No `rustc`/`cargo`/crates.io in this sandbox: the change moves `write_atomic` out of `transaction.rs` into a shared path and touches six T-5 tests. Unverifiable here, so not attempted |
+| **D10** (`threat-model.a2ml` still describes the removed home-rolled HMAC) | Agent-denied: Trustfile `@trust-deny: modify-threat-model` |
+| **Trustfile's "key-management tool" sentence** (its lines 8–10 contradict ADR-0001) | Agent-denied: Trustfile `@trust-deny: modify-trustfile`. Owner edit, ADR-0001 §6 |
+| D5 (`hexad` feed in an octad estate) | Needs VeriSimDB's answer on whether `hexad` is a live format (prompt §5.5) |
+| The `crates/januskey-keys` move | Toolchain (ADR-0001 §5) |
 
 ---
 

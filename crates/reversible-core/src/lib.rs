@@ -9,11 +9,15 @@
 //
 // Lineage:
 //   maa-framework (policy) → absolute-zero (theory) → januskey (PoC)
-//     → ochrance, valence-shell, aletheia (applications)
+//     → ochrance, valence-shell, aletheia (intended consumers)
 //
-// This crate provides the shared foundation that all three applications
-// use: content-addressed storage, operation metadata, and the
-// ReversibleExecutor trait.
+// This crate is *intended* to be the shared basis for reversible operation data:
+// content-addressed storage, operation metadata, and the ReversibleExecutor
+// trait. It is not yet shared: no repository outside this workspace depends on
+// it, ARCHITECTURE.adoc Phase 2 (valence-shell) and Phase 3 (ochrance) are
+// unstarted, and the hash algorithm at the manifest boundary is unresolved
+// (SHA-256 here, BLAKE3 believed there). See
+// docs/adr/0001-identity-and-scope.md §4 for what may and may not be claimed.
 
 #![forbid(unsafe_code)]
 
@@ -34,7 +38,9 @@ pub use transaction::{
 
 /// Trait that any reversible operation system must implement.
 ///
-/// This is the Rust-side mirror of ochrance's `VerifiedSubsystem` interface.
+/// This is *intended* as the Rust-side mirror of ochrance's
+/// `VerifiedSubsystem` interface; no ochrance-side implementation or consumer
+/// exists yet, and none has been tested against this trait.
 /// Implementations provide:
 /// - Forward execution of operations with metadata for reversal
 /// - Undo of previously executed operations
