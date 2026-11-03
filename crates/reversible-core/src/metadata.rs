@@ -284,13 +284,23 @@ impl MetadataStore {
         self.save()
     }
 
-    /// Save the log to disk
+    /// Save the log to disk.
+    ///
+    /// Replaces the log using [`crate::transaction::write_atomic`]. Parent
+    /// directory sync is best effort, so success does not guarantee that the
+    /// rename will survive a crash.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors from creating the parent directory, serialising the log,
+    /// or creating, setting permissions on, writing, syncing or renaming the
+    /// temporary file.
     fn save(&self) -> Result<()> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
         }
         let content = serde_json::to_string_pretty(&self.log)?;
-        fs::write(&self.path, content)?;
+        crate::transaction::write_atomic(&self.path, content.as_bytes())?;
         Ok(())
     }
 
@@ -554,5 +564,45 @@ mod tests {
         let store2 = MetadataStore::new(path).unwrap();
         assert_eq!(store2.count(), 1);
         assert!(store2.get(&id).is_some());
+    }
+
+    /// T-8: a save replaces the log by rename, so a reader never sees a torn
+    /// log and no temporary file survives the save. A stale temporary file left
+    /// by an earlier crash is not read and does not stop the next save.
+    #[test]
+    fn save_replaces_the_log_atomically() {
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path();
+        let path = dir.join("metadata.json");
+
+        let mut store = MetadataStore::new(path.clone()).unwrap();
+        store.append(modify_entry("/a.txt", b"a0", b"a1")).unwrap();
+
+        let leftovers = |dir: &Path| -> Vec<String> {
+            fs::read_dir(dir)
+                .expect("read dir")
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .filter(|n| n.ends_with(".tmp"))
+                .collect()
+        };
+        assert_eq!(
+            leftovers(dir),
+            Vec::<String>::new(),
+            "a save's own temporary file is renamed away"
+        );
+
+        // A torn temporary file from an earlier crash must not matter.
+        let stale = "metadata.json.99999.0.tmp";
+        fs::write(dir.join(stale), b"{ torn").expect("plant stale tmp");
+        store.append(modify_entry("/b.txt", b"b0", b"b1")).unwrap();
+        assert_eq!(
+            leftovers(dir),
+            vec![stale.to_string()],
+            "the next save leaves the stale file alone and cleans up after itself"
+        );
+
+        let reopened = MetadataStore::new(path).expect("log parses after atomic saves");
+        assert_eq!(reopened.count(), 2);
     }
 }

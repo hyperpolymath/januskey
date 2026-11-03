@@ -8,10 +8,10 @@ standards/testing-and-benchmarking/TESTING-TAXONOMY.adoc v1.0
 
 === CRG Grade: D (Alpha — Unstable)
 
-*Justification:* 135 tests declared (`cargo test --workspace --locked -- --list`; rust-ci runs them); the
-Idris2 ABI typechecks and 11 proofs are checked (PROVEN ledger rows: ABI, grade and transaction-model lemmas, not the
+*Justification:* 136 tests declared (`cargo test --workspace --locked -- --list`; rust-ci runs them); the
+Idris2 ABI typechecks and 12 proofs are checked (PROVEN ledger rows: ABI, grade, transaction-model and epistemic-model lemmas, not the
 security obligations); benchmarks exist (5 Criterion groups). But: no
-fuzz testing, no mutation testing, 225 unwrap() calls, E2E mostly skips,
+fuzz testing, no mutation testing, 241 unwrap() calls, E2E mostly skips,
 benchmarks measured fake crypto until this session. RSR compliance
 present. Deep annotation incomplete (TOPOLOGY.md exists but
 per-directory orientation missing → blocks C).
@@ -61,11 +61,11 @@ handling
 
 |15 |Compatibility |MISSING |0 |— |No version migration tests
 
-|16 |Proof regression |✓ |11 proofs checked |`+just test-proofs test-proofs-reject test-agda+` |Idris2 0.8.0 typecheck, Agda kernel, expected rejections
+|16 |Proof regression |✓ |12 proofs checked |`+just test-proofs test-proofs-reject test-agda+` |Idris2 0.8.0 typecheck, Agda kernel, expected rejections
 (run by idris-abi.yml, agda-proofs.yml and dashboard-check)
 |===
 
-*Total declared:* 135 tests + 5 benchmark groups; 11 proofs checked (PROVEN ledger rows) *Total
+*Total declared:* 136 tests + 5 benchmark groups; 12 proofs checked (PROVEN ledger rows; five of them Grade 3 under mathesis — see `docs/theory/PROOF-GRADES.adoc`) *Total
 missing:* Fuzz, mutation, chaos, compatibility
 
 === Aspect Matrix
@@ -127,7 +127,7 @@ recording.
 
 === Known Debt
 
-* 225 unwrap() calls (tracked in PROOF-NEEDS.md)
+* 241 unwrap() calls (tracked in PROOF-NEEDS.adoc; measured 2026-11-01)
 * E2E test needs pre-built binary to exercise full lifecycle
 * idris-abi.yml and agda-proofs.yml run on every PR but are not yet required checks
 * No code coverage measurement

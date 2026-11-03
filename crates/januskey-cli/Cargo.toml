@@ -4,13 +4,20 @@
 [package]
 name = "januskey"
 version = "1.0.0"
-description = "Provably reversible file operations through Maximal Principle Reduction"
+description = "Reversible file operations with inversion metadata (formal proofs pending)"
 keywords = ["reversible", "filesystem", "transactions", "undo", "backup"]
 categories = ["command-line-utilities", "filesystem"]
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+
+[features]
+# The key store + lifecycle manager (`jk-keys`) is NOT part of this repo's
+# identity: it has no call edge to or from the `jk` reversibility path.
+# It is kept working behind a feature while it awaits extraction.
+# See docs/adr/0001-identity-and-scope.md.
+key-lifecycle = []
 
 [dependencies]
 reversible-core = { path = "../reversible-core" }
@@ -62,3 +69,4 @@ path = "src/main.rs"
 [[bin]]
 name = "jk-keys"
 path = "src/keys_cli.rs"
+required-features = ["key-lifecycle"]

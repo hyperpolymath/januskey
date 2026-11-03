@@ -6,7 +6,7 @@
 [metadata]
 project = "januskey"
 version = "1.0.0"
-last-updated = "2026-06-12"
+last-updated = "2026-11-01"
 status = "active"
 crg-grade = "D"
 
@@ -19,6 +19,12 @@ phase = "Core tests complete; 2026-04..06 wave was CI/governance/license hardeni
 session-date = "2026-06-12"
 work = "Estate standardization merged (flat contractiles, bot_directives, 6a2/anchor, self-validating, GOVERNANCE/MAINTAINERS/CODEOWNERS, flake.nix removed); CodeQL cron weekly→monthly cherry-picked; governance checkpoint layer (STATE refresh, bot_directives trio, Dust/Bust flat port, k9 template set)"
 
+[recent-work.since-2026-11-01]
+identity = "ADR-0001 (docs/adr/0001-identity-and-scope.md): identity resolved from code. The product is `jk`; measured coupling between the reversibility path and the key subsystem is zero in both directions, and the audit chain is library-only (main.rs never builds an AuditLog). Applied: `key-lifecycle` feature gates the jk-keys binary out of the default build; identity statements corrected in README, PROOF-NEEDS, ARCHITECTURE, januskey-cli/src/lib.rs, KEY_LIFECYCLE; V-1..V-3 ledger rows pin downstream consumption (valence-shell, ochrance, aletheia) as DESIGNED, since no repository outside this workspace depends on reversible-core. Not applied: the module move into crates/januskey-keys, which needs a toolchain this session does not have (no rustc, no crates.io) — steps and acceptance criteria in ADR-0001 §5."
+human-action = "Two files contradict ADR-0001 and are agent-denied by the Trustfile (@trust-deny: modify-trustfile, modify-threat-model): contractiles/Trustfile.a2ml line 8 calls januskey \"a key-management tool\"; threat-model.a2ml [primitives.mac] still describes the removed home-rolled HMAC. Both need an owner edit."
+
+claim-surfaces = "Estate consistency audit (docs/estate/2026-11-01-handoff-and-consistency-audit.md) found the structural model intact and the drift in this repo's own published surfaces. Corrected for over-claim only: wiki theory pages (rmo, rmr, mpr, maa-framework, formal-model, index) restated at the strength of the claims ledger; security/THREAT_MODEL.adoc compliance mapping rewritten and its '256-bit ECC' and BLAKE3 rows removed (neither is in the tree); CLI about/long_about and the Obliterate help no longer claim provable reversibility or a GDPR determination; crate descriptions and module headers aligned; TOPOLOGY diagram label de-claimed. No ledger row changed status and no test or proof count changed."
+
 [recent-work.since-2026-04-04]
 ci-standardization = "Reusable-workflow wrappers: rust-ci (#39), hypatia-scan (#40, canonical sync #31/#32, workdir fix #29, repin #46), mirror (#42), secret-scanner (#43), scorecard (#44, job-level perms #48); cargo-audit + workflow-linter prevention workflows; concurrency-cancel guards (#34/#35); SHA repins (#27/#28/#33/#50); Dependabot security path + auto-merge restored; actions bumps (#36/#47/#53)"
 license = "PMPL-1.0-or-later → MPL-2.0 migration (a740439); Cargo.toml license aligned to LICENSE (#52)"
@@ -28,15 +34,30 @@ docs = "CHANGELOG.md seeded, Keep-a-Changelog (#45); tech-debt audit recorded (#
 structure = "contractiles: bust/ added + k9 → svc/ per ADR-001 2026-04-18 (4094646, 9f05e98); 6SCM → 6A2 metadata migration"
 
 [test-coverage]
-# As assessed in READINESS.md (2026-04-03); no test-suite changes landed since.
-unit-tests = "36"
-p2p-property-tests = "8"
+# Reconciled 2026-11-01. The per-category counts are the 2026-04-03 assessment and
+# have NOT been re-derived; the two aggregates below are the figures READINESS.adoc
+# declares and dashboard-check measures. Quote the aggregates, not the categories.
+unit-tests = "36 (2026-04-03 assessment, not re-derived)"
+p2p-property-tests = "8 (2026-04-03 assessment, not re-derived)"
 e2e-integration-tests = "1 script (mostly skips without pre-built binary)"
-property-tests = "9"
-regression-tests = "5"
-idris2-proofs = "30"
-benchmarks = "5 Criterion groups"
-total = "67 tests + 5 benchmark groups + 30 Idris2 proofs (READINESS.md matrix)"
+property-tests = "9 (2026-04-03 assessment, not re-derived)"
+regression-tests = "5 (2026-04-03 assessment, not re-derived)"
+idris2-proofs = "12 PROVEN ledger rows (the former 30 counted lemmas before the tautology purge; PROOF-NEEDS.adoc is authoritative)"
+benchmarks = "5 Criterion groups (no baseline recorded)"
+total = "136 tests + 5 benchmark groups + 12 PROVEN ledger rows — as declared in READINESS.adoc and measured by dashboard-check"
+
+[proof-grades]
+# mathesis (estate-mathematical-architecture §5/§6) + standards
+# 3-practice/PROOF-POLICY.adoc. A grade is a second axis over the PROVEN/TESTED
+# ledger vocabulary, never a percentage. Detail: docs/theory/PROOF-GRADES.adoc.
+grade-3 = "G-1, T-1, T-2, T-3 — Agda theory modules under verification/proofs/agda; AGDA-VERIFIED"
+grade-3-pending = "E-1m — Epistemic.agda; no receipt yet, because the receipt-commit predates this module"
+receipt-commit = "4afb710e86646658f667f10bd6274ee47416bfc7 (agda-proofs.yml run 40867211509, success)"
+receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); resource-algebra pinned at cf9235c"
+receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (canonical per PROOF-POLICY §2.1 since 2026-11-01; the 4afb710 CI receipt predates the flag, so the next agda-proofs.yml run is its receipt)"
+not-graded = "the 7 Idris2 PROVEN rows (ABI/interface contracts, PROOF-POLICY §1); all 23 TESTED rows (observed behaviour); ASSUMED/DESIGNED/OPEN rows"
+open-obligations = "re-earn the Agda receipt in CI under the canonical flag set; one Agda version across CI (agda-proofs pins 2.6.4.3, dashboard-check installs 2.6.3); no Creusot contract on the Rust, and neither rustc nor crates.io is reachable from the agent sandbox (docs/estate/environment-toolchains.md), so no Rust behaviour is graded"
+claimed-higher = "none — no Grade 2i, 2ii or 1 is claimed"
 
 [test-categories-complete]
 unit = true

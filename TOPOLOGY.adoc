@@ -1,5 +1,5 @@
 == JanusKey — Project Topology
-// Last updated: 2026-10-13 (proof count reconciled to the PROOF-NEEDS claims ledger by dashboard-check)
+// Last updated: 2026-11-01 (diagram label de-claimed; proof/test counts unchanged — see the PROOF-NEEDS claims ledger)
 
 === System Architecture
 
@@ -35,7 +35,7 @@
                                             ▼
                         ┌─────────────────────────────────────────┐
                         │           TARGET FILESYSTEM             │
-                        │      (Provably Reversible State)        │
+                        │      (Reversible, proofs pending)       │
                         └─────────────────────────────────────────┘
 
                         ┌─────────────────────────────────────────┐
@@ -77,9 +77,9 @@ SECURITY (honest)
 INTERFACES & RESEARCH
   CLI Interface (jk)                ████████░░  ~85%   Full command set; no user testing yet
   MPR Methodology                   ████░░░░░░  ~40%   Design documented; FORMAL PROOFS PENDING
-                                                        (Idris2 ABI typechecks; 11 proofs checked: ABI, grade and transaction-model
+                                                        (Idris2 ABI typechecks; 12 proofs checked: ABI, grade, transaction-model and epistemic-model
                                                         lemmas, not the security obligations; MPR not linked to the Rust)
-  Testing (READINESS matrix)        ██████░░░░  ~60%   135 tests + 5 benches; missing fuzz, mutation,
+  Testing (READINESS matrix)        ██████░░░░  ~60%   136 tests + 5 benches; missing fuzz, mutation,
                                                         chaos, compatibility (Grade D)
 
 REPO INFRASTRUCTURE

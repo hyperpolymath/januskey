@@ -5,7 +5,13 @@
 
 ## Overview
 
-JanusKey’s design is grounded in rigorous theoretical foundations that provide mathematical guarantees for reversibility. This section covers the core concepts that make JanusKey’s guarantees possible.
+JanusKey's design is stated over a formal model — file-system states, operations
+and their inverses — and part of that model is checked by machine. The pages here
+describe the intended theory and, in each case, how much of it is actually
+discharged: three transaction lemmas are proved in Agda, the ABI lemmas are proved
+in Idris2, and the claims that would matter most (that every operation is
+reversible, that the model corresponds to the Rust) are OPEN and ASSUMED
+respectively. `PROOF-NEEDS.adoc` is the authority.
 
 ### Contents
 
@@ -29,12 +35,16 @@ The foundational principle underlying JanusKey is **Maximal Principle Reduction 
 
 ### Traditional vs MPR Approach
 
-| Aspect       | Traditional                 | MPR                          |
-|--------------|-----------------------------|------------------------------|
-| Data safety  | Achieved through backups    | Impossible to lose by design |
-| Verification | Post-hoc testing            | Compile-time guarantees      |
-| Trust model  | Trust operational processes | Trust mathematical proofs    |
-| Failure mode | Graceful degradation        | No degradation possible      |
+| Aspect       | Traditional                 | MPR (as intended)                    |
+|--------------|-----------------------------|--------------------------------------|
+| Data safety  | Achieved through backups    | No code path destroys the inverse    |
+| Verification | Post-hoc testing            | Design review; proofs where they exist |
+| Trust model  | Trust operational processes | Trust the record, and the proof where one is discharged |
+| Failure mode | Graceful degradation        | Not applicable — this is a CLI, and it can lose the store |
+
+Read MPR as a design philosophy, not a method with tooling: the repository says so
+itself (`README.adoc` §Known scope boundaries) and no proof in this tree is linked
+to the Rust by machine (ledger row G-2 is ASSUMED).
 
 ## The MAA Framework
 

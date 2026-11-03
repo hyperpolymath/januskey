@@ -9,9 +9,18 @@ export LC_ALL="${LC_ALL:-C.UTF-8}"
 prover="${AGDA:-agda}"
 "$prover" --version
 bash scripts/fetch-siblings.sh
-flags=(--safe --without-K --no-libraries --ignore-interfaces --double-check
+# PROOF-POLICY §2.1 canonical invocation: --safe --without-K --cubical-compatible
+# (standards/3-practice/PROOF-POLICY.adoc). The cubical-compatible flag is
+# infectious in principle — direct imports must use it too — but Agda 2.6.4.3
+# accepts a --without-K sibling on the include path and reports the pattern
+# matches that will not compute under transports as UnsupportedIndexedMatch
+# warnings (14 in Reversibility, 16 in TransactionAtomicity, 2 in Epistemic; the
+# sibling's ≤-trans, obliterate-absorbs and just-inj). Those are warnings about
+# computation under transport, not about the propositions, so the gate keeps
+# them visible rather than silencing them with -WnoUnsupportedIndexedMatch.
+flags=(--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check
        -i verification/proofs/agda -i _build/dependencies/resource-algebra/src)
-for module in Reversibility TransactionAtomicity; do
+for module in Reversibility TransactionAtomicity Epistemic; do
   "$prover" "${flags[@]}" "verification/proofs/agda/$module.agda"
 done
 mkdir -p _build/check-logs

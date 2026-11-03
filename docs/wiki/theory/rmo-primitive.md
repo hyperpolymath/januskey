@@ -3,296 +3,171 @@
 
 # RMO: Obliterative Wipe Primitive
 
+> **Status: engineering primitive, not a compliance mechanism and not a theorem.**
+> RMO describes what `jk obliterate` does. It overwrites a file's bytes and
+> removes it, and — when a JanusKey store exists — shreds the unshared
+> content-store blobs and purges the operation-log entries for that path.
+> It does **not** establish that the data is unrecoverable, and it is not a
+> GDPR Article 17 determination. This page previously claimed both; the
+> correction is recorded in `PROOF-NEEDS.adoc` (rows C-3, X-1) and in the
+> audit at `docs/estate/2026-11-01-handoff-and-consistency-audit.md` (D1).
+
 ## Definition
 
-**RMO (Obliterative Wipe)** is a data primitive that guarantees, via formal proof, the non-existence (unrecoverability) of specific data after invocation. This implements GDPR Article 17 "Right to Erasure" with mathematical certainty.
+**RMO (Obliterative Wipe)** is the deliberate, documented exception to
+JanusKey's reversibility. Everything else in the tool stores the information
+needed to invert itself; `jk obliterate` destroys that information instead.
 
-> For data $d$ after $\text{RMO}(d)$, there exists no algorithm $A$ such that $A(\text{system\_state}) = d$.
+It is best-effort by construction:
 
-## Core Properties
+- Overwrite-in-place cannot reach physical media through wear levelling
+  (SSD), copy-on-write (ZFS, Btrfs), journaling, or a hypervisor's snapshot.
+- The threat model for overwriting assumes rotating magnetic media.
+- On modern media, physical destruction of the device is the only
+  guaranteed obliteration.
 
-### Property 1: Irrecoverability
+The same caveat appears in `README.adoc` §"The secure obliteration exception"
+and `GLOSSARY.adoc` §"Secure obliteration". If this page and those disagree,
+they win.
 
-After obliteration, the data cannot be recovered through any algorithmic means:
+## What the operation actually does
 
-$$\nexists A: A(\Sigma', M') \to d$$
+1. **Overwrite.** Three passes over the file's current length — `0x00`, then
+   `0xFF`, then random bytes — with `sync_all()` after each pass
+   (`crates/januskey-cli/src/obliteration.rs`, `secure_overwrite`, `OVERWRITE_PASSES = 3`).
+   The pattern set has the shape of DoD 5220.22-M. That is a description of
+   the passes, **not** a claim of conformance to that standard.
+2. **Unlink.** `fs::remove_file` on the path.
+3. **Scrub the store** (only when a `.januskey/` store exists,
+   `obliterate_path`): shred every content-store blob referenced by an
+   operation-log entry whose primary or secondary path is this one — **except**
+   a blob that a surviving entry for another path still references, which is
+   kept so the other path's history stays undoable.
+4. **Purge the log entries.** `MetadataStore::purge_path`, so `jk undo` and
+   `jk history` no longer mention the path. Blobs are shredded *before* the
+   log is purged: if a shred fails, the entries survive and the command can be
+   re-run.
+5. **Record.** Each shred appends a record to `obliterations.json`
+   (`OBLITERATION_LOG_FILE`), including the working file's proof.
 
-where $\Sigma'$ and $M'$ are the post-obliteration content and metadata stores.
+## The obliteration record
 
-### Property 2: Verifiable Deletion
-
-Obliteration generates a cryptographic proof that can be independently verified:
-
-``` rust
+```rust
 pub struct ObliterationProof {
     pub id: String,
-    pub content_hash: ContentHash,
-    pub timestamp: DateTime<Utc>,
-    pub nonce: String,
-    pub commitment: String,  // H(content_hash || nonce || timestamp)
-    pub overwrite_passes: usize,
-}
-```
-
-### Property 3: Audit Trail Without Content
-
-The fact of obliteration is logged for compliance, but the content itself is never stored in the audit log:
-
-``` rust
-pub struct ObliterationRecord {
+    pub content_hash: ContentHash,   // what was destroyed
     pub timestamp: DateTime<Utc>,
     pub user: String,
-    pub content_hash: ContentHash,  // Hash only, not content
-    pub reason: Option<String>,
-    pub legal_basis: Option<String>,
-    pub proof: ObliterationProof,
+    pub nonce: String,
+    pub commitment: String,          // H(content_hash ‖ nonce ‖ timestamp)
+    pub overwrite_passes: usize,
+    pub storage_cleared: bool,       // set by the tool; not independently verified
 }
 ```
 
-## Secure Overwrite Protocol
+What the commitment is: a SHA-256 binding of *the claim being made* — which
+content hash, at what time, with which nonce. It detects accidental changes
+to the record. It does not resist a writer who edits the record, because the
+commitment has no secret key. It is **not** a proof that the content
+is gone, and `storage_cleared` is an assertion written by the same code path
+that performed the overwrite, not an independent check.
 
-RMO implements a multi-pass secure overwrite based on DoD 5220.22-M standards:
+What can be checked in-process today: `ObliterationProof::verify_commitment`
+(recompute the hash from the record), `ObliterationManager::verify_proof(id)`,
+and `verify_obliteration(path, original_hash)` (the path no longer holds that
+content). There is **no** `jk verify-obliteration` and no
+`jk obliteration-history` subcommand; the CLI surface is `jk obliterate <paths>…`
+with the global `--dry-run` and `--yes` flags, and it asks for confirmation
+when non-interactive without `--yes`.
 
-### Phase 1: Pattern Overwrite
+## Status, in the claims-ledger vocabulary
 
-``` rust
-const OVERWRITE_PASSES: usize = 3;
-const PATTERNS: [u8; 3] = [0x00, 0xFF, 0x00];
+| Statement | Status | Where |
+|---|---|---|
+| A transaction containing an obliteration is not all-reversible | **PROVEN** (model) | `Layout.idr::obliterateNotReversible` (ledger C-3) |
+| Obliterating a path shreds its unshared blobs and log entries, and undo then has nothing | **TESTED** | `obliteration_cas_test::obliterate_scrubs_blobs_log_and_undo` |
+| A blob another path still references is kept | **TESTED** | `obliteration_cas_test::obliterate_keeps_blob_shared_with_another_path` |
+| `jk obliterate` scrubs the store end to end | **TESTED** | `obliteration_cas_test::cli_obliterate_scrubs_store_and_undo_has_nothing` |
+| Data erasure is complete and irreversible (obliteration correctness) | **OPEN** | `PROOF-NEEDS.adoc` §What Needs Proving |
+| Physical erasure; hash one-wayness | **ASSUMED** (external) | ledger X-1 |
+| The obliteration record is chained into the keyed, tamper-evident audit log | **DESIGNED, not built** | `obliterations.json` is an unkeyed JSON ledger; chaining deferred (J2-3) |
 
-// Pass 1: Write all zeros
-// Pass 2: Write all ones
-// Pass 3: Random data
-```
+Nothing in RMO is proved. The one PROVEN row above is a *model* statement
+(C-3) about the operation log, not about bytes on a device.
 
-### Phase 2: File Removal
+## Erasure requests: what this does and does not establish
 
-After secure overwrite, the file is deleted from the filesystem.
+RMO is useful to a controller handling an erasure request. It is not a
+compliance determination, and this repository makes none.
 
-### Phase 3: Proof Generation
+| Requirement (e.g. GDPR Art. 17) | What JanusKey supplies | What it does not supply |
+|---|---|---|
+| Erase without undue delay | Overwrite + unlink in one command; store scrub where a store exists | Any guarantee against media-level retention, journaling, snapshots, or backups |
+| Evidence that erasure was carried out | A timestamped commitment record with the content hash, user, pass count — logged without the content | Proof of non-existence; independent verification |
+| Records of the request | `obliterations.json`, plus the audit chain for other operations | Retention policy, legal-basis handling, controller/processor analysis |
+| No retention of erased content | Proof records hold the hash, not the bytes | Erased copies outside JanusKey's reach (backups, replicas, caches) |
 
-A cryptographic commitment is generated:
-
-$$\text{commitment} = H(\text{content\_hash} \| \text{nonce} \| \text{timestamp})$$
-
-This allows verification that:
-
-1.  The specific content (identified by hash) was obliterated
-
-2.  Obliteration occurred at a specific time
-
-3.  The proof has not been tampered with
-
-## CLI Commands
-
-### Obliterate Content
-
-``` bash
-# Obliterate by content hash
-jk obliterate --hash sha256:abc123... --reason "User request" --legal-basis "GDPR Article 17"
-
-# Obliterate content from a specific operation
-jk obliterate --operation <operation-id> --reason "Data breach cleanup"
-```
-
-### View Obliteration History
-
-``` bash
-jk obliteration-history --limit 20
-```
-
-Output:
-
-    Obliteration History (RMO Audit Trail)
-    ════════════════════════════════════════════════════════════════════════════════
-
-    2025-12-17 10:30:00 UTC | OBLITERATED | sha256:abc123...
-          Proof: 12345678 | User: jonathan
-          Reason: User request
-          Legal basis: GDPR Article 17
-
-    ════════════════════════════════════════════════════════════════════════════════
-    Total obliterations: 1
-
-### Verify Obliteration Proof
-
-``` bash
-jk verify-obliteration <proof-id>
-```
-
-Output:
-
-    Obliteration Proof Verification
-    ──────────────────────────────────────────────────
-
-    Proof ID:        abc123-def456...
-    Content Hash:    sha256:abc123...
-    Timestamp:       2025-12-17 10:30:00 UTC
-    User:            jonathan
-    Overwrite Passes: 3
-
-    Commitment:      9f86d081884c7d659a2feaa0c55ad015...
-    Nonce:           a3f2b8c9d0e1f2a3...
-
-    ✓ Cryptographic commitment VERIFIED
-      The proof cryptographically confirms that:
-      • Content with hash sha256:abc123... was obliterated
-      • Obliteration occurred at 2025-12-17 10:30:00
-      • 3 overwrite passes were performed
-
-    ✓ Content confirmed absent from store
+Whether a given deployment is compliant is a determination for the
+controller, on the facts of that deployment — including media type, backups,
+replicas, and retention policy. A local file tool cannot make it.
 
 ## Relationship with RMR
 
-RMR and RMO are complementary primitives in the MAA Framework:
+RMR (reversible transactions) and RMO (obliterative wipe) are complementary,
+and the composition is intentional:
 
+```
         +---------------+                    +---------------+
         |     RMR       |                    |     RMO       |
         | Reversibility |                    | Obliteration  |
         +-------+-------+                    +-------+-------+
-                |                                    |
-                |        Normal operation            |
-                +------------------------------------>
-                |                                    |
-                |        Can undo via RMR            |
+                |        normal operation            |
+                +------------------------------------>|
+                |        can undo via RMR            |
                 <------------------------------------+
-                |                                    |
-                |        GDPR erasure request        |
-                +------------------------------------>
-                |                                    |
-                |        After RMO: NO undo          |
-                |        Content unrecoverable       |
-                |                                    |
-        +-------+-------+                    +-------+-------+
-        | Accountability|                    |   Autonomy    |
-        +---------------+                    +---------------+
-
-### Key Differences
-
-| Aspect          | RMR                        | RMO                       |
-|-----------------|----------------------------|---------------------------|
-| Purpose         | Track and reverse changes  | Permanently erase data    |
-| Reversibility   | Always reversible          | Never reversible          |
-| Content storage | Preserves original content | Destroys original content |
-| Audit           | Full operation details     | Fact of deletion only     |
-| Legal basis     | Accountability             | Right to Erasure          |
-
-## GDPR Compliance
-
-RMO directly supports GDPR Article 17 "Right to Erasure":
-
-### Article 17 Requirements
-
-> The data subject shall have the right to obtain from the controller the erasure of personal data concerning him or her without undue delay.
->
-> —  GDPR Article 17
-
-### How RMO Complies
-
-| GDPR Requirement            | RMO Implementation                          |
-|-----------------------------|---------------------------------------------|
-| Erasure without undue delay | Immediate secure overwrite                  |
-| Verification of erasure     | Cryptographic obliteration proof            |
-| Record of erasure           | Audit log with timestamp, user, legal basis |
-| No retention of erased data | Proof contains only hash, not content       |
-
-## Formal Verification
-
-### Theorem: Formal Obliteration
-
-After $\text{RMO}(h)$ for content hash $h$:
-
-$$\Sigma(h) = \bot \land \text{proof\_valid}(h)$$
-
-The content is removed from the store and a valid proof exists.
-
-### Proof
-
-1.  **Secure Overwrite**: Content at path derived from $h$ is overwritten with patterns
-
-2.  **File Removal**: Path is deleted from filesystem
-
-3.  **Proof Generation**: Commitment $H(h \| n \| t)$ is computed
-
-4.  **Store Update**: $\Sigma(h) := \bot$
-
-By the irreversibility of secure overwrite and the collision resistance of SHA256, the content is unrecoverable. ∎
-
-## Implementation
-
-``` rust
-impl ObliterationManager {
-    pub fn obliterate(
-        &mut self,
-        content_store: &ContentStore,
-        content_hash: &ContentHash,
-        reason: Option<String>,
-        legal_basis: Option<String>,
-    ) -> Result<ObliterationRecord> {
-        // Get content path
-        let content_path = content_store.content_path(content_hash);
-
-        // Perform secure overwrite
-        let passes = secure_overwrite(&content_path)?;
-
-        // Remove file
-        fs::remove_file(&content_path)?;
-
-        // Generate proof
-        let proof = ObliterationProof::generate(content_hash, passes);
-
-        // Create audit record
-        let record = ObliterationRecord {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
-            user: whoami::username(),
-            content_hash: content_hash.clone(),
-            reason,
-            legal_basis,
-            proof,
-            cleaned_operation_ids: Vec::new(),
-        };
-
-        // Log for audit
-        self.log.records.push(record.clone());
-        self.save()?;
-
-        Ok(record)
-    }
-}
+                |        erasure request             |
+                +------------------------------------>|
+                |        after RMO: no undo path     |
 ```
 
-## Security Considerations
+The difference that matters for design, not marketing:
 
-### Secure Overwrite Limitations
+| Aspect | RMR | RMO |
+|---|---|---|
+| Purpose | Track and reverse changes | Destroy the record of one path |
+| Reversibility | Reversible by metadata lookup | No inverse exists; undo has nothing to restore |
+| Content storage | Preserved in the content store | Shredded, unless another path shares the blob |
+| Audit | Operation log entries | Fact of deletion only, in an unkeyed ledger |
+| Failure mode | Store loss makes undo impossible | Shared blobs and media-level retention leave traces |
 
-- Does not guarantee erasure from SSDs with wear leveling
+## Security considerations
 
-- May not erase data from filesystem journal
+- **Media.** See the caveat at the top. A successful `jk obliterate` on an
+  SSD does not mean the bytes are gone.
+- **Shared blobs.** Deduplication means one blob can back several paths.
+  Obliterating one path keeps a blob another path still references — correct
+  for reversibility, but it means "obliterated" is not "gone from the store".
+  `--dry-run` lists only the target paths. It does not report the shared
+  blobs that will be kept or the history entries that will be purged.
+- **The ledger is unkeyed.** `obliterations.json` is not HMAC-chained. An
+  attacker with write access to the store can edit it. The keyed `AuditLog`
+  covers other operations and requires an unlocked key; joining the two is
+  J2-3, not done.
+- **Interruption.** Blobs are shredded before the log is purged, so a
+  partially completed obliteration can be re-run. It cannot be *undone*.
 
-- Cloud storage may retain backups
+## Formal status
 
-For maximum security:
+There is no theorem here, and there should not be a `∎` on this page until
+one exists. The nearest statement in the kernel is G-1
+(`verification/proofs/agda/Reversibility.agda`): reversibility is a `Loss`
+grade over traces, with an obliterating step absorbing — a statement about the
+grade algebra, not about storage media. `X-1` keeps physical erasure and hash
+one-wayness explicitly outside the theorem set.
 
-1.  Use encrypted storage where possible
-
-2.  Consider physical destruction for highly sensitive data
-
-3.  Verify with specialized forensic tools
-
-### Proof Tamper Resistance
-
-The cryptographic commitment prevents:
-
-- Backdating obliteration claims
-
-- Claiming obliteration of different content
-
-- Modifying the proof after generation
-
-## Further Reading
+## Further reading
 
 - [RMR: Reversible Transaction Primitive](rmr-primitive.md)
-
 - [MAA Framework Overview](maa-framework.md)
-
-- [CLI Commands Guide](../guides/cli.md)
+- `../../../PROOF-NEEDS.adoc` — the claims ledger this page reconciles against
+- `../../security/THREAT_MODEL.adoc` — limitations and the compliance mapping

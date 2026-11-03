@@ -217,6 +217,13 @@ data AuditorView : Type where
 ||| Knows has no negative form, so the former `systemForgetsOldKey` (which
 ||| returned knowledge of the new key and said nothing about the old) is gone.
 ||| Types.systemKnowsNewKey remains as the positive statement.
+|||
+||| It *is* expressible once knowledge is indiscriminability over an observation
+||| and "usable" is a predicate that can be false: see
+||| verification/proofs/agda/Epistemic.agda, lemma rotate-forgets-old (no agent,
+||| the system included, can use the old key after rotation) and row E-1m in the
+||| claims ledger. The deleted lemma stays deleted here — this module's model has
+||| not changed.
 
 -- ============================================================
 -- 10. Error Code Proofs

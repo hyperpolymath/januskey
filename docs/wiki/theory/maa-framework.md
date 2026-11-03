@@ -11,7 +11,15 @@ The MAA Framework is an ethical and engineering paradigm that structurally balan
 
 2.  **User Autonomy/Privacy**: Users must have verifiable control over their data, including deletion
 
-These requirements are often in tension. MAA resolves this through formal primitives that provide mathematical guarantees for both.
+These requirements are often in tension. MAA proposes a pair of primitives that
+address both sides — one reversible, one obliterative.
+
+> **Status.** MAA is a design framework, not a verified theory. RMR and RMO are
+> described below at the strength the code supports: RMR's transactional model
+> has three proved lemmas and an open obligation for "every operation is
+> reversible"; RMO is an engineering primitive that destroys data and records
+> that it did, with no proof that the data is unrecoverable. The claims ledger in
+> `PROOF-NEEDS.adoc` is the authority for both.
 
 ## The Problem Statement
 
@@ -62,7 +70,7 @@ MAA introduces two formally verified primitives that satisfy both requirements:
 
 ### RMR (Reversible Transaction)
 
-> A primitive for state transitions that guarantees instant, mathematically certain rollback to a prior safe state via Algorithmic Reversibility.
+> A primitive for state transitions that records, before each change, what is needed to undo it — so that undo is a metadata lookup rather than a restore from backup. Whether every operation is *in fact* reversible is an open obligation, not a guarantee; see the claims ledger.
 
 RMR provides:
 
@@ -78,17 +86,23 @@ See: [RMR Primitive Specification](rmr-primitive.md)
 
 ### RMO (Obliterative Wipe)
 
-> A primitive for data erasure that achieves Formal Obliteration, proving the non-existence of specified data traces.
+> A primitive for data erasure: best-effort overwrite, removal, store scrub, and a tamper-evident record of what was destroyed.
 
 RMO provides:
 
-- Cryptographically verifiable deletion
+- An overwrite-then-unlink operation, plus scrubbing of the unshared
+  content-store blobs and operation-log entries for the path
 
-- Proof of non-existence
+- A timestamped commitment (`H(content_hash ‖ nonce ‖ timestamp)`) recording
+  what was claimed destroyed — reviewable, not independently verifiable from
+  outside the store
 
-- Compliance with right-to-erasure
+- A deletion path with no inverse: after RMO there is nothing for undo to restore
 
-- User autonomy with mathematical guarantees
+- An honest boundary: no proof of non-existence, no physical-erasure guarantee
+  on SSD/CoW/journaled media, and no compliance determination. See
+  [RMO Primitive Specification](rmo-primitive.md) §"Status, in the
+  claims-ledger vocabulary".
 
 See: [RMO Primitive Specification](rmo-primitive.md)
 
@@ -190,16 +204,21 @@ pub fn obliterate(content_hash: &ContentHash) -> Result<ObliterationProof> {
 }
 ```
 
-## Compliance Mapping
+## Requirements Mapping (not a compliance claim)
 
-| Regulation        | Requirement           | MAA Component               |
-|-------------------|-----------------------|-----------------------------|
-| GDPR Art. 17      | Right to erasure      | RMO primitive               |
-| GDPR Art. 5(1)(e) | Storage limitation    | RMO with retention policies |
-| GDPR Art. 30      | Records of processing | RMR audit trail             |
-| SOX Section 802   | Record retention      | RMR full history            |
-| HIPAA             | Audit controls        | RMR operation logging       |
-| CCPA              | Right to delete       | RMO primitive               |
+This table says which primitive is *relevant* to each requirement. It is not a
+statement that any of them is satisfied: compliance is a determination for the
+controller, on the facts of a deployment, and no assessment of JanusKey has been
+performed.
+
+| Regulation        | Requirement           | Relevant primitive | What that does **not** establish |
+|-------------------|-----------------------|--------------------|----------------------------------|
+| GDPR Art. 17      | Right to erasure      | RMO (`jk obliterate`), for files the tool can reach | That the data is gone from backups, replicas, journals or the media |
+| GDPR Art. 5(1)(e) | Storage limitation    | RMR history + `jk gc` pruning | Any retention policy; none is implemented or enforced |
+| GDPR Art. 30      | Records of processing | RMR operation log, `obliterations.json` | That the record is complete or that the ledger is trustworthy on its own (the obliteration ledger is unkeyed) |
+| SOX Section 802   | Record retention      | RMR history, while the store is intact | Immutability against an attacker with write access |
+| HIPAA             | Audit controls        | Attestation chain (HMAC-SHA256) over covered operations | That every relevant action is covered; obliteration records are not yet chained into the keyed audit log |
+| CCPA              | Right to delete       | RMO, as above | Any of the above |
 
 ## Security Considerations
 
@@ -234,13 +253,24 @@ Charles Bennett proved that all computation can be made reversible without signi
 
 Rolf Landauer established that erasing information has a minimum thermodynamic cost. RMO acknowledges that true erasure is an irreversible physical process.
 
-### Epistemological Certainty
+### What is proved, and what is not
 
-Traditional logging provides *evidence* of state changes. MAA provides *proof*:
+Traditional logging provides *evidence* of state changes. JanusKey provides
+smaller, differently-shaped things, and the difference matters:
 
-- RMR: Mathematical proof of reversibility
+- **RMR:** three proved lemmas over a transaction *model* — a rollback restores
+  the state it began in given each step's undo restores its execute; the
+  lifecycle preserves the log invariant; at most one transaction is active
+  (`verification/proofs/agda/TransactionAtomicity.agda`, ledger rows T-1..T-3).
+  The claim "every operation is reversible" is **OPEN**, as is the mechanical
+  correspondence between that model and the Rust.
+- **RMO:** nothing is proved. Overwriting is best effort; the record is
+  tamper-evident, not a certificate of absence. There is no mathematical proof
+  of non-existence, and there cannot be one from inside this process: the tool
+  cannot observe the media, the journal, or the backups.
 
-- RMO: Mathematical proof of non-existence
+The claims ledger in `PROOF-NEEDS.adoc` is the authority for both, and
+`dashboard-check` fails the build when a dashboard's counts disagree with it.
 
 ## Further Reading
 
@@ -248,6 +278,6 @@ Traditional logging provides *evidence* of state changes. MAA provides *proof*:
 
 - [RMO Primitive Specification](rmo-primitive.md)
 
-- [Formal Proofs of Reversibility](../formal-proofs/reversibility.md)
+- [Formal Proofs](../formal-proofs/index.md)
 
 - [Maximal Principle Reduction](mpr.md)

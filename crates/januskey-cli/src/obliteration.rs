@@ -3,7 +3,9 @@
 // SPDX-FileCopyrightText: 2025 Jonathan D.A. Jewell
 //
 // RMO: Obliterative Wipe Primitive
-// Implements GDPR Article 17 "Right to Erasure" with formal obliteration proofs
+// The erasure use case. There are no formal obliteration proofs: overwriting is
+// best effort (see PROOF-NEEDS.adoc row X-1), and an ObliterationProof records
+// what was claimed destroyed, not that it is unrecoverable.
 //
 // The RMO primitive provides:
 // 1. A best-effort DoD 5220.22-M-style multi-pass overwrite of the file's
@@ -433,7 +435,8 @@ fn entry_hashes(op: &OperationMetadata) -> impl Iterator<Item = &ContentHash> {
 }
 
 /// Obliterate every recoverable trace of `path` inside a JanusKey store
-/// (GDPR Article 17 "right to erasure" for a tracked file):
+/// (the erasure use case for a tracked file; this is not a compliance claim —
+/// see PROOF-NEEDS.adoc row X-1 on physical erasure):
 ///
 /// 1. shred and remove the working file, if it still exists;
 /// 2. shred every content-store blob referenced by an operation-log entry

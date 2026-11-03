@@ -17,6 +17,10 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Added
 
+* feat(proofs): `Epistemic.agda` replaces the vacuous Idris `Knows` modality with
+knowledge as indiscriminability: ignorance, obliteration and rotation-forgetting
+become propositions, with two expected-rejection fixtures; new ledger row E-1m
+(PROVEN, Grade 3), E-1 stays OPEN
 * feat(crg): add crg-grade and crg-badge justfile recipes
 * feat(crg): add Current Grade badge anchor to READINESS.md
 * feat: add idrisiser Idris2 proof wrappers for JanusKey cryptographic
@@ -32,6 +36,12 @@ benchmarks, READINESS.md
 
 ==== Fixed
 
+* fix(reversible-core): the operation metadata log saves through the shared
+atomic writer (`write_atomic`), with `save_replaces_the_log_atomically`; ledger
+row T-8 stays OPEN until the unbuilt test runs
+* fix(proofs): the Agda gate runs PROOF-POLICY §2.1's canonical invocation
+(`--safe --without-K --cubical-compatible`); measured green locally with Agda
+2.6.4.3 before the change, replacing an unverified prediction that it would fail
 * fix(ci): bump a2ml/k9-validate-action pins to canonical (#33)
 * fix(ci): sync hypatia-scan.yml to canonical (#32)
 * fix(ci): adopt canonical hypatia-scan.yml (#31)
@@ -54,6 +64,10 @@ placeholder
 
 ==== Documentation
 
+* docs(theory): proof grades under mathesis and PROOF-POLICY — four Agda rows
+are Grade 3 with a receipt at 4afb710; one recorded divergence from the
+canonical Agda invocation (`docs/theory/PROOF-GRADES.adoc`)
+
 * docs(security): draft MCP-exposure threat model (AI-authored, pending
 human sign-off)
 * docs: add M2 estate audit report (2026-04-04)
@@ -65,6 +79,10 @@ human sign-off)
 * docs: add checkpoint files for state tracking
 
 ==== CI
+
+* ci(proofs): record what the agent sandbox can and cannot install (Agda and Zig
+from PyPI wheels; Rust, Creusot and Idris2 blocked by egress),
+`docs/estate/environment-toolchains.md`
 
 * ci(rust): convert rust-ci.yml to thin wrapper (standards#174) (#39)
 * ci: redistribute concurrency-cancel guard to read-only check workflows

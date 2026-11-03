@@ -8,21 +8,54 @@ The README makes claims. This file backs them up.
 
 == Claims Substantiation
 
-=== Claim 1: "100% Reversible - Every operation can be undone, always"
+=== Claim 1: "Operations carry their own inverse — undo without a backup"
 
-**How it works:** JanusKey implements architectural reversibility by storing inverted operations alongside each mutation. The delete operation, implemented in `crates/januskey-cli/src/obliteration.rs`, calculates and stores a full restoration record before removing file content. The `delta.rs` module generates inverse metadata that sufficient to reconstruct the pre-operation state. Every operation in the transaction layer (`crates/januskey-cli/src/metadata.rs`) maintains a "prior state" record, enabling perfect reversal through the `undo` pathway.
+**How it works:** each operation captures what its inverse needs *before* it
+mutates anything, and records it in an append-only log. Delete stores the content
+in the content store and the file metadata in the log; modify stores the original
+hash (plus a delta or full copy in `delta.rs`); move stores the source path;
+copy stores the destination. Undo is then a lookup in the log followed by the
+operation-specific inverse — no filesystem scan, no tape restore.
 
-**Caveat:** Reversibility is strong only when the operation log remains intact. If `.jk/` metadata store is corrupted or lost, recovery becomes impossible. The system trades **write amplification** (each operation doubles metadata I/O) for guaranteed recoverability.
+**Caveat (the honest one):** this is an engineering mechanism, not a proved
+theorem. The ledger row "every operation is reversible, as a theorem linked to
+the Rust" is **OPEN**; the Agda proof covers a transaction *model* (T-1..T-3)
+whose step-level premise is tested, not proved (T-6), and the operation metadata
+log now saves by rename but that change is unbuilt (T-8, OPEN). Reversibility also fails
+outright if the store is lost, and `jk obliterate` and `jk gc` are deliberate
+exceptions that destroy what undo would need. What has been restored, and what
+has not, is tabulated in `docs/wiki/theory/rmr-primitive.md` §2.
 
-**Evidence:** `crates/januskey-cli/src/lib.rs` (public API) delegates to `obliteration.rs` and `delta.rs` for operation logic; see `Reversible` trait (if present) or reversibility-proof comments in `attestation.rs`.
+**Evidence:** `crates/januskey-cli/src/operations.rs` (the executors —
+`execute_delete`, `execute_modify`, …), `crates/januskey-cli/src/delta.rs`
+(inverse members), `crates/reversible-core/src/metadata.rs` (the log),
+`crates/reversible-core/src/content_store.rs` (SHA-256 content addressing),
+`crates/reversible-core/src/lib.rs` (`ReversibleExecutor`),
+`crates/januskey-cli/tests/property_tests.rs::execute_then_undo_is_identity`.
 
-=== Claim 2: "Complete Audit Trail - Every change tracked automatically"
+=== Claim 2: "Audit trail — every tracked change is recorded and chained"
 
-**How it works:** The metadata store (`crates/januskey-cli/src/metadata.rs`) maintains an append-only operation log. The `attestation.rs` module calculates cryptographic commitments (SHA256 hashes) of each operation, creating a tamper-evident chain. Content-addressed storage (`crates/januskey-cli/src/content_store.rs`) ensures deduplication by content hash, preventing duplicate storage while maintaining full history.
+**How it works:** the operation log (`crates/reversible-core/src/metadata.rs`) is
+append-only: new operations are appended, existing entries are not edited in
+place. `attestation.rs` chains entries with a real HMAC-SHA256
+(`hmac` crate, RFC 2104): the MAC covers the entry data and the previous entry's
+hash, with a scheme label bound in as a domain separator, keyed on a
+store-derived key. It **refuses** to write an entry when no key is set rather
+than falling back to an unkeyed hash (the former
+`SHA256(key‖data‖prev)` construction was not a MAC and has been removed). Content is addressed by SHA-256, so
+duplicate content is stored once.
 
-**Caveat:** The audit trail is only as trustworthy as the append-only mechanism. If the log is truncated or rewritten on-disk, the chain breaks. For forensic-grade auditing, integrate with an external append-only store (database, blockchain).
+**Caveat:** "every change" is too strong in both directions. `jk obliterate`
+purges the log entries for a path on purpose, `jk gc` prunes old entries, and the
+obliteration ledger (`obliterations.json`) is **unkeyed** — its records are not in
+the HMAC chain yet (deferred, J2-3). The chain detects edits to entries it covers;
+it does not make the file immutable, and an attacker with write access can delete
+the whole log.
 
-**Evidence:** `crates/januskey-cli/src/metadata.rs` defines the log structure; `attestation.rs` computes cryptographic bindings; `content_store.rs` handles SHA256 hashing.
+**Evidence:** `crates/reversible-core/src/metadata.rs` (log structure and
+`save` — see the T-8 caveat), `crates/januskey-cli/src/attestation.rs` (HMAC
+chain, `AuditLog`), `crates/reversible-core/src/content_store.rs` (hashing and
+dedup).
 
 == Technology Choices
 
@@ -37,19 +70,29 @@ The README makes claims. This file backs them up.
 
 == File Map
 
+The receipt, file by file. Paths are the ones that exist today: the content
+store, metadata log and transaction layer live in `reversible-core`, not in the
+CLI crate (they were extracted in Phase 1, 2026-03-21).
+
 [cols="1,3"]
 |===
 | Path | Purpose
 
-| `crates/januskey-cli/src/main.rs` | CLI entry point, command dispatch (delete, modify, move, copy, undo, begin, commit, rollback, preview)
-| `crates/januskey-cli/src/lib.rs` | Public API: init, delete, modify, move, copy, undo, transaction logic
-| `crates/januskey-cli/src/obliteration.rs` | Delete operation with restoration metadata
-| `crates/januskey-cli/src/delta.rs` | Computes inverse operations (modify undo, move undo, copy undo)
-| `crates/januskey-cli/src/metadata.rs` | Append-only operation log, transaction tracking, rollback state
-| `crates/januskey-cli/src/content_store.rs` | SHA256 content hashing, deduplication, storage management
-| `crates/januskey-cli/src/attestation.rs` | Cryptographic commitments, audit trail, tamper detection
-| `crates/januskey-cli/src/keys.rs` | Cryptographic key management (if key-based reversibility)
-| `crates/januskey-cli/src/error.rs` | Error types and propagation
+| `crates/januskey-cli/src/main.rs` | CLI entry point; command dispatch (`init, delete, modify, move, copy, rename, obliterate, undo, begin, commit, rollback, preview, history, status, gc`)
+| `crates/januskey-cli/src/lib.rs` | Public API: `init`, the file operations, undo, transaction wiring
+| `crates/januskey-cli/src/operations.rs` | `OperationExecutor`: the actual filesystem operations and their metadata capture
+| `crates/januskey-cli/src/delta.rs` | Line/block deltas and the inverse content for modify
+| `crates/januskey-cli/src/obliteration.rs` | `jk obliterate`: secure overwrite, store scrub, obliteration records
+| `crates/januskey-cli/src/attestation.rs` | HMAC-SHA256 audit chain over operations
+| `crates/januskey-cli/src/keys.rs`, `keys_cli.rs` | AES-256-GCM key store (Argon2id), key lifecycle; the `jk-keys` binary
+| `crates/reversible-core/src/content_store.rs` | SHA-256 content-addressed storage, deduplication
+| `crates/reversible-core/src/metadata.rs` | Append-only operation log (`MetadataStore`); it now calls the shared atomic writer, unbuilt — ledger row T-8
+| `crates/reversible-core/src/transaction.rs` | Transaction lifecycle and the atomic write→fsync→rename log save
+| `crates/reversible-core/src/manifest.rs` | A2ML manifest emitter (the intended ochrance boundary)
+| `crates/reversible-core/src/lib.rs` | `ReversibleExecutor` trait — `execute`, `undo`, `generate_manifest`
+| `src/abi/JanusKey/ABI/*.idr` | Idris2 ABI layer (types, layout, FFI codes, proved lemmas)
+| `verification/proofs/agda/*.agda` | Agda kernel: reversibility as a `Loss` grade; transaction atomicity
+| `crates/dashboard-check` | Runs every PROVEN/TESTED ledger row and reconciles the dashboards against `STATE.a2ml`
 |===
 
 == Dogfooted Across The Account
@@ -62,4 +105,9 @@ The README makes claims. This file backs them up.
 
 == Readiness
 
-**CRG Grade:** C (Beta) - Reversibility architecture sound, append-only log working, needs edge-case testing around symlinks and special files.
+**CRG Grade: D — Alpha, Unstable.** The machine-readable status is
+`.machine_readable/6a2/STATE.a2ml` (completion 60%, grade D) and `READINESS.adoc`
+(Grade D, promotion path to C recorded there). `just check-dashboard` fails the
+build if this file, TOPOLOGY or READINESS print a grade or count that disagrees
+with STATE or with the claims ledger, so this line is checked rather than
+maintained by hand.

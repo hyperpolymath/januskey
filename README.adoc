@@ -20,6 +20,31 @@ Every `jk delete`, `jk modify`, or `jk move` stores the inverse operation in an 
 **Formal proofs of complete reversibility are pending.** The engineering mechanism (inversion metadata) is implemented in Rust. The mathematical guarantee that this construction makes data loss impossible under all allowed operations has not yet been mechanically verified. See link:EXPLAINME.adoc#_reversibility_guarantee[EXPLAINME §Reversibility guarantee].
 ====
 
+== What this repository is, and what else it contains
+
+The product is `jk`: reversible file operations whose inversion metadata lives in
+an append-only, content-addressed log. Its implementation is `main.rs` + `lib.rs` +
+`operations.rs` + `delta.rs` + `obliteration.rs` over `reversible-core`.
+
+The workspace contains two further things that are **not** on that path. They are
+listed here because the repository's name invites the wrong inference, and because
+"what the code does" is the only boundary that survives review:
+
+* **A key store with lifecycle management** (`crates/januskey-cli/src/keys.rs`,
+  built as a second binary `jk-keys`). It is behind the opt-in `key-lifecycle`
+  feature, so a default build produces `jk` only. It has no call edge to or from the
+  reversibility path, and it protects no file content — the content store is
+  plaintext. Being feature-gated removes the *binary*; the module is still compiled
+  into the library and still pulls its crypto crates until it is moved out (ADR-0001
+  §5). Key custody is not part of this project's identity and is scheduled to
+  move; see link:docs/adr/0001-identity-and-scope.md[ADR-0001].
+* **An HMAC-SHA256-chained audit log** (`attestation.rs`). Library-only today: the
+  `jk` binary never constructs an audit log, and the key it requires is supplied by
+  the caller, not derived from the key store.
+
+`reversible-core` is *intended* to be shared with ochrance, valence-shell and
+aletheia. None of them depends on it yet; see ARCHITECTURE §Consumption status.
+
 == What is standard and what is ours
 
 [cols="1,2,2", options="header"]
@@ -76,10 +101,10 @@ Rollback is an lookup-then-execute operation against the append-only log, bounde
 
 == The secure obliteration exception
 
-Reversibility is the default. Secure obliteration (`jk shred`) is the deliberate, explicit exception. It is best-effort only:
+Reversibility is the default. Secure obliteration (`jk obliterate`) is the deliberate, explicit exception. It is best-effort only:
 
 * Overwrite-in-place cannot guarantee physical erasure on SSDs (wear leveling), CoW filesystems (ZFS, Btrfs), or journaling filesystems.
-* The threat model for `shred` assumes spinning-rust physical media. On modern media, physical destruction is the only guaranteed obliteration.
+* The threat model for overwriting assumes rotating magnetic media. On modern media, physical destruction is the only guaranteed obliteration.
 
 == Commands
 
@@ -98,6 +123,12 @@ Reversibility is the default. Secure obliteration (`jk shred`) is the deliberate
 
 | `jk move <src> <dst>`
 | Move/rename files
+
+| `jk rename <old> <new>`
+| Rename in place (reversible)
+
+| `jk obliterate <files>`
+| Overwrite then remove (NOT reversible; best-effort)
 
 | `jk copy <src> <dst>`
 | Copy files
@@ -122,6 +153,9 @@ Reversibility is the default. Secure obliteration (`jk shred`) is the deliberate
 
 | `jk status`
 | Show current status
+
+| `jk gc`
+| Prune old operations
 |===
 
 == Architecture
@@ -147,7 +181,7 @@ Reversibility is the default. Secure obliteration (`jk shred`) is the deliberate
 
 [CAUTION]
 ====
-**Secure obliteration is best-effort.** `jk shred` cannot guarantee physical erasure on SSD, CoW, or journaling filesystems. This is a physical constraint, not a software bug.
+**Secure obliteration is best-effort.** `jk obliterate` cannot guarantee physical erasure on SSD, CoW, or journaling filesystems. This is a physical constraint, not a software bug.
 ====
 
 [CAUTION]
@@ -161,6 +195,9 @@ Reversibility is the default. Secure obliteration (`jk shred`) is the deliberate
 ----
 # Build from source (requires Rust)
 cargo build --workspace --release
+
+# Include the off-path key lifecycle binary as well
+cargo build --workspace --release --features key-lifecycle
 
 # Initialize
 jk init

@@ -14,9 +14,11 @@ maa-framework (policy vision)
 
 JanusKey is the *junction point* where absolute-zero’s theoretical work
 on Certified Null Operations (CNOs) was first applied to practical file
-operations. The three downstream applications independently implemented
-reversibility, but shared no code — until the `+reversible-core+`
-extraction described below.
+operations. The three downstream applications each implemented reversibility
+and shared no code. `+reversible-core+` was extracted (Phase 1, 2026-03-21) so
+that they *could* share it — **none of them does yet**, and nothing below should
+be read as consumption until a dependency edge and a green test exist in the
+consuming repository (ADR-0001 §4).
 
 === Workspace Structure
 
@@ -32,19 +34,25 @@ januskey/
 │   │   └── lib             — ReversibleExecutor trait
 │   │
 │   └── januskey-cli/       ← CLI TOOL (depends on reversible-core)
-│       ├── operations      — FileOperation executor (actual filesystem ops)
-│       ├── keys            — Key management (AES-GCM, Argon2)
-│       ├── attestation     — Audit trail
-│       ├── obliteration    — Secure deletion
-│       ├── delta           — Differential operations
-│       ├── main            — jk CLI binary
-│       └── keys_cli        — jk-keys CLI binary
+│       ├── operations      — FileOperation executor (actual filesystem ops)   ON THE jk PATH
+│       ├── obliteration    — Secure deletion (the deliberate exception)       ON THE jk PATH
+│       ├── delta           — Differential operations                          ON THE jk PATH
+│       ├── main            — jk CLI binary                                    ON THE jk PATH
+│       ├── attestation     — HMAC-SHA256 audit chain      library-only: jk never builds one
+│       ├── keys            — key store (Argon2id, AES-256-GCM wrap, rotate,
+│       │                     revoke, backup)   OFF-PATH: no call edge to jk; see ADR-0001
+│       └── keys_cli        — jk-keys binary   OFF-PATH: behind feature `key-lifecycle`
 ....
+
+`link:docs/adr/0001-identity-and-scope.md[ADR-0001]` records the identity
+decision: the product is `jk`; the key lifecycle manager is not part of it and
+awaits extraction; the audit chain is library-only and not wired into the CLI.
 
 === reversible-core: The Shared Foundation
 
 `+reversible-core+` is a lean Rust library crate (no CLI deps) that
-provides the types all three downstream applications share:
+provides the types the three downstream applications are *intended* to share.
+None consumes the crate today (see Consumption status below):
 
 ==== ReversibleExecutor Trait
 
@@ -87,10 +95,13 @@ Per absolute-zero, every `+OperationType+` has a known inverse:
 Manifest header (version, subsystem, timestamp, Merkle root) - Refs (one
 per operation, with content hash) - Policy (verification mode)
 
-Ochrance parses these and produces `+VerificationProof+` witnesses: -
-`+LaxProof+` — manifest is well-formed - `+CheckedProof+` — all content
-hashes verified via BLAKE3 - `+AttestedProof+` — manifest is signed
-(Ed25519)
+Ochrance is *designed* to parse these and produce `+VerificationProof+`
+witnesses: - `+LaxProof+` — manifest is well-formed - `+CheckedProof+` — all
+content hashes verified (BLAKE3 on its side; this side hashes SHA-256, and the
+mismatch is unresolved) - `+AttestedProof+` — manifest is signed (Ed25519)
+
+It has never parsed one. Treat this paragraph as a specification of an intended
+boundary, not as an integration.
 
 === Integration Status
 
@@ -100,7 +111,7 @@ Extracted core types from januskey into `+reversible-core+`. Workspace
 builds, 44 tests pass. januskey-cli re-exports all types for backward
 compatibility.
 
-==== Phase 2: valence-shell integration — NEXT
+==== Phase 2: valence-shell integration — NOT STARTED (no consumer exists)
 
 Wire valence-shell (`+impl/rust-cli/+`) to depend on
 `+reversible-core+`: - Add `+ContentStore+` to `+ShellState+` for
@@ -109,7 +120,7 @@ content-addressed undo data - Replace inline
 `+a2ml_emitter.rs+` for manifest generation - Replace
 `+verification.rs+` stubs with `+ReversibleExecutor+` implementation
 
-==== Phase 3: ochrance ABI extension — PENDING
+==== Phase 3: ochrance ABI extension — NOT STARTED (no consumer exists)
 
 Add reversibility types to ochrance’s Idris2 ABI: -
 `+src/abi/Ochrance/ABI/Reversibility.idr+` — `+ReversibleOp+`,
@@ -121,6 +132,32 @@ Add reversibility types to ochrance’s Idris2 ABI: -
 
 Update ARCHITECTURE.md and ECOSYSTEM.a2ml in all three repos with
 cross-references.
+
+==== Consumption status (2026-11-01)
+
+What is *claimed* here is deliberately narrow, because the estate's recurring
+defect is a plan becoming a fact in prose.
+
+[cols="2,2,4",options="header"]
+|===
+| Claim | Status | Evidence required to change it
+
+| valence-shell depends on `reversible-core`
+| NOT TRUE — no consumer outside this workspace
+| A dependency edge in valence-shell's manifest, plus a test there that drives `ReversibleExecutor`
+
+| ochrance verifies januskey manifests
+| NOT TRUE — `ManifestEmitter` has never been parsed by it
+| An ochrance-side parse of a generated manifest, and a decision on the hash algorithm (SHA-256 here; BLAKE3 believed to be used there)
+
+| aletheia uses `reversible-core`
+| NOT TRUE — explicitly deferred (Phase 0 research)
+| same as valence-shell
+|===
+
+These three are also ledger rows `V-1`, `V-2` and `V-3` in `PROOF-NEEDS.adoc`,
+so their status is machine-checked against the dashboards rather than maintained
+by memory.
 
 ==== Deferred
 

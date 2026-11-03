@@ -23,7 +23,11 @@ These 6 SCM files MUST exist in `.machine_readable/` directory ONLY:
 
 **CRITICAL:** If ANY of these files exist in the root directory, this is an ERROR.
 
-### Bot Directives: `.bot_directives/` ONLY
+Bot directives live under `.machine_readable/bot_directives/`, not in a root
+`.bot_directives/` (corrected 2026-11-01; the path had been stale since the estate
+standardization merge).
+
+### Bot Directives: `.machine_readable/bot_directives/` ONLY
 
 Bot-specific instructions for:
 - rhodibot - Git operations
@@ -55,7 +59,7 @@ This repo contains:
 ```
 januskey/
 ├── 0-AI-MANIFEST.a2ml         # THIS FILE (start here)
-├── README.md                   # Project overview
+├── README.adoc                 # Project overview
 ├── [your source files]         # Main code
 ├── .machine_readable/          # SCM files (6 files)
 │   ├── .machine_readable/6a2/STATE.a2ml
@@ -64,13 +68,13 @@ januskey/
 │   ├── .machine_readable/6a2/AGENTIC.a2ml
 │   ├── .machine_readable/6a2/NEUROSYM.a2ml
 │   └── .machine_readable/6a2/PLAYBOOK.a2ml
-└── .bot_directives/            # Bot instructions
+└── .machine_readable/bot_directives/   # Bot instructions
 ```
 
 ## SESSION STARTUP CHECKLIST
 
 ✅ Read THIS file (0-AI-MANIFEST.a2ml) first
-✅ Understand canonical locations (.machine_readable/, .bot_directives/)
+✅ Understand canonical locations (.machine_readable/, .machine_readable/bot_directives/)
 ✅ Know the invariants (no SCM duplication, etc.)
 ✅ Check for MCP enforcement (if applicable)
 ✅ Read `.machine_readable/6a2/STATE.a2ml` for current status
@@ -105,7 +109,7 @@ When ending a session:
 
 After reading this file, demonstrate understanding by stating:
 
-**"I have read the AI manifest. SCM files are located in `.machine_readable/` ONLY, bot directives in `.bot_directives/`, and I will not create duplicate files in the root directory."**
+**"I have read the AI manifest. SCM files are located in `.machine_readable/` ONLY, bot directives in `.machine_readable/bot_directives/`, and I will not create duplicate files in the root directory."**
 
 ## META
 
