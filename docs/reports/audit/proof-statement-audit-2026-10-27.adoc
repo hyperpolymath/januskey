@@ -8,7 +8,7 @@
 ====
 This report records the audit as it was run on `main` at 10f0bc2. Since then:
 
-* *Fixed*: P4 and P5 (content store). Writes are now atomic and a damaged blob is repaired, and a malformed hash cannot leave the store root (#163). These are now ledger rows S-1 and S-2.
+* *Fixed*: P4 and P5 (content store). A damaged blob is now repaired, writes go by temporary file and rename (by construction; no test injects a mid-write failure), and a malformed hash cannot leave the store root (#163). These are now ledger rows S-1 and S-2.
 * *Fixed*: transaction-log persistence and resumable rollback (T-4 and T-5, #162 and #164).
 * *Still open*:
 ** P1 to P3 (attestation log): uncovered fields, the last entry, and tail truncation. These are now ledger rows L-1 and L-2.

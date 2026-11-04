@@ -29,4 +29,8 @@ permissions:
 jobs:
   hypatia:
     uses: metadatastician/standards/.github/workflows/hypatia-scan-reusable.yml@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12
-    secrets: inherit
+    # Named, not `inherit`: GitHub refuses inheritance from a user account
+    # (hyperpolymath) into an organisation (metadatastician). The reusable
+    # declares this one optional secret.
+    secrets:
+      HYPATIA_SCAN_PAT: ${{ secrets.HYPATIA_SCAN_PAT }}
