@@ -31,11 +31,12 @@ Two things are wrong with treating this as erasure.
 . *Sealing.* `store` seals the content with AES-256-GCM under a fresh 256-bit key from the OS CSPRNG and a 96-bit random nonce. The blob file is `version byte ‖ nonce ‖ ciphertext ‖ tag`.
 ** *Never* use a convergent key (key = H(content)). Such a key can be recomputed from the content, so it cannot be shredded.
 . *Deduplication is unchanged.* The key belongs to the blob, not to a path. A blob shared by two paths keeps its key until the last path that needs it is obliterated, which is the rule `obliterate_path` already applies to blobs.
-. *Key storage.* Keep all blob keys in *one key table* (`.januskey/keys`), sealed as a whole under the current *epoch key*. See §4 for where the epoch key comes from.
-** An earlier draft proposed one key file per blob, because dropping a single file is cheap.
-** But making a shred final requires every live key to be re-sealed under a fresh epoch key. With per-blob files that is one synced write per live key: 1.2 s for only 1 000 keys (§3).
-** The single table makes a final shred one synced write, whatever the number of keys.
-. *Shred.* `obliterate` and `gc` drop the blob's entry and write the table again under a *fresh* epoch key. Then they destroy the old epoch key, then delete the blob.
+. *Key storage.* Keep all blob keys in *one key table* (`.januskey/keys`), sealed as a whole under the current *epoch key*, plus an append-only *key journal*. See §4 for where the epoch key comes from.
+** A `store` appends one entry, sealed under the current epoch key, to the journal and syncs it. That costs the same at any number of keys; rewriting the whole table on every store would not.
+** A shred folds the journal into the table as part of the rewrite it does anyway.
+** Journal entries are sealed under the same epoch key as the table, so the rotation below covers retained copies of the journal too.
+** An earlier draft proposed one key file per blob, because dropping a single file is cheap. But making a shred final requires every live key to be re-sealed under a fresh epoch key. With per-blob files that is one synced write per live key: 1.2 s for only 1 000 keys (§3). The table makes a final shred one synced write.
+. *Shred.* `obliterate` and `gc` drop the blob's entry, fold in the journal, and write the table again under a *fresh* epoch key, starting an empty journal. Then they destroy the old epoch key, then delete the blob.
 ** Destroying the old epoch key is what makes the shred final. A snapshot, a backup or a copy-on-write extent can keep an old copy of the table, but that copy is sealed under an epoch key that no longer exists.
 ** If the old epoch key is not destroyed, for example because the new table is written but the old key survives, the shred is only *pending*. Every retained copy of the old table, and so of the blob's key, can still be opened.
 ** The cost of a final shred is O(live keys): 1.2 ms at 1 000 keys, 34 ms at 100 000 (§3).
@@ -44,12 +45,17 @@ Two things are wrong with treating this as erasure.
 ** That file existed in plaintext on the same medium before JanusKey ever saw it, so CoW extents, flash remapping, snapshots or backups may still hold its plaintext.
 ** Covering it needs encryption from the file's creation, meaning an encrypted volume underneath, which is outside JanusKey.
 ** The record says which copies the shred covers, and the docs say the working file is overwritten best-effort only.
-. *Addresses.* Use HMAC-SHA-256 under a per-store index key instead of a bare SHA-256, so that an address alone does not confirm a guessed plaintext. The index key is in turn an erasure target when the whole store is destroyed.
+. *Addresses.* Use HMAC-SHA-256 under a per-store *index key* instead of a bare SHA-256, so that an address alone does not confirm a guessed plaintext.
+** That only holds if the attacker who reads the store cannot also read the index key. The index key is therefore part of the protected hierarchy and never sits beside the store in plaintext.
+** It is derived from the root of §4 with HKDF-SHA-256 under its own label. It is never written down, and is recomputed when the store is opened.
+** It is stable for the store's lifetime, because rotating it would re-address every blob. So it is not rotated per shred.
+** Destroying the root destroys it too, which is a whole-store erasure.
+** The protection is exactly as strong as the root. An attacker who holds the store *and* the passphrase (or the hardware root) can still confirm guesses.
 . *Proof object.* `ObliterationProof` loses `storage_cleared` and `overwrite_passes`. It records the key id that was destroyed, and is honestly named a *record*, not a proof.
 
 == 3. Measured cost (E1, done)
 
-`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after two rounds of review corrections.
+`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after three rounds of review corrections.
 
 * *Conditions:* 4 vCPU, a container's virtual disk, one run, and medians, with Criterion's 95% intervals in the raw output.
 * *Payloads:* random, so incompressible. That is the worst case for gzip: it costs time and saves nothing. Compressible content would make every gzip row faster, and the sealed row with it, since that row compresses before sealing.
@@ -59,10 +65,12 @@ Two things are wrong with treating this as erasure.
 |===
 |Store (per blob) |4 KiB |64 KiB |1 MiB |16 MiB
 |`ContentStore::store`, compression off |0.92 ms |2.10 ms |6.05 ms |40.1 ms
-|`ContentStore::store`, compression on (the `jk` default, today) |1.70 ms |4.40 ms |35.7 ms |545 ms
-|proposed: gzip, then seal, then a synced blob write and a synced key write (key unwrapped) |2.88 ms |5.22 ms |39.0 ms |582 ms
+|`ContentStore::store`, compression on (the `jk` default, today) |1.34 ms |3.98 ms |36.3 ms |525 ms
+|proposed: gzip, then seal, then a synced blob write and one synced append to the key journal (entry unwrapped) |1.63 ms |3.66 ms |39.1 ms |588 ms
 |seal only, no I/O |3.7 µs |55 µs |1.65 ms |38.6 ms
 |===
+
+The default-store and proposed rows come from one paired re-run, made after the layout moved to the key journal. An earlier run of the default store measured 1.70 / 4.40 / 35.7 / 545 ms. The spread at 4 and 64 KiB between those runs is as large as the difference between the two rows, so read small-blob differences as noise.
 
 [cols="2,1",options="header"]
 |===
@@ -77,8 +85,10 @@ Destroying the old epoch secret is not in any row. Its cost depends on where it 
 
 What the numbers say:
 
-* *Sealing is cheap next to today's default.* Against the store `jk` actually runs (gzip on), sealing adds 1.2 ms at 4 KiB, about 1.7× because of the key's own synced write, and about 7% at 16 MiB. The cost is in fsync count and compression, not in the cipher.
-** An earlier version of this section said sealing doubles large-blob store time. That compared against the store with compression off, which is not the default.
+* *Sealing is cheap next to today's default.* Against the store `jk` actually runs (gzip on), the proposed path is within run-to-run noise at 4 and 64 KiB, and adds about 8% at 1 MiB and 12% at 16 MiB. The cost is in compression and fsync count, not in the cipher.
+** Two earlier versions of this section were wrong.
+** One said sealing doubles large-blob store time. That compared against the store with compression off, which is not the default.
+** The other gave 1.7× at 4 KiB. That measured a separate key *file* per blob, with its own temp file, rename and directory fsync, which the chosen layout does not do.
 * *Compression is the large-blob cost today.* gzip on incompressible input is the slowest step by an order of magnitude: 545 against 40 ms at 16 MiB.
 ** That observation is independent of this ADR.
 ** Skipping compression when it does not pay, or a faster codec, would help either design.
@@ -122,7 +132,10 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 ** *Addresses are part of the history.* The operation log serialises each blob's `ContentHash`, and `undo` passes that exact value to `ContentStore::retrieve`. Moving blobs to HMAC addresses would leave every historical operation pointing at a blob that no longer exists.
 ** `ContentHash` therefore becomes versioned (`sha256:` or `hmac-sha256:`), and `retrieve` resolves either form.
 ** Migration proceeds in three steps: seal each blob at its new address; rewrite every reference in the operation log in one atomic save (the log already saves by write, sync and rename, row T-8); only then shred the SHA-addressed copies.
-** A crash between the steps leaves both copies, never neither. The SHA address keeps its dictionary exposure until the rewrite commits.
+** A crash between the steps leaves both copies, never neither. That cuts both ways.
+*** The old SHA-addressed blobs are plaintext with predictable names. Exposure ends only when *every* old copy is shredded, not when the log rewrite commits.
+*** Migration therefore records itself as incomplete, in a marker it writes first and removes last. Every `jk` invocation resumes the cleanup until the last old copy is gone.
+*** `jk status` reports a store with a migration still in progress as still exposed.
 ** *Obliteration records hold addresses too.* Each `ObliterationRecord` and its nested proof in `obliterations.json` carry the old SHA-256 `ContentHash`, together with the nonce and commitment derived from it. For a blob already obliterated there is no plaintext left from which to compute an HMAC address.
 *** Rewriting those records is impossible, so migration must either *redact* or *retain*.
 *** *Redact:* keep the record's id, time, reason and legal basis, and remove the hash, nonce and commitment. The record can then no longer answer "was this content obliterated?".

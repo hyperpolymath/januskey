@@ -8,7 +8,8 @@
 //   store:  ContentStore::store with compression off and with it on (the
 //           `jk` default), against the proposed path: gzip, then an
 //           AES-256-GCM seal under a fresh per-blob key, then the same
-//           temp/fsync/rename write for the blob and again for its key file.
+//           temp/fsync/rename write for the blob, plus one synced append of
+//           its key to the key journal (the layout ADR-0002 §2 chooses).
 //           `seal_only` is the cipher with no I/O.
 //   erase:  obliterate_file on a blob (3-pass overwrite, unlink: the current
 //           path) against crypto-shredding, in its two stages:
@@ -110,6 +111,11 @@ fn bench_store(c: &mut Criterion) {
             &size,
             |b, &size| {
                 let dir = tempfile::tempdir().unwrap();
+                let mut journal = fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(dir.path().join("keys.journal"))
+                    .unwrap();
                 let (mut data, mut n) = (random_payload(size), 0u64);
                 b.iter(|| {
                     make_unique(&mut data, &mut n);
@@ -117,9 +123,14 @@ fn bench_store(c: &mut Criterion) {
                     // Compress before sealing: ciphertext does not compress.
                     let (key, sealed) = seal(&gzip(&data));
                     write_synced(dir.path(), hash.raw_hash(), &sealed);
-                    // The key must be durable too: one more synced write. It is
-                    // stored unwrapped here; wrapping adds microseconds (E5).
-                    write_synced(dir.path(), &format!("{}.key", hash.raw_hash()), &key);
+                    // The key must be durable too. A store appends one entry
+                    // to the key journal and syncs it; the sealed table is
+                    // rewritten only by a shred, which rewrites it anyway.
+                    // Wrapping the entry adds microseconds (E5).
+                    let mut entry = [0u8; ENTRY];
+                    entry[..32].copy_from_slice(&key);
+                    journal.write_all(&entry).unwrap();
+                    journal.sync_all().unwrap();
                 });
             },
         );
