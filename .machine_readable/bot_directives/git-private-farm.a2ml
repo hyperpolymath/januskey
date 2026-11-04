@@ -3,12 +3,13 @@
 
 [metadata]
 repo = "januskey"
-last-updated = "2026-06-12"
+last-updated = "2026-11-04"
 owner = "hyperpolymath"
 
 [propagation]
-enabled = true
-workflow = ".github/workflows/instant-sync.yml"
+enabled = false
+workflow = ""
+retired = "instant-sync.yml was deleted in #156 (it was already disabled); no workflow in this repo dispatches to the farm, so nothing propagates until one is added"
 target = "hyperpolymath/.git-private-farm"
 event-type = "propagate"
 secret-name = "FARM_DISPATCH_TOKEN"

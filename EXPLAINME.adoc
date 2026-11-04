@@ -21,7 +21,7 @@ operation-specific inverse — no filesystem scan, no tape restore.
 theorem. The ledger row "every operation is reversible, as a theorem linked to
 the Rust" is **OPEN**; the Agda proof covers a transaction *model* (T-1..T-3)
 whose step-level premise is tested, not proved (T-6), and the operation metadata
-log now saves by rename but that change is unbuilt (T-8, OPEN). Reversibility also fails
+log saves by rename and a failed save changes nothing (T-8, TESTED), but a file change whose log record fails to persist is not recoverable (T-9, OPEN). Reversibility also fails
 outright if the store is lost, and `jk obliterate` and `jk gc` are deliberate
 exceptions that destroy what undo would need. What has been restored, and what
 has not, is tabulated in `docs/wiki/theory/rmr-primitive.md` §2.
@@ -53,7 +53,7 @@ it does not make the file immutable, and an attacker with write access can delet
 the whole log.
 
 **Evidence:** `crates/reversible-core/src/metadata.rs` (log structure and
-`save` — see the T-8 caveat), `crates/januskey-cli/src/attestation.rs` (HMAC
+`save` — T-8, and the T-9 caveat), `crates/januskey-cli/src/attestation.rs` (HMAC
 chain, `AuditLog`), `crates/reversible-core/src/content_store.rs` (hashing and
 dedup).
 
@@ -86,7 +86,7 @@ CLI crate (they were extracted in Phase 1, 2026-03-21).
 | `crates/januskey-cli/src/attestation.rs` | HMAC-SHA256 audit chain over operations
 | `crates/januskey-cli/src/keys.rs`, `keys_cli.rs` | AES-256-GCM key store (Argon2id), key lifecycle; the `jk-keys` binary
 | `crates/reversible-core/src/content_store.rs` | SHA-256 content-addressed storage, deduplication
-| `crates/reversible-core/src/metadata.rs` | Append-only operation log (`MetadataStore`); it now calls the shared atomic writer, unbuilt — ledger row T-8
+| `crates/reversible-core/src/metadata.rs` | Append-only operation log (`MetadataStore`); it saves through the shared atomic writer and a failed save changes nothing (T-8, TESTED); a file change whose record fails to persist is T-9 (OPEN)
 | `crates/reversible-core/src/transaction.rs` | Transaction lifecycle and the atomic write→fsync→rename log save
 | `crates/reversible-core/src/manifest.rs` | A2ML manifest emitter (the intended ochrance boundary)
 | `crates/reversible-core/src/lib.rs` | `ReversibleExecutor` trait — `execute`, `undo`, `generate_manifest`
