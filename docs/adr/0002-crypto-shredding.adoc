@@ -1,0 +1,117 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= ADR-0002 — Obliteration by crypto-shredding
+:toc: left
+
+* *Status:* proposed. Not accepted, and nothing is built. The benchmark in `benches/crypto_shred.rs` is the only code.
+* *Date:* 2026-11-04
+* *Related:*
+** ADR-0001: `jk` is reversible file operations, not a key system.
+** `PROOF-NEEDS.adoc` rows O-1 (OPEN), X-1 (ASSUMED) and E-1m (PROVEN).
+** `docs/reports/audit/proof-statement-audit-2026-10-27.adoc` §5.
+
+== 1. Context
+
+`jk obliterate` today calls `secure_overwrite`: three passes over the file, an fsync after each pass, then an unlink. It records an `ObliterationProof` whose `storage_cleared` is hard-coded to `true` (row O-1).
+
+Two things are wrong with treating this as erasure.
+
+* *The overwrite does not reach the old bytes on the media that matter.*
+** On an SSD, the flash translation layer writes each pass to fresh cells.
+** On a copy-on-write file system (btrfs, ZFS, APFS) each pass is a new extent.
+** A journal, a snapshot or a backup keeps its own copy.
+** NIST SP 800-88 Rev. 1 warns that overwriting may not reach all of the storage on a flash device. DoD 5220.22-M, which the code cites, dropped its overwrite procedure in the 2006 revision. Row X-1 is therefore an assumption that is false on most current disks.
+* *The content address survives the erasure.* A blob is addressed by SHA-256 of its plaintext. That address stays in `obliterations.json` and in the proof (`content_hash`). Anyone who can guess low-entropy content, such as a short password or a yes/no field, can confirm the guess after obliteration.
+
+== 2. Proposal
+
+*Crypto-shredding:* each blob is stored encrypted under its own random key, and erasing a blob means erasing its key.
+
+[arabic]
+. *Sealing.* `store` seals the content with AES-256-GCM under a fresh 256-bit key from the OS CSPRNG and a 96-bit random nonce. The blob file is `version byte ‖ nonce ‖ ciphertext ‖ tag`.
+** *Never* use a convergent key (key = H(content)). Such a key can be recomputed from the content, so it cannot be shredded.
+. *Deduplication is unchanged.* The key belongs to the blob, not to a path. A blob shared by two paths keeps its key until the last path that needs it is obliterated, which is the rule `obliterate_path` already applies to blobs.
+. *Key storage.* Keep one small key file per blob under `.januskey/keys/` rather than a single table. A table rewrite is O(N) per shred (§3). Key files are wrapped under a store key; see §4 for where the store key comes from.
+. *Shred.* `obliterate` and `gc` remove the blob's key file, then the blob. Once the key file is gone, every copy of the ciphertext anywhere (flash cells, snapshots, backups) is ciphertext under a key that no longer exists.
+. *Addresses.* Use HMAC-SHA-256 under a per-store index key instead of a bare SHA-256, so that an address alone does not confirm a guessed plaintext. The index key is in turn an erasure target when the whole store is destroyed.
+. *Proof object.* `ObliterationProof` loses `storage_cleared` and `overwrite_passes`. It records the key id that was destroyed, and is honestly named a *record*, not a proof.
+
+== 3. Measured cost (E1, done)
+
+`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04. Conditions: 4 vCPU, a container's virtual disk, one run, and medians shown with Criterion's 95% intervals in the raw output.
+
+These figures are evidence about *shape*, not about real disks. fsync on a virtual disk is not fsync on an SSD.
+
+[cols="2,1,1,1,1",options="header"]
+|===
+|Store (per blob) |4 KiB |64 KiB |1 MiB |16 MiB
+|`ContentStore::store`, plaintext (today) |1.39 ms |1.95 ms |4.40 ms |40.2 ms
+|seal + same synced write (prototype) |1.02 ms |1.57 ms |6.43 ms |81.1 ms
+|seal only, no I/O |3.7 µs |54 µs |1.72 ms |40.0 ms
+|===
+
+[cols="2,1",options="header"]
+|===
+|Erase |Time
+|`obliterate_file` on the blob, 4 KiB (today) |0.72 ms
+|`obliterate_file` on the blob, 1 MiB (today) |6.04 ms
+|`obliterate_file` on the blob, 16 MiB (today) |122.9 ms
+|drop one 32-byte key file (same `obliterate_file`) |0.74 ms, *independent of blob size*
+|drop one entry from a key table, 1 000 / 10 000 / 100 000 keys |0.80 / 2.22 / 14.2 ms
+|===
+
+What the numbers say:
+
+* *Small blobs.* Below about 64 KiB, fsync dominates and the cipher is in the noise. The prototype is even faster than today's store, because it skips the store's two-level directory creation. That gap is an artefact of the prototype, not a gain from sealing.
+* *Large blobs.* At 16 MiB, sealing doubles store time. The cipher ran at about 400 MiB/s at that size, against about 1.1 GiB/s on small inputs, which points at allocation and copying rather than AES itself.
+* *Erasure.* Erasure becomes constant-time in blob size. On a 16 MiB blob it is about 166× cheaper, and on any medium it is a claim that can be made, whereas overwriting is not.
+* *Key layout.* A single key table makes every shred rewrite the whole table, so it was rejected in favour of per-blob key files.
+
+== 4. Where the recursion ends (the honest limit)
+
+Crypto-shredding does not remove the physical-erasure assumption. It *shrinks* it: from "every copy of every blob, of any size, on any medium" to "one small secret held where erasure is real".
+
+A deleted key file can itself survive on flash. That is why key files are wrapped, and why the root must live somewhere else.
+
+[cols="3,1,1,4",options="header"]
+|===
+|Root of the key hierarchy |Elegance |Dependability |Aspects
+|Passphrase via Argon2id (already a dependency), plus a per-epoch random salt kept only in memory and in an OS keyring |★★ |★★ |Usable everywhere. Privacy is only as good as the passphrase. A shred becomes final when the epoch is rotated and the old epoch secret is gone.
+|OS keyring or TPM / Secure Enclave sealed key |★★★ |★★★ |Hardware erase semantics. Platform-specific, so a Rust/SPARK seam and an Idris2 ABI per platform. This is the estate's FFI pattern.
+|No root at rest: the key is supplied per session, for example by a hardware token |★★★ |★★ |The strongest privacy. Undo needs the token present, which changes how `jk` is used, and ADR-0001 says that is not the product.
+|===
+
+Recommended for a first build: the passphrase plus epoch rotation, with the TPM/keyring root as a later, separate seam.
+
+== 5. Statements this makes provable
+
+* *O-1, restated:* "after `shred(h)`, the live key store holds no key for `h`, and every stored copy of `h` is a sealed blob under a key with that id".
+** This is a finite-map model in the Agda kernel.
+** It has the same shape as `obliterate-cuts-recovery` (E-1m): recovery needs the key, and the key is not in any reachable state.
+** It is provable, and then TESTED against the Rust through a conformance test.
+* *X-1 becomes two assumptions:*
+** AES-256-GCM is IND-CPA and INT-CTXT for one message per key. One message per key also removes nonce reuse as a failure mode.
+** Erasing the root or epoch secret is real erasure.
+* *C-3 is unchanged:* obliteration stays by design irreversible, and `undo` after a shred has nothing to restore, as today.
+
+== 6. Consequences
+
+* *Identity (ADR-0001).* Encryption is a *storage* detail here, as SHA-256 addressing already is. `jk` gains no key lifecycle, rotation UI or key export. The `jk-keys` lifecycle manager stays out of the product. The only shared code is the AEAD and KDF crates already in the dependency graph, so no new dependency is needed.
+* *Format and migration.* Blobs gain a version byte. A store with plaintext blobs is read as today, and new writes are sealed. Old plaintext blobs need an explicit `jk migrate` that seals and shreds them. Until that runs, the old plaintext is exactly as exposed as it is now, and the docs must say so.
+* *Reversibility.* Every `undo` now needs the store key. A lost passphrase loses history. That is a new failure mode, and it needs a recovery story (an escrow file, or an accepted loss) before acceptance.
+* *Wording.* The DoD 5220.22-M and "cryptographic proof of erasure" claims are removed from the code, docs and ledger.
+
+== 7. Experiments before building (proposed)
+
+* *E2: real media.* Repeat E1 on ext4 over an NVMe SSD and on btrfs. Report the fsync share of store time.
+* *E3: cipher choice.* Compare ChaCha20-Poly1305 with AES-256-GCM on a CPU without AES-NI. Check that the 16 MiB seal is limited by allocation, not by the cipher, by sealing in place (`encrypt_in_place`).
+* *E4: forensic acceptance test.* This is the decisive one. Build a btrfs file system on a loop device, store a marker payload, obliterate it, then scan the raw image for the marker.
+** *Expected for today's overwrite:* the marker is found (the CoW extents survive).
+** *Expected with sealing:* the marker is never found, because the plaintext is never written.
+** It becomes a TESTED row if it holds.
+* *E5: shred cost with the store key wrapped.* Add one key unwrap and rewrap to the key-file path, and confirm the cost stays constant in blob size.
+
+== 8. Beyond this repository
+
+* The same erasure-on-flash problem applies to any estate repository that promises deletion: consent and retention tooling, and obliteration in other stores. If this ADR is accepted, the root-key seam (§4) is a candidate for a shared crate rather than a januskey-only module.
+* `docs/security/THREAT_MODEL.adoc` covers only the key store. It needs a section on the obliteration path whichever way this ADR is decided.
