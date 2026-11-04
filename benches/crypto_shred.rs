@@ -34,9 +34,11 @@ use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
 use flate2::{write::GzEncoder, Compression};
+use hmac::{Hmac, Mac};
 use januskey::obliteration::obliterate_file;
 use januskey::{ContentHash, ContentStore};
 use rand::RngCore;
+use sha2::Sha256;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -86,6 +88,28 @@ fn seal(data: &[u8]) -> ([u8; 32], Vec<u8>) {
     out.extend_from_slice(&nonce);
     out.extend_from_slice(&ct);
     (key, out)
+}
+
+/// Seal `data` under a given key; returns nonce || ciphertext.
+fn seal_under(key: &[u8; 32], data: &[u8]) -> Vec<u8> {
+    let mut nonce = [0u8; 12];
+    rand::rng().fill_bytes(&mut nonce);
+    let cipher = Aes256Gcm::new_from_slice(key).unwrap();
+    let ct = cipher.encrypt(Nonce::from_slice(&nonce), data).unwrap();
+    let mut out = Vec::with_capacity(12 + ct.len());
+    out.extend_from_slice(&nonce);
+    out.extend_from_slice(&ct);
+    out
+}
+
+/// The per-message subkey of ADR §5: HKDF-SHA-256 expand of the epoch key
+/// with the message's sequence number. One output block, so this is exactly
+/// HMAC-SHA-256(epoch key, info || 0x01) with info = the sequence number.
+fn subkey(epoch_key: &[u8; 32], seq: u64) -> [u8; 32] {
+    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(epoch_key).unwrap();
+    mac.update(&seq.to_le_bytes());
+    mac.update(&[1]);
+    mac.finalize().into_bytes().into()
 }
 
 /// Open `nonce || ciphertext` sealed by [`seal`] under `key`.
@@ -233,13 +257,19 @@ fn bench_erase(c: &mut Criterion) {
             &journal_len,
             |b, &journal_len| {
                 let dir = tempfile::tempdir().unwrap();
-                let entries: Vec<([u8; 32], Vec<u8>)> = (0..journal_len)
-                    .map(|_| seal(&random_payload(TABLE_ROW)))
+                let mut epoch_key = [0u8; 32];
+                rand::rng().fill_bytes(&mut epoch_key);
+                // Entry i is sealed under the subkey for sequence number i + 1
+                // (0 is the table), as ADR §5 specifies.
+                let entries: Vec<Vec<u8>> = (0..journal_len as u64)
+                    .map(|i| seal_under(&subkey(&epoch_key, i + 1), &random_payload(TABLE_ROW)))
                     .collect();
                 b.iter(|| {
                     let mut rows = Vec::with_capacity(journal_len * TABLE_ROW);
-                    for (key, sealed) in &entries {
-                        rows.extend_from_slice(&open(key, sealed));
+                    for (i, sealed) in entries.iter().enumerate() {
+                        // Only the epoch key is held: derive each subkey here.
+                        let key = subkey(&epoch_key, i as u64 + 1);
+                        rows.extend_from_slice(&open(&key, sealed));
                     }
                     write_synced(dir.path(), "keys.journal", &[]);
                     black_box(rows.len());

@@ -33,6 +33,10 @@ Two things are wrong with treating this as erasure.
 . *Deduplication is unchanged.* The key belongs to the blob, not to a path. A blob shared by two paths keeps its key until the last path that needs it is obliterated, which is the rule `obliterate_path` already applies to blobs.
 . *Key storage.* Keep all blob keys in *one key table* (`.januskey/keys`), sealed as a whole under the current *epoch key*, plus an append-only *key journal*. See §4 for where the epoch key comes from.
 ** A `store` appends one entry, sealed under the current epoch key, to the journal and syncs it. That costs the same at any number of keys; rewriting the whole table on every store would not.
+** *Key before blob.* The journal entry is synced *before* the sealed blob is renamed into place.
+*** A crash in between leaves a key with no blob. That is harmless, and the next fold drops it.
+*** It never leaves a blob with no key. That case would be permanent loss, because deduplication would accept the existing blob on a retry.
+*** Deduplication accepts an existing blob only if the table or journal holds its key; otherwise the blob is rewritten.
 ** A shred folds the journal into the table as part of the rewrite it does anyway.
 ** Journal entries are sealed under the same epoch key as the table, so the rotation below covers retained copies of the journal too.
 ** An earlier draft proposed one key file per blob, because dropping a single file is cheap. But making a shred final requires every live key to be re-sealed under a fresh epoch key. With per-blob files that is one synced write per live key: 1.2 s for only 1 000 keys (§3). The table makes a final shred one synced write.
@@ -41,21 +45,22 @@ Two things are wrong with treating this as erasure.
 ** If the old epoch key is not destroyed, for example because the new table is written but the old key survives, the shred is only *pending*. Every retained copy of the old table, and so of the blob's key, can still be opened.
 ** The cost of a final shred is O(live keys + journal entries since the last rotation).
 *** Opening, dropping and re-sealing the table took about 1 ms at 1 000 keys and 26 ms at 100 000.
-*** Folding the journal adds 0.4 ms at 100 entries and 3.4 ms at 10 000 (§3).
+*** Folding the journal adds 0.7 ms at 100 entries and 18 ms at 10 000 (§3). Each entry needs its own subkey derivation and AES key schedule.
 ** *Stores and rotations are serialised.* Suppose a `jk` process appended to the journal under generation _n_ after a concurrent shred had folded that journal but before it removed secret _n_. That blob's key would be in no table and sealed under a destroyed secret, and its undo content would be lost permanently.
 *** So every journal append and every whole rotation runs under one exclusive store lock (`.januskey/keys.lock`, an OS file lock).
+*** Readers take the same lock *shared*, for the whole of a `retrieve` or `undo` that uses a key. Without it, a process could open generation _n_, keep the victim's key or plaintext, and finish an undo after the shred reported the content gone. That would recreate obliterated data. A final shred waits for readers to finish.
 *** As a second guard, each journal entry carries the generation it was sealed under. A store that finds `current` changed while it waited for the lock re-seals under the new generation.
 *** This is stricter than the rest of `jk` today: concurrent writers are out of scope for the transaction log (T-5). It is required here because the failure is permanent key loss, not a lost update.
 ** *Rotation is crash-safe only with generations.* The keyring and the file system cannot be updated in one atomic step, so tables and epoch secrets are numbered by generation.
 *** A shred moving from generation _n_ to _n+1_:
 **** stores the new epoch secret in the keyring under _n+1_, keeping _n_;
 **** writes `keys.<n+1>`, with an empty journal for _n+1_, and syncs it;
-**** atomically renames a small `current` pointer file to name _n+1_;
+**** writes a small `current` pointer naming _n+1_ by temporary file, fsync and rename, then fsyncs the directory, so the switch is durable *before* the next step;
 **** removes secret _n_ from the keyring;
 **** deletes `keys.<n>`, its journal, and the blob.
 *** On open, a store whose keyring holds both _n_ and _n+1_ is mid-rotation:
-**** if `current` names _n+1_, the open finishes the last two steps;
-**** if `current` still names _n_, the open discards secret _n+1_ and `keys.<n+1>`.
+**** recovery chooses the generation that actually opens, not merely the one `current` names: it tries `current`'s generation first, then the other;
+**** it finishes or undoes the rotation from there, and never discards the only generation whose secret is still present.
 *** A crash at any point leaves exactly one openable generation.
 *** The shred is final only once secret _n_ has left the keyring.
 ** Shreds could instead be batched, so that one rotation finalises many. A batched shred appends a *tombstone* for the blob to the key journal and syncs it (0.2 ms, §3); the blob is unusable through `jk` at once, but the old table and journal, and so the key, stay openable under the live epoch key until the next rotation. The ADR's default is a final shred every time; batching, and how long a shred may stay pending, are decisions for acceptance.
@@ -73,7 +78,7 @@ Two things are wrong with treating this as erasure.
 
 == 3. Measured cost (E1, done)
 
-`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after six rounds of review corrections.
+`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after seven rounds of review corrections.
 
 * *Conditions:* 4 vCPU, a container's virtual disk, one run, and medians, with Criterion's 95% intervals in the raw output.
 * *Payloads:* random, so incompressible. That is the worst case for gzip: it costs time and saves nothing. Compressible content would make every gzip row faster, and the sealed row with it, since that row compresses before sealing.
@@ -96,7 +101,7 @@ The default-store and proposed rows come from one paired re-run, made after the 
 |today: `obliterate_file` on the blob, 4 KiB / 64 KiB / 1 MiB / 16 MiB |0.71 / 0.98 / 6.76 / 124 ms
 |*pending* shred (batched): append a tombstone to the key journal and sync it |0.20 ms
 |*final* shred, one table: open (authenticate and decrypt) the sealed table, drop the entry, re-seal it under a fresh epoch key, one synced write; 64-byte rows; 1 000 / 10 000 / 100 000 live keys |0.96 / 2.91 / 26.2 ms
-|*final* shred, add for the journal: open each entry stored since the last rotation and start an empty journal, one synced write; 10 / 100 / 1 000 / 10 000 entries |0.42 / 0.45 / 0.77 / 3.44 ms
+|*final* shred, add for the journal: derive each entry's subkey from the epoch key, open it, and start an empty journal, one synced write; 10 / 100 / 1 000 / 10 000 entries |0.45 / 0.70 / 2.28 / 18.0 ms
 |*final* shred, one file per key: rewrap every key file under a fresh epoch key, 1 000 live keys |1 210 ms
 |===
 
@@ -105,7 +110,7 @@ Not in any row:
 * *Destroying the old epoch secret.* Its cost depends on where it lives (§4).
 * *The generation protocol's extra writes:* one keyring write and one pointer rename (§2).
 
-The journal row is never zero in practice, even when every shred is final: any store since the last rotation leaves an entry, including the victim's own. An earlier version of this section claimed it was zero.
+The journal row is never zero in practice, even when every shred is final: any store since the last rotation leaves an entry, including the victim's own. An earlier version of this section claimed it was zero. An earlier journal row (0.42 / 0.45 / 0.77 / 3.44 ms) used keys derived before timing began; the current row derives every subkey inside the measurement.
 
 What the numbers say:
 

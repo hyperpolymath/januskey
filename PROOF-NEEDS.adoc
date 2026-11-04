@@ -134,7 +134,7 @@ one, so the receipt covers these rows as they stand. Mathesis status for them:
 The other seven PROVEN rows — A-1, A-2, C-1 to C-5 — are Idris2 theorems. Under
 PROOF-POLICY §1 those are interface and ABI contracts, so the theory ladder does
 not grade them: they are PROVEN in the vocabulary above and nothing more. The
-same holds for the 23 TESTED rows, which record observed behaviour and never
+same holds for the 27 TESTED rows, which record observed behaviour and never
 grading. First-party Rust behaviour belongs to **Creusot** (not SPARK, and not
 Idris2); no Creusot contract exists in this tree, which is why no Rust row is
 graded.
