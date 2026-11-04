@@ -42,6 +42,10 @@ Two things are wrong with treating this as erasure.
 ** The cost of a final shred is O(live keys + journal entries since the last rotation).
 *** Opening, dropping and re-sealing the table took about 1 ms at 1 000 keys and 26 ms at 100 000.
 *** Folding the journal adds 0.4 ms at 100 entries and 3.4 ms at 10 000 (§3).
+** *Stores and rotations are serialised.* Suppose a `jk` process appended to the journal under generation _n_ after a concurrent shred had folded that journal but before it removed secret _n_. That blob's key would be in no table and sealed under a destroyed secret, and its undo content would be lost permanently.
+*** So every journal append and every whole rotation runs under one exclusive store lock (`.januskey/keys.lock`, an OS file lock).
+*** As a second guard, each journal entry carries the generation it was sealed under. A store that finds `current` changed while it waited for the lock re-seals under the new generation.
+*** This is stricter than the rest of `jk` today: concurrent writers are out of scope for the transaction log (T-5). It is required here because the failure is permanent key loss, not a lost update.
 ** *Rotation is crash-safe only with generations.* The keyring and the file system cannot be updated in one atomic step, so tables and epoch secrets are numbered by generation.
 *** A shred moving from generation _n_ to _n+1_:
 **** stores the new epoch secret in the keyring under _n+1_, keeping _n_;
