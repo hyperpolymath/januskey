@@ -13,12 +13,13 @@
 //           `seal_only` is the cipher with no I/O.
 //   erase:  obliterate_file on a blob (3-pass overwrite, unlink: the current
 //           path) against crypto-shredding, in its two stages:
-//             pending: drop the blob's key file (through the same
-//                      obliterate_file); copies retained elsewhere are still
-//                      wrapped under the live epoch key;
-//             final:   drop the entry and re-seal every live key under a
-//                      fresh epoch key, either as one table (one synced
-//                      write) or as one file per key (one synced write each).
+//             pending: append a tombstone for the blob to the key journal
+//                      and sync it; the old table, and so the key, can still
+//                      be opened under the live epoch key;
+//             final:   open the sealed table, drop the entry and re-seal
+//                      every live key under a fresh epoch key, as one table
+//                      (one synced write). For contrast, the rejected layout:
+//                      one file per key (one synced write each).
 //
 // Payloads are random, so incompressible: the worst case for gzip, which then
 // costs time and saves nothing. Each is made unique per iteration, so dedupe
@@ -41,9 +42,12 @@ use std::path::Path;
 use std::time::Duration;
 
 const SIZES: [usize; 4] = [4 << 10, 64 << 10, 1 << 20, 16 << 20];
-/// A key-table entry: 32-byte content address, then the blob key wrapped
-/// under the epoch key (12-byte nonce, 32-byte key, 16-byte tag).
-const ENTRY: usize = 32 + 12 + 32 + 16;
+/// A plaintext key-table row: 32-byte content address and 32-byte blob key.
+/// The table is sealed as one message, so its rows are not wrapped one by one.
+const TABLE_ROW: usize = 32 + 32;
+/// A key-journal entry: one table row sealed on its own (12-byte nonce,
+/// the row, 16-byte tag), since entries are appended one at a time.
+const JOURNAL_ENTRY: usize = 12 + TABLE_ROW + 16;
 
 /// `size` random bytes: incompressible, the worst case for gzip.
 fn random_payload(size: usize) -> Vec<u8> {
@@ -81,6 +85,13 @@ fn seal(data: &[u8]) -> ([u8; 32], Vec<u8>) {
     out.extend_from_slice(&nonce);
     out.extend_from_slice(&ct);
     (key, out)
+}
+
+/// Open `nonce || ciphertext` sealed by [`seal`] under `key`.
+fn open(key: &[u8; 32], sealed: &[u8]) -> Vec<u8> {
+    let cipher = Aes256Gcm::new_from_slice(key).unwrap();
+    let (nonce, ct) = sealed.split_at(12);
+    cipher.decrypt(Nonce::from_slice(nonce), ct).unwrap()
 }
 
 /// gzip at the store's level, as `ContentStore::write_blob` does.
@@ -127,7 +138,7 @@ fn bench_store(c: &mut Criterion) {
                     // to the key journal and syncs it; the sealed table is
                     // rewritten only by a shred, which rewrites it anyway.
                     // Wrapping the entry adds microseconds (E5).
-                    let mut entry = [0u8; ENTRY];
+                    let mut entry = [0u8; JOURNAL_ENTRY];
                     entry[..32].copy_from_slice(&key);
                     journal.write_all(&entry).unwrap();
                     journal.sync_all().unwrap();
@@ -170,36 +181,40 @@ fn bench_erase(c: &mut Criterion) {
         );
     }
 
-    // Pending shred: drop one key file, the same overwrite on 32 bytes.
-    g.bench_function("pending_drop_key_file", |b| {
+    // Pending shred: append a tombstone for the blob to the key journal and
+    // sync it. The live epoch key still opens the old table.
+    g.bench_function("pending_journal_tombstone", |b| {
         let dir = tempfile::tempdir().unwrap();
-        b.iter_batched(
-            || {
-                let p = dir.path().join("key");
-                fs::write(&p, random_payload(32)).unwrap();
-                p
-            },
-            |p| black_box(obliterate_file(&p).unwrap()),
-            BatchSize::PerIteration,
-        );
+        let mut journal = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(dir.path().join("keys.journal"))
+            .unwrap();
+        b.iter(|| {
+            journal.write_all(&random_payload(JOURNAL_ENTRY)).unwrap();
+            journal.sync_all().unwrap();
+        });
     });
 
-    // Final shred, one table: drop the entry, re-seal the whole table under a
-    // fresh epoch key, one synced write. (Destroying the old epoch secret is
-    // not measured: where it lives is the open question of ADR §4.)
+    // Final shred, one table: open (authenticate and decrypt) the sealed
+    // table, drop the entry, re-seal the rest under a fresh epoch key, one
+    // synced write. Not measured: folding in a non-empty journal (one more
+    // open per entry since the last shred) and destroying the old epoch
+    // secret, whose cost depends on where ADR §4 puts it.
     for entries in [1_000usize, 10_000, 100_000] {
         g.bench_with_input(
-            BenchmarkId::new("final_reseal_table", entries),
+            BenchmarkId::new("final_open_drop_reseal_table", entries),
             &entries,
             |b, &entries| {
                 let dir = tempfile::tempdir().unwrap();
-                let table = random_payload(entries * ENTRY);
+                let (old_key, sealed_table) = seal(&random_payload(entries * TABLE_ROW));
                 let mut victim = 0usize;
                 b.iter(|| {
                     victim = (victim + 1) % entries;
-                    let mut next = Vec::with_capacity(table.len() - ENTRY);
-                    next.extend_from_slice(&table[..victim * ENTRY]);
-                    next.extend_from_slice(&table[(victim + 1) * ENTRY..]);
+                    let table = open(&old_key, &sealed_table);
+                    let mut next = Vec::with_capacity(table.len() - TABLE_ROW);
+                    next.extend_from_slice(&table[..victim * TABLE_ROW]);
+                    next.extend_from_slice(&table[(victim + 1) * TABLE_ROW..]);
                     let (epoch_key, sealed) = seal(&next);
                     write_synced(dir.path(), "keys", &sealed);
                     black_box(epoch_key);

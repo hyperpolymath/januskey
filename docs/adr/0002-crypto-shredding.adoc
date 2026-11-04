@@ -39,8 +39,8 @@ Two things are wrong with treating this as erasure.
 . *Shred.* `obliterate` and `gc` drop the blob's entry, fold in the journal, and write the table again under a *fresh* epoch key, starting an empty journal. Then they destroy the old epoch key, then delete the blob.
 ** Destroying the old epoch key is what makes the shred final. A snapshot, a backup or a copy-on-write extent can keep an old copy of the table, but that copy is sealed under an epoch key that no longer exists.
 ** If the old epoch key is not destroyed, for example because the new table is written but the old key survives, the shred is only *pending*. Every retained copy of the old table, and so of the blob's key, can still be opened.
-** The cost of a final shred is O(live keys): 1.2 ms at 1 000 keys, 34 ms at 100 000 (§3).
-** Shreds could instead be batched, so that one rotation finalises many. That leaves a window in which a shred is pending. The ADR's default is a final shred every time; batching is an option to decide at acceptance.
+** The cost of a final shred is O(live keys): opening, dropping and re-sealing took about 1 ms at 1 000 keys and 26 ms at 100 000 (§3).
+** Shreds could instead be batched, so that one rotation finalises many. A batched shred appends a *tombstone* for the blob to the key journal and syncs it (0.2 ms, §3); the blob is unusable through `jk` at once, but the old table and journal, and so the key, stay openable under the live epoch key until the next rotation. The ADR's default is a final shred every time; batching, and how long a shred may stay pending, are decisions for acceptance.
 . *Scope: content-store copies only.* The guarantee covers what JanusKey writes: blobs and keys. It does not cover the working file itself, which `jk obliterate` targets too.
 ** That file existed in plaintext on the same medium before JanusKey ever saw it, so CoW extents, flash remapping, snapshots or backups may still hold its plaintext.
 ** Covering it needs encryption from the file's creation, meaning an encrypted volume underneath, which is outside JanusKey.
@@ -55,7 +55,7 @@ Two things are wrong with treating this as erasure.
 
 == 3. Measured cost (E1, done)
 
-`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after three rounds of review corrections.
+`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after five rounds of review corrections.
 
 * *Conditions:* 4 vCPU, a container's virtual disk, one run, and medians, with Criterion's 95% intervals in the raw output.
 * *Payloads:* random, so incompressible. That is the worst case for gzip: it costs time and saves nothing. Compressible content would make every gzip row faster, and the sealed row with it, since that row compresses before sealing.
@@ -76,12 +76,15 @@ The default-store and proposed rows come from one paired re-run, made after the 
 |===
 |Erase |Time
 |today: `obliterate_file` on the blob, 4 KiB / 64 KiB / 1 MiB / 16 MiB |0.71 / 0.98 / 6.76 / 124 ms
-|*pending* shred: drop one 32-byte key file (the same `obliterate_file`) |0.72 ms
-|*final* shred, one table: drop the entry and re-seal the table under a fresh epoch key, 1 000 / 10 000 / 100 000 live keys |1.17 / 3.91 / 33.8 ms
+|*pending* shred (batched): append a tombstone to the key journal and sync it |0.20 ms
+|*final* shred, one table: open (authenticate and decrypt) the sealed table, drop the entry, re-seal it under a fresh epoch key, one synced write; 64-byte rows; 1 000 / 10 000 / 100 000 live keys |0.96 / 2.91 / 26.2 ms
 |*final* shred, one file per key: rewrap every key file under a fresh epoch key, 1 000 live keys |1 210 ms
 |===
 
-Destroying the old epoch secret is not in any row. Its cost depends on where it lives, which is §4's open question.
+Two costs are not in any row:
+
+* *Destroying the old epoch secret.* Its cost depends on where it lives (§4).
+* *Folding a non-empty journal into the table.* That is one more open per journal entry since the last shred, which is zero when every shred is final.
 
 What the numbers say:
 
@@ -92,11 +95,13 @@ What the numbers say:
 * *Compression is the large-blob cost today.* gzip on incompressible input is the slowest step by an order of magnitude: 545 against 40 ms at 16 MiB.
 ** That observation is independent of this ADR.
 ** Skipping compression when it does not pay, or a faster codec, would help either design.
-* *A final shred costs O(live keys), not O(blob size).* With one sealed table it is one synced write. That is cheaper than today's overwrite of a 16 MiB blob even at 100 000 keys (34 against 124 ms), but dearer than overwriting a 1 MiB blob at that key count.
+* *A final shred costs O(live keys), not O(blob size).* With one sealed table it is one synced write. That is cheaper than today's overwrite of a 16 MiB blob even at 100 000 keys (26 against 124 ms), but dearer than overwriting a 1 MiB blob at that key count.
 * *Unlike overwriting, the claim holds on any medium*, subject to §4.
 * *Key layout.* One file per key makes final shreds unworkable (1.2 s at 1 000 keys). It is why §2 chose the single table.
-** The pending-shred row (0.72 ms) is only the first step of a shred, not an erasure.
-** An earlier version compared that row with today's overwrite (a "166×" saving). That comparison was wrong, and it is withdrawn.
+** The pending-shred row is only the first step of a batched shred, not an erasure.
+** An earlier version measured a pending shred as deleting a per-blob key file (0.72 ms). That operation belongs to the rejected layout.
+** An earlier version also compared that figure with today's overwrite (a "166×" saving). That comparison was wrong, and it is withdrawn.
+** Earlier final-shred figures (1.17 / 3.91 / 33.8 ms) re-sealed rows sized as if each key were wrapped on its own (92 bytes). They also skipped opening the old table. The current row times the whole open, drop and re-seal on 64-byte rows.
 
 == 4. Where the recursion ends (the honest limit)
 
@@ -107,12 +112,27 @@ An old copy of the key table can itself survive on flash. That is why the table 
 [cols="3,1,1,4",options="header"]
 |===
 |Root of the key hierarchy |Elegance |Dependability |Aspects
-|Passphrase via Argon2id (already a dependency), plus a per-epoch random salt kept only in memory and in an OS keyring |★★ |★★ |Usable everywhere. Privacy is only as good as the passphrase. A shred becomes final when the epoch is rotated and the old epoch secret is gone.
+|Passphrase plus a keyring-held epoch secret (see the hierarchy below) |★★ |★★ |Usable everywhere. Privacy is only as good as the passphrase. A shred becomes final when the epoch secret is replaced and the old one is gone from the keyring.
 |OS keyring or TPM / Secure Enclave sealed key |★★★ |★★★ |Hardware erase semantics. Platform-specific, so a Rust/SPARK seam and an Idris2 ABI per platform. This is the estate's FFI pattern.
 |No root at rest: the key is supplied per session, for example by a hardware token |★★★ |★★ |The strongest privacy. Undo needs the token present, which changes how `jk` is used, and ADR-0001 says that is not the product.
 |===
 
 Recommended for a first build: the passphrase plus epoch rotation, with the TPM/keyring root as a later, separate seam.
+
+*The hierarchy has two roots, because the index key must stay stable while epoch keys must change.*
+
+* *Store root.* Argon2id over the passphrase, with a salt fixed when the store is created and stored beside it.
+** It never changes.
+** It is never written down.
+* *Index key.* HKDF-SHA-256 over the store root, under the label `"index"` (§2).
+** It is stable for the store's lifetime, so rotation never re-addresses blobs.
+* *Epoch secret.* 256 random bits, held in the OS keyring (or TPM), never on the store's medium.
+** Every final shred replaces it.
+** It is not derivable from the passphrase, so a retained copy of the store together with the passphrase does not recover it.
+* *Epoch key.* HKDF-SHA-256 over the store root, salted with the epoch secret, under the label `"epoch"`.
+** Opening the table needs both the passphrase and the current epoch secret.
+** Removing the old epoch secret from the keyring finalises every shred made under it.
+* *Erasure scope.* "Erasing the epoch secret is real erasure" is now an assumption about the keyring's storage, not about the store's medium. On platforms whose keyring persists to the same flash, the honest claim is no stronger than that keyring's own deletion. E2 must check this per platform.
 
 == 5. Statements this makes provable
 
@@ -120,9 +140,15 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 ** This is a finite-map model in the Agda kernel.
 ** It has the same shape as `obliterate-cuts-recovery` (E-1m): recovery needs the key, and the key is not in any reachable state.
 ** It is provable, and then TESTED against the Rust through a conformance test.
-* *X-1 becomes two assumptions:*
-** AES-256-GCM is IND-CPA and INT-CTXT for one message per key. One message per key also removes nonce reuse as a failure mode.
-** Erasing the root or epoch secret is real erasure.
+* *X-1 becomes three assumptions:*
+** *AEAD security.* AES-256-GCM is IND-CPA and INT-CTXT for *one message per key*.
+*** Blob keys meet that by construction.
+*** The epoch key would not, because the table and every journal entry under one epoch are separate messages.
+*** So each of them is sealed under its own subkey: HKDF-SHA-256 over the epoch key with the message's sequence number (0 for the table, then 1, 2, … for journal entries).
+*** Every AEAD key therefore still encrypts exactly one message, and random-nonce collisions and per-key GCM usage limits stop being part of the assumption.
+*** The design must never reuse a sequence number within an epoch, which is a property for the model to check.
+** *Erasure.* Erasing the epoch secret where §4 keeps it is real erasure.
+** *Key derivation.* HKDF-SHA-256 is a PRF and Argon2id resists offline guessing at the chosen cost.
 * *C-3 is unchanged:* obliteration stays by design irreversible, and `undo` after a shred has nothing to restore, as today.
 
 == 6. Consequences
@@ -133,9 +159,11 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 ** `ContentHash` therefore becomes versioned (`sha256:` or `hmac-sha256:`), and `retrieve` resolves either form.
 ** Migration proceeds in three steps: seal each blob at its new address; rewrite every reference in the operation log in one atomic save (the log already saves by write, sync and rename, row T-8); only then shred the SHA-addressed copies.
 ** A crash between the steps leaves both copies, never neither. That cuts both ways.
-*** The old SHA-addressed blobs are plaintext with predictable names. Exposure ends only when *every* old copy is shredded, not when the log rewrite commits.
-*** Migration therefore records itself as incomplete, in a marker it writes first and removes last. Every `jk` invocation resumes the cleanup until the last old copy is gone.
-*** `jk status` reports a store with a migration still in progress as still exposed.
+*** The old SHA-addressed blobs are plaintext with predictable names. Migration records itself as incomplete, in a marker it writes first and removes last. Every `jk` invocation resumes cleanup until no reachable old file remains.
+*** Even then, cleanup removes only the *reachable* files. Plaintext the store wrote before migration may still exist in copy-on-write extents, on remapped flash, in snapshots and in backups. That is §1's own premise, and no epoch key covers those copies.
+*** So a migrated store is never reported as unexposed. `jk status` reports "plaintext from before migration may persist on the medium, its snapshots and backups", permanently, for any store that ever held plaintext blobs.
+*** Removing that exposure needs the medium, its snapshots and its backups to be sanitised outside JanusKey.
+*** For data whose exposure matters, the ADR recommends starting a fresh sealed store over migrating an old one.
 ** *Obliteration records hold addresses too.* Each `ObliterationRecord` and its nested proof in `obliterations.json` carry the old SHA-256 `ContentHash`, together with the nonce and commitment derived from it. For a blob already obliterated there is no plaintext left from which to compute an HMAC address.
 *** Rewriting those records is impossible, so migration must either *redact* or *retain*.
 *** *Redact:* keep the record's id, time, reason and legal basis, and remove the hash, nonce and commitment. The record can then no longer answer "was this content obliterated?".
