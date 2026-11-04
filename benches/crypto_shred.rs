@@ -18,7 +18,8 @@
 //                      be opened under the live epoch key;
 //             final:   open the sealed table, drop the entry and re-seal
 //                      every live key under a fresh epoch key, as one table
-//                      (one synced write). For contrast, the rejected layout:
+//                      (one synced write), plus folding in the journal. For
+//                      contrast, the rejected layout:
 //                      one file per key (one synced write each).
 //
 // Payloads are random, so incompressible: the worst case for gzip, which then
@@ -218,6 +219,30 @@ fn bench_erase(c: &mut Criterion) {
                     let (epoch_key, sealed) = seal(&next);
                     write_synced(dir.path(), "keys", &sealed);
                     black_box(epoch_key);
+                });
+            },
+        );
+    }
+
+    // Folding the journal into the table during a final shred: open each entry
+    // stored since the last rotation (each under its own subkey) and start an
+    // empty journal, one synced write. Added to the table cost above.
+    for journal_len in [10usize, 100, 1_000, 10_000] {
+        g.bench_with_input(
+            BenchmarkId::new("fold_journal", journal_len),
+            &journal_len,
+            |b, &journal_len| {
+                let dir = tempfile::tempdir().unwrap();
+                let entries: Vec<([u8; 32], Vec<u8>)> = (0..journal_len)
+                    .map(|_| seal(&random_payload(TABLE_ROW)))
+                    .collect();
+                b.iter(|| {
+                    let mut rows = Vec::with_capacity(journal_len * TABLE_ROW);
+                    for (key, sealed) in &entries {
+                        rows.extend_from_slice(&open(key, sealed));
+                    }
+                    write_synced(dir.path(), "keys.journal", &[]);
+                    black_box(rows.len());
                 });
             },
         );

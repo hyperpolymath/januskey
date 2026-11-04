@@ -39,7 +39,21 @@ Two things are wrong with treating this as erasure.
 . *Shred.* `obliterate` and `gc` drop the blob's entry, fold in the journal, and write the table again under a *fresh* epoch key, starting an empty journal. Then they destroy the old epoch key, then delete the blob.
 ** Destroying the old epoch key is what makes the shred final. A snapshot, a backup or a copy-on-write extent can keep an old copy of the table, but that copy is sealed under an epoch key that no longer exists.
 ** If the old epoch key is not destroyed, for example because the new table is written but the old key survives, the shred is only *pending*. Every retained copy of the old table, and so of the blob's key, can still be opened.
-** The cost of a final shred is O(live keys): opening, dropping and re-sealing took about 1 ms at 1 000 keys and 26 ms at 100 000 (§3).
+** The cost of a final shred is O(live keys + journal entries since the last rotation).
+*** Opening, dropping and re-sealing the table took about 1 ms at 1 000 keys and 26 ms at 100 000.
+*** Folding the journal adds 0.4 ms at 100 entries and 3.4 ms at 10 000 (§3).
+** *Rotation is crash-safe only with generations.* The keyring and the file system cannot be updated in one atomic step, so tables and epoch secrets are numbered by generation.
+*** A shred moving from generation _n_ to _n+1_:
+**** stores the new epoch secret in the keyring under _n+1_, keeping _n_;
+**** writes `keys.<n+1>`, with an empty journal for _n+1_, and syncs it;
+**** atomically renames a small `current` pointer file to name _n+1_;
+**** removes secret _n_ from the keyring;
+**** deletes `keys.<n>`, its journal, and the blob.
+*** On open, a store whose keyring holds both _n_ and _n+1_ is mid-rotation:
+**** if `current` names _n+1_, the open finishes the last two steps;
+**** if `current` still names _n_, the open discards secret _n+1_ and `keys.<n+1>`.
+*** A crash at any point leaves exactly one openable generation.
+*** The shred is final only once secret _n_ has left the keyring.
 ** Shreds could instead be batched, so that one rotation finalises many. A batched shred appends a *tombstone* for the blob to the key journal and syncs it (0.2 ms, §3); the blob is unusable through `jk` at once, but the old table and journal, and so the key, stay openable under the live epoch key until the next rotation. The ADR's default is a final shred every time; batching, and how long a shred may stay pending, are decisions for acceptance.
 . *Scope: content-store copies only.* The guarantee covers what JanusKey writes: blobs and keys. It does not cover the working file itself, which `jk obliterate` targets too.
 ** That file existed in plaintext on the same medium before JanusKey ever saw it, so CoW extents, flash remapping, snapshots or backups may still hold its plaintext.
@@ -55,7 +69,7 @@ Two things are wrong with treating this as erasure.
 
 == 3. Measured cost (E1, done)
 
-`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after five rounds of review corrections.
+`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after six rounds of review corrections.
 
 * *Conditions:* 4 vCPU, a container's virtual disk, one run, and medians, with Criterion's 95% intervals in the raw output.
 * *Payloads:* random, so incompressible. That is the worst case for gzip: it costs time and saves nothing. Compressible content would make every gzip row faster, and the sealed row with it, since that row compresses before sealing.
@@ -78,13 +92,16 @@ The default-store and proposed rows come from one paired re-run, made after the 
 |today: `obliterate_file` on the blob, 4 KiB / 64 KiB / 1 MiB / 16 MiB |0.71 / 0.98 / 6.76 / 124 ms
 |*pending* shred (batched): append a tombstone to the key journal and sync it |0.20 ms
 |*final* shred, one table: open (authenticate and decrypt) the sealed table, drop the entry, re-seal it under a fresh epoch key, one synced write; 64-byte rows; 1 000 / 10 000 / 100 000 live keys |0.96 / 2.91 / 26.2 ms
+|*final* shred, add for the journal: open each entry stored since the last rotation and start an empty journal, one synced write; 10 / 100 / 1 000 / 10 000 entries |0.42 / 0.45 / 0.77 / 3.44 ms
 |*final* shred, one file per key: rewrap every key file under a fresh epoch key, 1 000 live keys |1 210 ms
 |===
 
-Two costs are not in any row:
+Not in any row:
 
 * *Destroying the old epoch secret.* Its cost depends on where it lives (§4).
-* *Folding a non-empty journal into the table.* That is one more open per journal entry since the last shred, which is zero when every shred is final.
+* *The generation protocol's extra writes:* one keyring write and one pointer rename (§2).
+
+The journal row is never zero in practice, even when every shred is final: any store since the last rotation leaves an entry, including the victim's own. An earlier version of this section claimed it was zero.
 
 What the numbers say:
 
@@ -177,7 +194,10 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 
 * *E2: real media.* Repeat E1 on ext4 over an NVMe SSD and on btrfs. Report the fsync share of store time.
 * *E3: cipher choice.* Compare ChaCha20-Poly1305 with AES-256-GCM on a CPU without AES-NI. Check that the 16 MiB seal is limited by allocation, not by the cipher, by sealing in place (`encrypt_in_place`).
-* *E4: forensic acceptance test.* This is the decisive one. Build a btrfs file system on a loop device, run the steps below, then scan the raw image for a marker payload. There are two cases.
+* *E4: forensic acceptance test.* This is the decisive one. Build a btrfs file system on a loop device, run the steps below, then scan the raw image for a marker payload.
+** *Compression is off in both arms.* `jk` compresses by default, and a gzip stream would hide a literal marker from the scan even with no erasure at all. That false negative would make the sealed path look as if it passed.
+** *A positive control is required.* Before any shred or obliterate, the scan must find the marker in today's store. If it does not, the run is invalid, not a pass.
+** There are two cases.
 ** *Store-only.* Store the marker straight into the content store, then shred it and rotate the epoch.
 *** Expected for today's overwrite: the marker is found, because the CoW extents survive.
 *** Expected with sealing: the marker is never found, because the store never writes plaintext.
@@ -185,7 +205,8 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 ** *Product flow.* Create a working file containing the marker, record it with `jk`, then `jk obliterate` it.
 *** Expected in both designs: the marker *is* found, from the working file's own extents.
 *** This case is kept as a test of the scope limit in §2, so that no one later reads the store-only result as covering the working file.
-* *E5: the full final shred.* Add the epoch-secret destruction (§4's chosen root) and crash coordination between the table write and the blob deletion to the `final_reseal_table` case. Confirm the cost stays independent of blob size and linear in live keys.
+* *E5: the full final shred.* Time the generation protocol of §2 end to end, including the keyring writes for §4's chosen root and the pointer rename. Confirm the cost stays independent of blob size and linear in live keys plus journal entries.
+** Inject a crash after each of the protocol's steps. Check that the next open recovers to exactly one openable generation, and that no step leaves the shred reported final while secret _n_ is still in the keyring.
 * *E6: compression.* Repeat the store rows with compressible payloads (text, source code). Then measure skipping gzip when it does not shrink the input. This is a candidate fix to today's store whatever happens to this ADR.
 
 == 8. Beyond this repository
