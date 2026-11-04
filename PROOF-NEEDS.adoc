@@ -76,7 +76,7 @@ tables must agree.
 | T-7 | Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) | ASSUMED | probabilistic, not checked
 | T-8 | The operation metadata log is saved atomically, and an undo whose `+mark_undone+` fails to persist can be retried | OPEN | by inspection: the log now takes the same write, sync, rename path as the transaction log (`+crate::transaction::write_atomic+`), and `+metadata::tests::save_replaces_the_log_atomically+` asserts it, but the crate has not been built since that edit, so the row stays OPEN until the test is green in CI. Retry is unchanged: `+undo+` still runs the undo before `+mark_undone+` persists, so a failed persist still leaves the file undone and the log not
 | S-1 | A content hash that is not `+sha256:+` plus 64 lowercase hex digits never resolves to a path outside the store root | TESTED | `+content_store::tests::malformed_hash_never_leaves_the_store_root+`; fixed in #163 after audit probe P5 showed `+delete+` removing a file outside the store (`+docs/reports/audit/proof-statement-audit-2026-10-27.adoc+`)
-| S-2 | `+store+` repairs a blob a crash left damaged instead of deduplicating against it, and leaves no temporary file behind | TESTED | not claimed: that the write itself is atomic. `+store+` writes by temporary file, sync and rename, but by construction only; no test injects a failure mid-write. `+content_store::tests::store_repairs_a_blob_truncated_by_a_crash+`, `+store_leaves_no_temp_files_and_count_ignores_strays+`; fixed in #163 (probe P4)
+| S-2 | `+store+` repairs a blob a crash left damaged instead of deduplicating against it, and a successful store leaves no temporary file behind | TESTED | not claimed: cleanup after a failed write or rename, whose removal error `+store+` ignores, so a temporary file can remain; not claimed: that the write itself is atomic. `+store+` writes by temporary file, sync and rename, but by construction only; no test injects a failure mid-write. `+content_store::tests::store_repairs_a_blob_truncated_by_a_crash+`, `+store_leaves_no_temp_files_and_count_ignores_strays+`; fixed in #163 (probe P4)
 | L-1 | Editing any field of any audit-log entry makes `+verify_integrity+` fail | OPEN | false today, probes P1 and P2: algorithm, purpose, old_state, new_state, rotated_to and rotated_from are in neither the MAC nor the chain hash, and key_id, fingerprint and reason are chain-hashed only, so on the last entry nothing protects them. The fix is a MAC over every field (a scheme version bump)
 | L-2 | Removing trailing audit-log entries makes `+verify_integrity+` fail | OPEN | false today, probe P3: every prefix of a valid log verifies. Needs an anchor held outside the log (a design decision: signed head, external counter, or witness)
 | O-1 | An `+ObliterationProof+` attests that the content it names was erased | OPEN | false today, probe P6: `+ObliterationProof::generate+` sets `+storage_cleared: true+` unconditionally and `+verify_commitment+` holds for content that was never stored. Either compute the field from the erasure, or stop calling the object a proof
@@ -124,11 +124,15 @@ their artefact is Agda (`+verification/proofs/agda/+`). They are **Grade 3**:
 each type-checks in Agda and none has been translated to an independent
 foundational system, which is mathesis §5's definition as written. The receipt
 is a green `+agda-proofs.yml+` run
-(https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509])
-at commit `+4afb710e86646658f667f10bd6274ee47416bfc7+`, Agda 2.6.4.3, with
-`+resource-algebra+` pinned at `+cf9235c+`. The modules, the gate script, the
-sibling fetch and the workflow are byte-identical at that commit and at this
-one, so the receipt covers these rows as they stand. Mathesis status for them:
+(https://github.com/hyperpolymath/januskey/actions/runs/41687715055[41687715055])
+at commit `+fc188c4+`, Agda 2.6.4.3, with `+resource-algebra+` pinned at
+`+cf9235c+`. That run used the current gate (`+Reversibility+`,
+`+TransactionAtomicity+` and `+Epistemic+` under `+--safe --without-K
+--cubical-compatible+`), and the modules, the gate script, the sibling fetch and
+the workflow are byte-identical at that commit and at this one, so the receipt
+covers these rows, E-1m included, as they stand. (An earlier receipt cited here,
+run 40867211509 at `+4afb710+`, predates `+Epistemic.agda+` and the
+`+--cubical-compatible+` flag, so it never covered E-1m.) Mathesis status for them:
 `+AGDA-VERIFIED+`.
 
 The other seven PROVEN rows — A-1, A-2, C-1 to C-5 — are Idris2 theorems. Under
@@ -251,7 +255,7 @@ the status table above.
 |S-1: A malformed content hash never resolves to a path outside the store root |TESTED |`crates/reversible-core/src/content_store.rs::malformed_hash_never_leaves_the_store_root` |`cargo test --locked -p reversible-core --lib malformed_hash_never_leaves_the_store_root`
 |S-1: A well-formed content hash keeps the existing two-level blob layout |TESTED |`crates/reversible-core/src/content_store.rs::well_formed_hash_keeps_the_existing_layout` |`cargo test --locked -p reversible-core --lib well_formed_hash_keeps_the_existing_layout`
 |S-2: Storing content again repairs a blob a crash left truncated |TESTED |`crates/reversible-core/src/content_store.rs::store_repairs_a_blob_truncated_by_a_crash` |`cargo test --locked -p reversible-core --lib store_repairs_a_blob_truncated_by_a_crash`
-|S-2: A store leaves no temporary file behind, and count ignores stray ones |TESTED |`crates/reversible-core/src/content_store.rs::store_leaves_no_temp_files_and_count_ignores_strays` |`cargo test --locked -p reversible-core --lib store_leaves_no_temp_files_and_count_ignores_strays`
+|S-2: A successful store leaves no temporary file behind, and count ignores stray ones |TESTED |`crates/reversible-core/src/content_store.rs::store_leaves_no_temp_files_and_count_ignores_strays` |`cargo test --locked -p reversible-core --lib store_leaves_no_temp_files_and_count_ignores_strays`
 |G-2: The Idris2 IsCNO / ReversibleOp pair corresponds to the Agda ReversiblePair (by transcription) |ASSUMED |`verification/proofs/agda/Reversibility.agda` |-
 |X-1: Hash one-wayness and physical erasure (cryptographic and physical assumptions) |ASSUMED |`src/abi/JanusKey/ABI/Proofs.idr` |-
 |G-3: The FFI bridge preserves grade 𝟙 (a homomorphism; resource-algebra lists homomorphisms as OPEN) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
