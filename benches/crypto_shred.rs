@@ -7,7 +7,8 @@
 //
 //   store:  ContentStore::store (plaintext, temp/fsync/rename) against an
 //           AES-256-GCM seal under a fresh per-blob key followed by the same
-//           temp/fsync/rename write; `seal_only` is the cipher with no I/O.
+//           temp/fsync/rename write for the blob and again for its key file;
+//           `seal_only` is the cipher with no I/O.
 //   erase:  obliterate_file on a blob (3-pass overwrite, unlink: the current
 //           path) against dropping the blob's key, either as one small key
 //           file (through the same obliterate_file) or as one entry removed
@@ -87,7 +88,9 @@ fn bench_store(c: &mut Criterion) {
                 let hash = ContentHash::from_bytes(&data);
                 let (key, sealed) = seal(&data);
                 write_synced(dir.path(), hash.raw_hash(), &sealed);
-                black_box(key);
+                // The key must be durable too: one more synced write. It is
+                // stored unwrapped here; wrapping adds microseconds (E5).
+                write_synced(dir.path(), &format!("{}.key", hash.raw_hash()), &key);
             });
         });
         g.bench_with_input(BenchmarkId::new("seal_only", size), &size, |b, &size| {

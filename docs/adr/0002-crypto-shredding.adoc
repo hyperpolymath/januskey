@@ -32,7 +32,16 @@ Two things are wrong with treating this as erasure.
 ** *Never* use a convergent key (key = H(content)). Such a key can be recomputed from the content, so it cannot be shredded.
 . *Deduplication is unchanged.* The key belongs to the blob, not to a path. A blob shared by two paths keeps its key until the last path that needs it is obliterated, which is the rule `obliterate_path` already applies to blobs.
 . *Key storage.* Keep one small key file per blob under `.januskey/keys/` rather than a single table. A table rewrite is O(N) per shred (§3). Key files are wrapped under a store key; see §4 for where the store key comes from.
-. *Shred.* `obliterate` and `gc` remove the blob's key file, then the blob. Once the key file is gone, every copy of the ciphertext anywhere (flash cells, snapshots, backups) is ciphertext under a key that no longer exists.
+. *Shred.* `obliterate` and `gc` remove the blob's key file, then the blob. Removing the key file is *not* yet erasure:
+** A snapshot, a backup or a copy-on-write extent can keep the deleted key file.
+** That retained copy is still wrapped under the current store or epoch key, so it can be unwrapped.
+** A shred is therefore *pending* until the wrapping key it was made under is destroyed. That happens through epoch rotation: rewrap every live key under a fresh epoch key, then destroy the old one.
+** Only then is every retained copy of the blob's ciphertext under a key that cannot be recovered.
+** Rotation costs O(live keys). It can run on every shred, which makes shreds final at once but costly, or in batches, which leaves a bounded window in which shreds are pending. That trade-off is a decision for acceptance (§4).
+. *Scope: content-store copies only.* The guarantee covers what JanusKey writes: blobs and keys. It does not cover the working file itself, which `jk obliterate` targets too.
+** That file existed in plaintext on the same medium before JanusKey ever saw it, so CoW extents, flash remapping, snapshots or backups may still hold its plaintext.
+** Covering it needs encryption from the file's creation, meaning an encrypted volume underneath, which is outside JanusKey.
+** The record says which copies the shred covers, and the docs say the working file is overwritten best-effort only.
 . *Addresses.* Use HMAC-SHA-256 under a per-store index key instead of a bare SHA-256, so that an address alone does not confirm a guessed plaintext. The index key is in turn an erasure target when the whole store is destroyed.
 . *Proof object.* `ObliterationProof` loses `storage_cleared` and `overwrite_passes`. It records the key id that was destroyed, and is honestly named a *record*, not a proof.
 
@@ -46,9 +55,11 @@ These figures are evidence about *shape*, not about real disks. fsync on a virtu
 |===
 |Store (per blob) |4 KiB |64 KiB |1 MiB |16 MiB
 |`ContentStore::store`, plaintext (today) |1.39 ms |1.95 ms |4.40 ms |40.2 ms
-|seal + same synced write (prototype) |1.02 ms |1.57 ms |6.43 ms |81.1 ms
+|seal + synced blob write + synced key-file write (prototype; key unwrapped) |2.69 ms |3.33 ms |8.11 ms |85.5 ms
 |seal only, no I/O |3.7 µs |54 µs |1.72 ms |40.0 ms
 |===
+
+The sealed row was re-measured after review. The first run wrote only the blob, so it left out the second durable write that every sealed blob needs, and it understated small-blob cost. The plaintext row in that re-run (1.61 / 1.82 / 4.75 / 40.3 ms) agreed with the first run within its intervals. Wrapping the key and any crash coordination between the two writes are still not included (E5).
 
 [cols="2,1",options="header"]
 |===
@@ -62,8 +73,8 @@ These figures are evidence about *shape*, not about real disks. fsync on a virtu
 
 What the numbers say:
 
-* *Small blobs.* Below about 64 KiB, fsync dominates and the cipher is in the noise. The prototype is even faster than today's store, because it skips the store's two-level directory creation. That gap is an artefact of the prototype, not a gain from sealing.
-* *Large blobs.* At 16 MiB, sealing doubles store time. The cipher ran at about 400 MiB/s at that size, against about 1.1 GiB/s on small inputs, which points at allocation and copying rather than AES itself.
+* *Small blobs.* Below about 64 KiB, the cipher costs microseconds, but the second synced write, for the key file, makes a sealed store about 1.7× slower (2.69 against 1.61 ms at 4 KiB). The cost is fsync count, not cryptography. Grouping key files into one synced write per transaction is the obvious lever, at the price of the O(N) rewrite rejected below. E2 must measure this on real media.
+* *Large blobs.* At 16 MiB, sealing roughly doubles store time. The cipher ran at about 400 MiB/s at that size, against about 1.1 GiB/s on small inputs, which points at allocation and copying rather than AES itself.
 * *Erasure.* Erasure becomes constant-time in blob size. On a 16 MiB blob it is about 166× cheaper, and on any medium it is a claim that can be made, whereas overwriting is not.
 * *Key layout.* A single key table makes every shred rewrite the whole table, so it was rejected in favour of per-blob key files.
 
@@ -85,7 +96,7 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 
 == 5. Statements this makes provable
 
-* *O-1, restated:* "after `shred(h)`, the live key store holds no key for `h`, and every stored copy of `h` is a sealed blob under a key with that id".
+* *O-1, restated:* "after `shred(h)` and the epoch rotation that follows it, no reachable state, retained copies of the key directory included, holds an unwrappable key for `h`; and every stored copy of `h` is a sealed blob under a key with that id". The working file is outside this statement (§2).
 ** This is a finite-map model in the Agda kernel.
 ** It has the same shape as `obliterate-cuts-recovery` (E-1m): recovery needs the key, and the key is not in any reachable state.
 ** It is provable, and then TESTED against the Rust through a conformance test.
@@ -98,6 +109,10 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 
 * *Identity (ADR-0001).* Encryption is a *storage* detail here, as SHA-256 addressing already is. `jk` gains no key lifecycle, rotation UI or key export. The `jk-keys` lifecycle manager stays out of the product. The only shared code is the AEAD and KDF crates already in the dependency graph, so no new dependency is needed.
 * *Format and migration.* Blobs gain a version byte. A store with plaintext blobs is read as today, and new writes are sealed. Old plaintext blobs need an explicit `jk migrate` that seals and shreds them. Until that runs, the old plaintext is exactly as exposed as it is now, and the docs must say so.
+** *Addresses are part of the history.* The operation log serialises each blob's `ContentHash`, and `undo` passes that exact value to `ContentStore::retrieve`. Moving blobs to HMAC addresses would leave every historical operation pointing at a blob that no longer exists.
+** `ContentHash` therefore becomes versioned (`sha256:` or `hmac-sha256:`), and `retrieve` resolves either form.
+** Migration proceeds in three steps: seal each blob at its new address; rewrite every reference in the operation log in one atomic save (the log already saves by write, sync and rename, row T-8); only then shred the SHA-addressed copies.
+** A crash between the steps leaves both copies, never neither. The SHA address keeps its dictionary exposure until the rewrite commits.
 * *Reversibility.* Every `undo` now needs the store key. A lost passphrase loses history. That is a new failure mode, and it needs a recovery story (an escrow file, or an accepted loss) before acceptance.
 * *Wording.* The DoD 5220.22-M and "cryptographic proof of erasure" claims are removed from the code, docs and ledger.
 
@@ -105,10 +120,14 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 
 * *E2: real media.* Repeat E1 on ext4 over an NVMe SSD and on btrfs. Report the fsync share of store time.
 * *E3: cipher choice.* Compare ChaCha20-Poly1305 with AES-256-GCM on a CPU without AES-NI. Check that the 16 MiB seal is limited by allocation, not by the cipher, by sealing in place (`encrypt_in_place`).
-* *E4: forensic acceptance test.* This is the decisive one. Build a btrfs file system on a loop device, store a marker payload, obliterate it, then scan the raw image for the marker.
-** *Expected for today's overwrite:* the marker is found (the CoW extents survive).
-** *Expected with sealing:* the marker is never found, because the plaintext is never written.
-** It becomes a TESTED row if it holds.
+* *E4: forensic acceptance test.* This is the decisive one. Build a btrfs file system on a loop device, run the steps below, then scan the raw image for a marker payload. There are two cases.
+** *Store-only.* Store the marker straight into the content store, then shred it and rotate the epoch.
+*** Expected for today's overwrite: the marker is found, because the CoW extents survive.
+*** Expected with sealing: the marker is never found, because the store never writes plaintext.
+*** It becomes a TESTED row if it holds.
+** *Product flow.* Create a working file containing the marker, record it with `jk`, then `jk obliterate` it.
+*** Expected in both designs: the marker *is* found, from the working file's own extents.
+*** This case is kept as a test of the scope limit in §2, so that no one later reads the store-only result as covering the working file.
 * *E5: shred cost with the store key wrapped.* Add one key unwrap and rewrap to the key-file path, and confirm the cost stays constant in blob size.
 
 == 8. Beyond this repository
