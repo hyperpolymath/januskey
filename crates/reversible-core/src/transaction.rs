@@ -720,6 +720,27 @@ mod tests {
         assert!(!path.exists(), "the failed save wrote nothing");
     }
 
+    /// T-5, T-8: a save that fails leaves the existing log exactly as it was on
+    /// disk. The failure is injected without touching the log (the save's
+    /// temporary name is already taken), so a save that removed or truncated the
+    /// destination before replacing it would be caught here. The final rename
+    /// itself is atomic by the filesystem's guarantee, not by a test.
+    #[test]
+    fn a_failed_save_leaves_the_existing_log_intact() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().join("transactions.json");
+        fs::write(&path, b"the previous log").expect("existing log");
+        let taken = dir.path().join("transactions.json.taken.tmp");
+        fs::write(&taken, b"another writer's bytes").expect("plant");
+
+        assert!(write_atomic_via(&path, &taken, b"the next log").is_err());
+
+        assert_eq!(
+            fs::read(&path).expect("the log is still there"),
+            b"the previous log"
+        );
+    }
+
     /// T-5: the temporary file has the log's permissions the moment it exists,
     /// before any content is written, so a restricted log is never exposed
     /// through its copy.

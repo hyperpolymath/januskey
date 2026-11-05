@@ -585,11 +585,13 @@ mod tests {
     /// T-8: a save replaces the log by rename, so a reader never sees a torn
     /// log and no temporary file survives the save. A stale temporary file left
     /// by an earlier crash is not read and does not stop the next save.
-    /// T-8: a mutation whose save fails is not applied in memory, so memory and
-    /// disk stay at the previous log; once the fault is cleared the retry
-    /// applies it exactly once. The save is made to fail at its last step (a
-    /// non-empty directory where the log goes refuses the rename), which works
-    /// for root too.
+    /// T-8: a mutation whose save fails is not applied in memory; once the
+    /// fault is cleared the retry applies it exactly once, and memory and disk
+    /// agree. The save is made to fail at its last step by replacing the log
+    /// with a non-empty directory (which refuses the rename and works for root
+    /// too), so this test cannot also show the old log surviving on disk; that
+    /// half is `transaction::tests::a_failed_save_leaves_the_existing_log_intact`,
+    /// which fails a save without touching the log.
     #[test]
     fn failed_save_leaves_every_mutation_unapplied() {
         let tmp = TempDir::new().unwrap();
