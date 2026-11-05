@@ -627,6 +627,36 @@ mod tests {
         }
     }
 
+    /// T-5: a save replaces the transaction log rather than overwriting it in
+    /// place. A hard link taken before the save still holds the old log
+    /// afterwards, which a plain `fs::write` (truncate and rewrite the same
+    /// inode) would not leave, so a regression of the save to an in-place write
+    /// fails here.
+    #[test]
+    fn save_replaces_rather_than_overwrites_the_log() {
+        let tmp = TempDir::new().expect("failed to create temp dir");
+        let path = tmp.path().join("transactions.json");
+        let mut manager = TransactionManager::new(path.clone()).expect("new manager");
+        manager.begin(None).expect("begin");
+
+        let old = tmp.path().join("transactions.json.old");
+        fs::hard_link(&path, &old).expect("link the current log");
+        let before = fs::read(&old).expect("read old");
+
+        manager.add_operation("op-1".to_string()).expect("op-1");
+
+        assert_eq!(
+            fs::read(&old).expect("read old"),
+            before,
+            "the old log was replaced, not rewritten"
+        );
+        assert_ne!(
+            fs::read(&path).expect("read new"),
+            before,
+            "the new log is in place"
+        );
+    }
+
     /// T-5: a save replaces the log by rename, leaves no temporary file, and is
     /// not confused by a torn temporary file left by an earlier crash.
     #[test]
@@ -718,6 +748,29 @@ mod tests {
             b"another writer's bytes"
         );
         assert!(!path.exists(), "the failed save wrote nothing");
+    }
+
+    /// T-5, T-8: a save that fails before it creates its temporary file leaves
+    /// the existing log exactly as it was on disk. The failure is injected
+    /// without touching the log (the temporary name is already taken), so a
+    /// save that removed or truncated the log before that point is caught here.
+    /// Not covered: a failure after the temporary file exists (during the write,
+    /// sync or rename), which would need a fault-injection seam in the writer;
+    /// the final rename is atomic by the filesystem's guarantee, not by a test.
+    #[test]
+    fn a_failed_save_leaves_the_existing_log_intact() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let path = dir.path().join("transactions.json");
+        fs::write(&path, b"the previous log").expect("existing log");
+        let taken = dir.path().join("transactions.json.taken.tmp");
+        fs::write(&taken, b"another writer's bytes").expect("plant");
+
+        assert!(write_atomic_via(&path, &taken, b"the next log").is_err());
+
+        assert_eq!(
+            fs::read(&path).expect("the log is still there"),
+            b"the previous log"
+        );
     }
 
     /// T-5: the temporary file has the log's permissions the moment it exists,

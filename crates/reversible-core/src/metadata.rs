@@ -278,13 +278,31 @@ impl MetadataStore {
         Ok(Self { path, log })
     }
 
-    /// Append an operation to the log
+    /// Append an operation to the log.
+    ///
+    /// Unlike the other mutators, an append is applied in memory even when its
+    /// save fails. The record describes a filesystem change that has already
+    /// happened, and callers such as `jk delete` carry on with the next file
+    /// after an error; keeping the record pending means the next successful
+    /// save persists it, rather than losing the only record that makes that
+    /// change undoable (T-8; the crash case is T-9).
     pub fn append(&mut self, metadata: OperationMetadata) -> Result<()> {
         self.log.operations.push(metadata);
-        self.save()
+        Self::save(&self.path, &self.log)
     }
 
-    /// Save the log to disk.
+    /// Save `next` and, only once it is on disk, make it the in-memory log, so a
+    /// failed save leaves memory and disk both at the previous log. Used by the
+    /// mutators that only edit the log (mark_undone, prune, purge); see
+    /// [`Self::append`] for why an append differs (T-8; the transaction log
+    /// does the same for T-5).
+    fn persist(&mut self, next: OperationLog) -> Result<()> {
+        Self::save(&self.path, &next)?;
+        self.log = next;
+        Ok(())
+    }
+
+    /// Save `log` to `path`.
     ///
     /// Replaces the log using [`crate::transaction::write_atomic`]. Parent
     /// directory sync is best effort, so success does not guarantee that the
@@ -295,12 +313,12 @@ impl MetadataStore {
     /// Returns errors from creating the parent directory, serialising the log,
     /// or creating, setting permissions on, writing, syncing or renaming the
     /// temporary file.
-    fn save(&self) -> Result<()> {
-        if let Some(parent) = self.path.parent() {
+    fn save(path: &Path, log: &OperationLog) -> Result<()> {
+        if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let content = serde_json::to_string_pretty(&self.log)?;
-        crate::transaction::write_atomic(&self.path, content.as_bytes())?;
+        let content = serde_json::to_string_pretty(log)?;
+        crate::transaction::write_atomic(path, content.as_bytes())?;
         Ok(())
     }
 
@@ -346,12 +364,13 @@ impl MetadataStore {
 
     /// Mark operation as undone
     pub fn mark_undone(&mut self, id: &str, undo_op_id: &str) -> Result<()> {
-        if let Some(op) = self.get_mut(id) {
-            op.undone = true;
-            op.undo_operation_id = Some(undo_op_id.to_string());
-            self.save()?;
-        }
-        Ok(())
+        let mut next = self.log.clone();
+        let Some(op) = next.operations.iter_mut().find(|op| op.id == id) else {
+            return Ok(());
+        };
+        op.undone = true;
+        op.undo_operation_id = Some(undo_op_id.to_string());
+        self.persist(next)
     }
 
     /// Filter operations by type
@@ -406,12 +425,16 @@ impl MetadataStore {
     pub fn purge_path_entries(&mut self, path: &Path) -> Result<Vec<OperationMetadata>> {
         let matches =
             |op: &OperationMetadata| op.path == path || op.path_secondary.as_deref() == Some(path);
-        let (removed, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.log.operations)
-            .into_iter()
+        let (removed, kept): (Vec<_>, Vec<_>) = self
+            .log
+            .operations
+            .iter()
+            .cloned()
             .partition(|op| matches(op));
-        self.log.operations = kept;
         if !removed.is_empty() {
-            self.save()?;
+            let mut next = self.log.clone();
+            next.operations = kept;
+            self.persist(next)?;
         }
         Ok(removed)
     }
@@ -442,8 +465,9 @@ impl MetadataStore {
         }
 
         let to_remove = original_count - keep;
-        self.log.operations.drain(0..to_remove);
-        self.save()?;
+        let mut next = self.log.clone();
+        next.operations.drain(0..to_remove);
+        self.persist(next)?;
         Ok(to_remove)
     }
 }
@@ -564,6 +588,139 @@ mod tests {
         let store2 = MetadataStore::new(path).unwrap();
         assert_eq!(store2.count(), 1);
         assert!(store2.get(&id).is_some());
+    }
+
+    /// Replace the log with a non-empty directory so the next save fails at
+    /// its last step (the rename is refused), for root too.
+    fn block_log(path: &Path) {
+        fs::remove_file(path).ok();
+        fs::create_dir_all(path).unwrap();
+        fs::write(path.join("blocker"), b"x").unwrap();
+    }
+
+    /// The in-memory log and the log reloaded from disk, as comparable rows.
+    fn rows(store: &MetadataStore) -> Vec<(String, bool, Option<String>)> {
+        store
+            .operations()
+            .iter()
+            .map(|op| (op.id.clone(), op.undone, op.undo_operation_id.clone()))
+            .collect()
+    }
+
+    /// T-8: an append whose save fails keeps its record in memory, and the
+    /// next successful save persists it exactly once. The record describes a
+    /// filesystem change that already happened (`jk delete` carries on to the
+    /// next file after an error), so dropping it would leave that change with
+    /// no record to undo it by.
+    #[test]
+    fn a_failed_append_keeps_its_record_for_the_next_save() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("metadata.json");
+        let mut store = MetadataStore::new(path.clone()).unwrap();
+        store.append(modify_entry("/a.txt", b"a0", b"a1")).unwrap();
+
+        block_log(&path);
+        let pending = modify_entry("/b.txt", b"b0", b"b1");
+        let pending_id = pending.id.clone();
+        assert!(store.append(pending).is_err());
+        assert!(
+            store.get(&pending_id).is_some(),
+            "the record is kept pending"
+        );
+        fs::remove_dir_all(&path).unwrap();
+
+        store.append(modify_entry("/c.txt", b"c0", b"c1")).unwrap();
+        let disk = MetadataStore::new(path).unwrap();
+        assert_eq!(rows(&store), rows(&disk), "memory and disk agree");
+        assert_eq!(disk.count(), 3, "the pending record is saved, once");
+        assert!(disk.get(&pending_id).is_some());
+    }
+
+    /// T-8: a mark_undone, prune or purge whose save fails is not applied in
+    /// memory; once the fault is cleared each retry applies exactly once, and
+    /// memory and disk agree. The fault replaces the log with a directory, so
+    /// this test cannot also show the old log surviving on disk; that half is
+    /// `transaction::tests::a_failed_save_leaves_the_existing_log_intact`,
+    /// which fails a save without touching the log.
+    #[test]
+    fn failed_save_leaves_every_mutation_unapplied() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("metadata.json");
+        let mut store = MetadataStore::new(path.clone()).unwrap();
+        let first = modify_entry("/a.txt", b"a0", b"a1");
+        let first_id = first.id.clone();
+        store.append(first).unwrap();
+        store.append(modify_entry("/b.txt", b"b0", b"b1")).unwrap();
+        store.append(modify_entry("/c.txt", b"c0", b"c1")).unwrap();
+
+        block_log(&path);
+        assert!(store.mark_undone(&first_id, "undo-1").is_err());
+        assert!(
+            !store.get(&first_id).unwrap().undone,
+            "a failed mark is not applied"
+        );
+        assert!(store.prune(1).is_err());
+        assert_eq!(store.count(), 3, "a failed prune removes nothing");
+        assert!(store.purge_path_entries(Path::new("/a.txt")).is_err());
+        assert!(
+            store.get(&first_id).is_some(),
+            "a failed purge removes nothing"
+        );
+        fs::remove_dir_all(&path).unwrap();
+
+        // Retry each mutator once the fault is cleared: each applies exactly
+        // once, and after each one memory and the reloaded disk agree. The log
+        // was removed with the fault, so the first retry rewrites all of it.
+        let agree = |store: &MetadataStore| {
+            assert_eq!(
+                rows(store),
+                rows(&MetadataStore::new(path.clone()).unwrap()),
+                "memory and disk agree"
+            )
+        };
+
+        store.mark_undone(&first_id, "undo-1").unwrap();
+        assert!(store.get(&first_id).unwrap().undone);
+        assert_eq!(
+            store.get(&first_id).unwrap().undo_operation_id.as_deref(),
+            Some("undo-1")
+        );
+        agree(&store);
+
+        let purged = store.purge_path_entries(Path::new("/b.txt")).unwrap();
+        assert_eq!(purged.len(), 1, "the retried purge removes /b.txt once");
+        assert_eq!(store.count(), 2);
+        agree(&store);
+
+        assert_eq!(store.prune(1).unwrap(), 1, "the retried prune removes one");
+        assert_eq!(store.count(), 1);
+        assert_eq!(store.operations()[0].path, PathBuf::from("/c.txt"));
+        agree(&store);
+    }
+
+    /// T-8: a save replaces the log rather than overwriting it in place. A hard
+    /// link taken before the save still holds the old log afterwards, which a
+    /// plain `fs::write` (truncate and rewrite the same inode) would not leave,
+    /// so a regression of `MetadataStore::save` to an in-place write fails here.
+    #[test]
+    fn save_replaces_rather_than_overwrites_the_log() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("metadata.json");
+        let mut store = MetadataStore::new(path.clone()).unwrap();
+        store.append(modify_entry("/a.txt", b"a0", b"a1")).unwrap();
+
+        let old = tmp.path().join("metadata.json.old");
+        fs::hard_link(&path, &old).unwrap();
+        let before = fs::read(&old).unwrap();
+
+        store.append(modify_entry("/b.txt", b"b0", b"b1")).unwrap();
+
+        assert_eq!(
+            fs::read(&old).unwrap(),
+            before,
+            "the old log was replaced, not rewritten"
+        );
+        assert_ne!(fs::read(&path).unwrap(), before, "the new log is in place");
     }
 
     /// T-8: a save replaces the log by rename, so a reader never sees a torn

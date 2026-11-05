@@ -190,7 +190,7 @@ attestations undermine trust
 |Content store integrity |Content-addressed storage never returns wrong
 content (paths confined to the store and damaged blobs repaired: S-1 and S-2 are TESTED; the write is atomic by construction, not by test; reads verify the hash) |Hash collisions or bugs corrupt stored data
 
-|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed; the metadata log, T-8, now saves by rename but that is unverified)
+|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed; the metadata log is tested for atomic and failed saves, T-8; a file change whose log record fails to persist is OPEN, T-9)
 |Partial transactions corrupt state
 
 |reversible-core |Undo/redo preserves data integrity |Core crate used by
@@ -247,6 +247,7 @@ the status table above.
 |T-5: An add_operation whose save fails is not applied in memory, and the retry records it exactly once on disk |TESTED |`crates/reversible-core/src/transaction.rs::failed_save_leaves_add_operation_unapplied` |`cargo test --locked -p reversible-core --lib failed_save_leaves_add_operation_unapplied`
 |T-5: A commit or rollback whose save fails leaves the transaction Active, and the retry settles it |TESTED |`crates/reversible-core/src/transaction.rs::failed_save_leaves_commit_and_rollback_unapplied` |`cargo test --locked -p reversible-core --lib failed_save_leaves_commit_and_rollback_unapplied`
 |T-5: A save replaces the log by rename, leaves no temporary file, and ignores a torn temporary file from an earlier crash |TESTED |`crates/reversible-core/src/transaction.rs::save_replaces_atomically_and_leaves_no_temporary_file` |`cargo test --locked -p reversible-core --lib save_replaces_atomically_and_leaves_no_temporary_file`
+|T-5: A transaction-log save replaces the log rather than overwriting it in place (a hard link to the old log keeps the old bytes; a regression to plain `fs::write` fails) |TESTED |`crates/reversible-core/src/transaction.rs::save_replaces_rather_than_overwrites_the_log` |`cargo test --locked -p reversible-core --lib transaction::tests::save_replaces_rather_than_overwrites_the_log`
 |T-5: Two saves never share a temporary file, and the open refuses one that exists, so a writer cannot truncate, rename or delete another's |TESTED |`crates/reversible-core/src/transaction.rs::each_save_uses_its_own_temporary_file` |`cargo test --locked -p reversible-core --lib each_save_uses_its_own_temporary_file`
 |T-5: A save keeps the permissions of the log it replaces (rename would otherwise widen a 0640 log to the umask default) |TESTED |`crates/reversible-core/src/transaction.rs::save_preserves_the_logs_permissions` |`cargo test --locked -p reversible-core --lib save_preserves_the_logs_permissions`
 |T-5: A save whose temporary file already exists (another writer's) fails without deleting that file or writing the log |TESTED |`crates/reversible-core/src/transaction.rs::a_save_never_removes_a_temporary_file_it_did_not_create` |`cargo test --locked -p reversible-core --lib a_save_never_removes_a_temporary_file_it_did_not_create`
@@ -289,7 +290,7 @@ be systematically replaced with proven error handling.
 
 *HIGH* — reversibility is the product, and its exceptions are destructive:
 obliteration destroys data on purpose, and the operation log is the only thing
-that makes undo possible (row T-8 is open). Any correctness bug in either is a
+that makes undo possible (row T-9 is open). Any correctness bug in either is a
 critical vulnerability. The ABI layer now typechecks, but none of the security
 obligations above is proved.
 

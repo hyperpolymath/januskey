@@ -3,18 +3,20 @@
 
 [metadata]
 repo = "januskey"
-last-updated = "2026-06-12"
+last-updated = "2026-11-04"
 owner = "hyperpolymath"
 
 [propagation]
-enabled = true
-workflow = ".github/workflows/instant-sync.yml"
+enabled = false
+workflow = ""
+retired = "instant-sync.yml was deleted in #156 (it was already disabled); no workflow in this repo dispatches to the farm, so nothing propagates until one is added"
 target = "hyperpolymath/.git-private-farm"
 event-type = "propagate"
 secret-name = "FARM_DISPATCH_TOKEN"
 presence-gated = false
-presence-gated-notes = "The dispatch step runs unconditionally on push to main/master and on published releases; there is no `if:` secret-presence gate, so the step fails (rather than skips) where the secret is absent (e.g. forks)."
-triggers = ["push to main/master", "release published"]
+presence-gated-notes = "Historical (inactive since #156): the retired instant-sync.yml dispatched unconditionally, with no secret-presence gate."
+triggers = []
+historical-triggers = ["push to main/master", "release published"]
 
 [never-propagate]
 items = ["secrets", "unmerged branches", "work-in-progress"]
