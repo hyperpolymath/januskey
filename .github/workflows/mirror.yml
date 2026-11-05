@@ -17,7 +17,7 @@ jobs:
     uses: metadatastician/standards/.github/workflows/mirror-reusable.yml@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12
     # Named, not `inherit`: metadatastician is an organisation and hyperpolymath a
     # user account, and GitHub refuses `secrets: inherit` across that boundary.
-    # These are the secrets mirror-reusable.yml declares (all optional).
+    # These are the ten secrets mirror-reusable.yml declares (all optional).
     secrets:
       GITLAB_SSH_KEY: ${{ secrets.GITLAB_SSH_KEY }}
       BITBUCKET_SSH_KEY: ${{ secrets.BITBUCKET_SSH_KEY }}
@@ -26,6 +26,9 @@ jobs:
       DISROOT_SSH_KEY: ${{ secrets.DISROOT_SSH_KEY }}
       GITEA_SSH_KEY: ${{ secrets.GITEA_SSH_KEY }}
       RADICLE_KEY: ${{ secrets.RADICLE_KEY }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_AGE_RECIPIENT: ${{ secrets.R2_AGE_RECIPIENT }}
     permissions:
       actions: read
       contents: read

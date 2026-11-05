@@ -48,9 +48,11 @@ const SIZES: [usize; 4] = [4 << 10, 64 << 10, 1 << 20, 16 << 20];
 /// A plaintext key-table row: 32-byte content address and 32-byte blob key.
 /// The table is sealed as one message, so its rows are not wrapped one by one.
 const TABLE_ROW: usize = 32 + 32;
-/// A key-journal entry: one table row sealed on its own (12-byte nonce,
-/// the row, 16-byte tag), since entries are appended one at a time.
-const JOURNAL_ENTRY: usize = 12 + TABLE_ROW + 16;
+/// The random salt a journal entry carries to select its subkey (ADR §5).
+const SALT: usize = 32;
+/// A key-journal entry: one table row sealed on its own, since entries are
+/// appended one at a time: salt, 12-byte nonce, the row, 16-byte tag.
+const JOURNAL_ENTRY: usize = SALT + 12 + TABLE_ROW + 16;
 
 /// `size` random bytes: incompressible, the worst case for gzip.
 fn random_payload(size: usize) -> Vec<u8> {
@@ -103,11 +105,11 @@ fn seal_under(key: &[u8; 32], data: &[u8]) -> Vec<u8> {
 }
 
 /// The per-message subkey of ADR §5: HKDF-SHA-256 expand of the epoch key
-/// with the message's sequence number. One output block, so this is exactly
-/// HMAC-SHA-256(epoch key, info || 0x01) with info = the sequence number.
-fn subkey(epoch_key: &[u8; 32], seq: u64) -> [u8; 32] {
+/// with the message's random salt. One output block, so this is exactly
+/// HMAC-SHA-256(epoch key, info || 0x01) with info = the salt.
+fn subkey(epoch_key: &[u8; 32], salt: &[u8]) -> [u8; 32] {
     let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(epoch_key).unwrap();
-    mac.update(&seq.to_le_bytes());
+    mac.update(salt);
     mac.update(&[1]);
     mac.finalize().into_bytes().into()
 }
@@ -259,17 +261,26 @@ fn bench_erase(c: &mut Criterion) {
                 let dir = tempfile::tempdir().unwrap();
                 let mut epoch_key = [0u8; 32];
                 rand::rng().fill_bytes(&mut epoch_key);
-                // Entry i is sealed under the subkey for sequence number i + 1
-                // (0 is the table), as ADR §5 specifies.
-                let entries: Vec<Vec<u8>> = (0..journal_len as u64)
-                    .map(|i| seal_under(&subkey(&epoch_key, i + 1), &random_payload(TABLE_ROW)))
-                    .collect();
+                // Each entry is salt || nonce || ciphertext, sealed under the
+                // subkey its own salt selects (ADR §5), written to disk once.
+                let mut journal = Vec::with_capacity(journal_len * JOURNAL_ENTRY);
+                for _ in 0..journal_len {
+                    let salt = random_payload(SALT);
+                    journal.extend_from_slice(&salt);
+                    let row = random_payload(TABLE_ROW);
+                    journal.extend_from_slice(&seal_under(&subkey(&epoch_key, &salt), &row));
+                }
+                let path = dir.path().join("keys.journal.full");
+                fs::write(&path, &journal).unwrap();
                 b.iter(|| {
+                    // Timed: read the journal from disk, derive each subkey
+                    // from the epoch key alone, open every entry, then start
+                    // an empty journal. Merging the rows is in the table row.
+                    let bytes = fs::read(&path).unwrap();
                     let mut rows = Vec::with_capacity(journal_len * TABLE_ROW);
-                    for (i, sealed) in entries.iter().enumerate() {
-                        // Only the epoch key is held: derive each subkey here.
-                        let key = subkey(&epoch_key, i as u64 + 1);
-                        rows.extend_from_slice(&open(&key, sealed));
+                    for entry in bytes.chunks_exact(JOURNAL_ENTRY) {
+                        let (salt, sealed) = entry.split_at(SALT);
+                        rows.extend_from_slice(&open(&subkey(&epoch_key, salt), sealed));
                     }
                     write_synced(dir.path(), "keys.journal", &[]);
                     black_box(rows.len());

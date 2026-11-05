@@ -36,7 +36,7 @@ Two things are wrong with treating this as erasure.
 ** *Key before blob.* The journal entry is synced *before* the sealed blob is renamed into place.
 *** A crash in between leaves a key with no blob. That is harmless, and the next fold drops it.
 *** It never leaves a blob with no key. That case would be permanent loss, because deduplication would accept the existing blob on a retry.
-*** Deduplication accepts an existing blob only if the table or journal holds its key; otherwise the blob is rewritten.
+*** Deduplication accepts an existing blob only if it *authenticates* (the AEAD open succeeds) under the key the table or journal maps to its address. Otherwise the blob is rewritten. A key merely being present is not enough: a repair can crash after syncing a new key but before replacing the old ciphertext, and that key would not open the old blob.
 ** A shred folds the journal into the table as part of the rewrite it does anyway.
 ** Journal entries are sealed under the same epoch key as the table, so the rotation below covers retained copies of the journal too.
 ** An earlier draft proposed one key file per blob, because dropping a single file is cheap. But making a shred final requires every live key to be re-sealed under a fresh epoch key. With per-blob files that is one synced write per live key: 1.2 s for only 1 000 keys (§3). The table makes a final shred one synced write.
@@ -45,7 +45,7 @@ Two things are wrong with treating this as erasure.
 ** If the old epoch key is not destroyed, for example because the new table is written but the old key survives, the shred is only *pending*. Every retained copy of the old table, and so of the blob's key, can still be opened.
 ** The cost of a final shred is O(live keys + journal entries since the last rotation).
 *** Opening, dropping and re-sealing the table took about 1 ms at 1 000 keys and 26 ms at 100 000.
-*** Folding the journal adds 0.7 ms at 100 entries and 18 ms at 10 000 (§3). Each entry needs its own subkey derivation and AES key schedule.
+*** Folding the journal adds 0.7 ms at 100 entries and 19 ms at 10 000 (§3). Each entry needs its own subkey derivation and AES key schedule.
 ** *Stores and rotations are serialised.* Suppose a `jk` process appended to the journal under generation _n_ after a concurrent shred had folded that journal but before it removed secret _n_. That blob's key would be in no table and sealed under a destroyed secret, and its undo content would be lost permanently.
 *** So every journal append and every whole rotation runs under one exclusive store lock (`.januskey/keys.lock`, an OS file lock).
 *** Readers take the same lock *shared*, for the whole of a `retrieve` or `undo` that uses a key. Without it, a process could open generation _n_, keep the victim's key or plaintext, and finish an undo after the shred reported the content gone. That would recreate obliterated data. A final shred waits for readers to finish.
@@ -61,7 +61,7 @@ Two things are wrong with treating this as erasure.
 *** On open, a store whose keyring holds both _n_ and _n+1_ is mid-rotation:
 **** recovery chooses the generation that actually opens, not merely the one `current` names: it tries `current`'s generation first, then the other;
 **** it finishes or undoes the rotation from there, and never discards the only generation whose secret is still present.
-*** A crash at any point leaves exactly one openable generation.
+*** A crash at any point leaves *at least one* openable generation. Between steps 2 and 4 both are openable by design. Recovery then selects deterministically: the generation `current` names if it opens, else the other. It then finishes or rolls back the rotation, so after recovery exactly one remains.
 *** The shred is final only once secret _n_ has left the keyring.
 ** Shreds could instead be batched, so that one rotation finalises many. A batched shred appends a *tombstone* for the blob to the key journal and syncs it (0.2 ms, §3); the blob is unusable through `jk` at once, but the old table and journal, and so the key, stay openable under the live epoch key until the next rotation. The ADR's default is a final shred every time; batching, and how long a shred may stay pending, are decisions for acceptance.
 . *Scope: content-store copies only.* The guarantee covers what JanusKey writes: blobs and keys. It does not cover the working file itself, which `jk obliterate` targets too.
@@ -78,7 +78,7 @@ Two things are wrong with treating this as erasure.
 
 == 3. Measured cost (E1, done)
 
-`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after seven rounds of review corrections.
+`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after eight rounds of review corrections.
 
 * *Conditions:* 4 vCPU, a container's virtual disk, one run, and medians, with Criterion's 95% intervals in the raw output.
 * *Payloads:* random, so incompressible. That is the worst case for gzip: it costs time and saves nothing. Compressible content would make every gzip row faster, and the sealed row with it, since that row compresses before sealing.
@@ -101,7 +101,7 @@ The default-store and proposed rows come from one paired re-run, made after the 
 |today: `obliterate_file` on the blob, 4 KiB / 64 KiB / 1 MiB / 16 MiB |0.71 / 0.98 / 6.76 / 124 ms
 |*pending* shred (batched): append a tombstone to the key journal and sync it |0.20 ms
 |*final* shred, one table: open (authenticate and decrypt) the sealed table, drop the entry, re-seal it under a fresh epoch key, one synced write; 64-byte rows; 1 000 / 10 000 / 100 000 live keys |0.96 / 2.91 / 26.2 ms
-|*final* shred, add for the journal (reading and clearing only; merging the rows into the table is part of the table row above, which re-seals the whole table anyway): derive each entry's subkey from the epoch key, open it, and start an empty journal, one synced write; 10 / 100 / 1 000 / 10 000 entries |0.45 / 0.70 / 2.28 / 18.0 ms
+|*final* shred, add for the journal (reading and clearing only; merging the rows into the table is part of the table row above, which re-seals the whole table anyway): read the journal from disk, derive each entry's subkey from the epoch key and its salt, open it, and start an empty journal, one synced write; 10 / 100 / 1 000 / 10 000 entries |0.48 / 0.74 / 2.43 / 19.1 ms
 |*final* shred, one file per key: rewrap every key file under a fresh epoch key, 1 000 live keys |1 210 ms
 |===
 
@@ -110,7 +110,7 @@ Not in any row:
 * *Destroying the old epoch secret.* Its cost depends on where it lives (§4).
 * *The generation protocol's extra writes:* one keyring write and one pointer rename (§2).
 
-The journal row is never zero in practice, even when every shred is final: any store since the last rotation leaves an entry, including the victim's own. An earlier version of this section claimed it was zero. An earlier journal row (0.42 / 0.45 / 0.77 / 3.44 ms) used keys derived before timing began; the current row derives every subkey inside the measurement.
+The journal row is never zero in practice, even when every shred is final: any store since the last rotation leaves an entry, including the victim's own. An earlier version of this section claimed it was zero. An earlier journal row (0.42 / 0.45 / 0.77 / 3.44 ms) used keys derived before timing began; the current row reads the journal from disk and derives every subkey inside the measurement.
 
 What the numbers say:
 
@@ -170,9 +170,9 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 ** *AEAD security.* AES-256-GCM is IND-CPA and INT-CTXT for *one message per key*.
 *** Blob keys meet that by construction.
 *** The epoch key would not, because the table and every journal entry under one epoch are separate messages.
-*** So each of them is sealed under its own subkey: HKDF-SHA-256 over the epoch key with the message's sequence number (0 for the table, then 1, 2, … for journal entries).
+*** So each of them is sealed under its own subkey: HKDF-SHA-256 over the epoch key with a random 256-bit salt that the message carries in its header.
 *** Every AEAD key therefore still encrypts exactly one message, and random-nonce collisions and per-key GCM usage limits stop being part of the assumption.
-*** The design must never reuse a sequence number within an epoch, which is a property for the model to check.
+*** A salt rather than a sequence number, because a sequence can be reused. Recovery that drops a torn final journal entry would hand its number to the next append, while a snapshot or CoW extent may still hold the torn entry's ciphertext. Two messages would then share one subkey. A fresh random salt is reused only with negligible probability (2^-128 by the birthday bound at 2^64 messages), and needs no durable counter.
 ** *Erasure.* Erasing the epoch secret where §4 keeps it is real erasure.
 ** *Key derivation.* HKDF-SHA-256 is a PRF and Argon2id resists offline guessing at the chosen cost.
 * *C-3 is unchanged:* obliteration stays by design irreversible, and `undo` after a shred has nothing to restore, as today.
@@ -215,7 +215,7 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 *** Expected in both designs: the marker *is* found, from the working file's own extents.
 *** This case is kept as a test of the scope limit in §2, so that no one later reads the store-only result as covering the working file.
 * *E5: the full final shred.* Time the generation protocol of §2 end to end, including the keyring writes for §4's chosen root and the pointer rename. Confirm the cost stays independent of blob size and linear in live keys plus journal entries.
-** Inject a crash after each of the protocol's steps. Check that the next open recovers to exactly one openable generation, and that no step leaves the shred reported final while secret _n_ is still in the keyring.
+** Inject a crash after each of the protocol's steps. Check that every crash point leaves at least one openable generation, that recovery selects the committed one and ends with exactly one, and that no step leaves the shred reported final while secret _n_ is still in the keyring.
 * *E6: compression.* Repeat the store rows with compressible payloads (text, source code). Then measure skipping gzip when it does not shrink the input. This is a candidate fix to today's store whatever happens to this ADR.
 
 == 8. Beyond this repository
