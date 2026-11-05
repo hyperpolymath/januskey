@@ -128,6 +128,9 @@ fn gzip(data: &[u8]) -> Vec<u8> {
     enc.finish().unwrap()
 }
 
+/// Store cost per blob: today's `ContentStore::store`, with compression off and
+/// on (the `jk` default), against the proposed gzip-then-seal path and the
+/// cipher alone.
 fn bench_store(c: &mut Criterion) {
     let mut g = c.benchmark_group("crypto_shred/store");
     g.sample_size(10).measurement_time(Duration::from_secs(3));
@@ -183,6 +186,8 @@ fn bench_store(c: &mut Criterion) {
     g.finish();
 }
 
+/// Erase cost: today's overwrite of a blob against the pending and final stages
+/// of a crypto-shred, and the rejected one-file-per-key layout for contrast.
 fn bench_erase(c: &mut Criterion) {
     let mut g = c.benchmark_group("crypto_shred/erase");
     g.sample_size(10).measurement_time(Duration::from_secs(3));

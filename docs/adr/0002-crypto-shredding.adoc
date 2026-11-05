@@ -4,6 +4,7 @@
 :toc: left
 
 * *Status:* proposed. Not accepted, and nothing is built. The benchmark in `benches/crypto_shred.rs` is the only code.
+* *Precondition for acceptance:* §2's key-table, journal and rotation protocol is a sketch refined through nine rounds of review, and §9 lists what is still open. Before acceptance it must be written as a state machine and checked mechanically for crash consistency at every step, either in TLA+ or in the Agda kernel beside T-1 to T-3. The checked properties are: no blob without an openable key, at least one openable generation, no reused subkey, and a final shred leaving no openable copy of the victim's key. Prose review cannot close this class of question; a model can.
 * *Date:* 2026-11-04
 * *Related:*
 ** ADR-0001: `jk` is reversible file operations, not a key system.
@@ -109,6 +110,9 @@ Not in any row:
 
 * *Destroying the old epoch secret.* Its cost depends on where it lives (§4).
 * *The generation protocol's extra writes:* one keyring write and one pointer rename (§2).
+* *Reading the sealed table from disk.* The table row opens a table already in memory, so the file read (up to about 6.4 MiB at 100 000 keys) is excluded.
+
+Adding the table row and the journal row also overcounts by one directory fsync: each row does its own, while §2's protocol syncs the directory once for both files. The sum is therefore an upper bound on that part, and a lower bound overall because of the exclusions above.
 
 The journal row is never zero in practice, even when every shred is final: any store since the last rotation leaves an entry, including the victim's own. An earlier version of this section claimed it was zero. An earlier journal row (0.42 / 0.45 / 0.77 / 3.44 ms) used keys derived before timing began; the current row reads the journal from disk and derives every subkey inside the measurement.
 
@@ -222,3 +226,12 @@ Recommended for a first build: the passphrase plus epoch rotation, with the TPM/
 
 * The same erasure-on-flash problem applies to any estate repository that promises deletion: consent and retention tooling, and obliteration in other stores. If this ADR is accepted, the root-key seam (§4) is a candidate for a shared crate rather than a januskey-only module.
 * `docs/security/THREAT_MODEL.adoc` covers only the key store. It needs a section on the obliteration path whichever way this ADR is decided.
+
+== 9. Open questions before acceptance
+
+These were raised in review and are *not* resolved by this proposal. Each belongs to the formal model required above, or to E5, rather than to further prose.
+
+* *Duplicate keys after a key-first crash.* A store can sync its journal entry and then crash before publishing the blob. A retry can then append a second key for the same address and publish under it. A fold must not keep the older key just because it exists. Either a retry reuses the pending key, or the fold keeps only the mapping that authenticates the published blob.
+* *Hashes with no stored plaintext.* `Modify` and `Create` record a `new_content_hash` whose content is never stored, and the working file may since have changed or gone. Migration cannot compute an HMAC address for such references. Like legacy obliteration records (§6), they must be redacted or retained with the exposure stated.
+* *Keys in process memory.* A rotation loads the old epoch secret, derives the epoch key and decrypts a table holding the victim's key. Under the threat model's memory-disclosure vector (AV-2: core dumps, swap, cold boot), dropping the old secret from the keyring is not enough. The secret, the derived keys, the decrypted table and the removed row must be held in locked memory and zeroized before the shred is reported final.
+* *Benchmark completeness.* The exclusions listed in §3 (table I/O, the shared directory fsync, the keyring and pointer writes) are measured together in E5, as one end-to-end final shred.
