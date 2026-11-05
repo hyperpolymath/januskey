@@ -626,13 +626,61 @@ mod tests {
         );
         unblock();
 
+        // Retry every mutator once the fault is cleared: each applies exactly
+        // once, and after each one memory and the reloaded disk agree.
+        let agree = |store: &MetadataStore| {
+            let disk = MetadataStore::new(path.clone()).unwrap();
+            let view = |s: &MetadataStore| -> Vec<(String, bool)> {
+                s.operations()
+                    .iter()
+                    .map(|op| (op.id.clone(), op.undone))
+                    .collect()
+            };
+            assert_eq!(view(store), view(&disk), "memory and disk agree");
+        };
+
+        store.append(modify_entry("/c.txt", b"c0", b"c1")).unwrap();
+        assert_eq!(store.count(), 3, "the retried append is recorded once");
+        agree(&store);
+
         store.mark_undone(&first_id, "undo-1").unwrap();
-        let reloaded = MetadataStore::new(path).unwrap();
-        assert_eq!(reloaded.count(), 2);
-        assert!(
-            reloaded.get(&first_id).unwrap().undone,
-            "memory and disk agree"
+        assert!(store.get(&first_id).unwrap().undone);
+        agree(&store);
+
+        let purged = store.purge_path_entries(Path::new("/b.txt")).unwrap();
+        assert_eq!(purged.len(), 1, "the retried purge removes /b.txt once");
+        assert_eq!(store.count(), 2);
+        agree(&store);
+
+        assert_eq!(store.prune(1).unwrap(), 1, "the retried prune removes one");
+        assert_eq!(store.count(), 1);
+        assert_eq!(store.operations()[0].path, PathBuf::from("/c.txt"));
+        agree(&store);
+    }
+
+    /// T-8: a save replaces the log rather than overwriting it in place. A hard
+    /// link taken before the save still holds the old log afterwards, which a
+    /// plain `fs::write` (truncate and rewrite the same inode) would not leave,
+    /// so a regression of `MetadataStore::save` to an in-place write fails here.
+    #[test]
+    fn save_replaces_rather_than_overwrites_the_log() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("metadata.json");
+        let mut store = MetadataStore::new(path.clone()).unwrap();
+        store.append(modify_entry("/a.txt", b"a0", b"a1")).unwrap();
+
+        let old = tmp.path().join("metadata.json.old");
+        fs::hard_link(&path, &old).unwrap();
+        let before = fs::read(&old).unwrap();
+
+        store.append(modify_entry("/b.txt", b"b0", b"b1")).unwrap();
+
+        assert_eq!(
+            fs::read(&old).unwrap(),
+            before,
+            "the old log was replaced, not rewritten"
         );
+        assert_ne!(fs::read(&path).unwrap(), before, "the new log is in place");
     }
 
     #[test]
