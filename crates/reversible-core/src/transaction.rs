@@ -750,11 +750,13 @@ mod tests {
         assert!(!path.exists(), "the failed save wrote nothing");
     }
 
-    /// T-5, T-8: a save that fails leaves the existing log exactly as it was on
-    /// disk. The failure is injected without touching the log (the save's
-    /// temporary name is already taken), so a save that removed or truncated the
-    /// destination before replacing it would be caught here. The final rename
-    /// itself is atomic by the filesystem's guarantee, not by a test.
+    /// T-5, T-8: a save that fails before it creates its temporary file leaves
+    /// the existing log exactly as it was on disk. The failure is injected
+    /// without touching the log (the temporary name is already taken), so a
+    /// save that removed or truncated the log before that point is caught here.
+    /// Not covered: a failure after the temporary file exists (during the write,
+    /// sync or rename), which would need a fault-injection seam in the writer;
+    /// the final rename is atomic by the filesystem's guarantee, not by a test.
     #[test]
     fn a_failed_save_leaves_the_existing_log_intact() {
         let dir = TempDir::new().expect("failed to create temp dir");
