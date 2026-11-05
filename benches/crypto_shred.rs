@@ -283,7 +283,7 @@ fn bench_erase(c: &mut Criterion) {
                     // an empty journal. Merging the rows is in the table row.
                     let bytes = fs::read(&path).unwrap();
                     let mut rows = Vec::with_capacity(journal_len * TABLE_ROW);
-                    for entry in bytes.chunks_exact(JOURNAL_ENTRY) {
+                    for entry in bytes.as_chunks::<JOURNAL_ENTRY>().0 {
                         let (salt, sealed) = entry.split_at(SALT);
                         rows.extend_from_slice(&open(&subkey(&epoch_key, salt), sealed));
                     }
