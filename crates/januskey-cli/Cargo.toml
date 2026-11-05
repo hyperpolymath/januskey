@@ -62,6 +62,11 @@ name = "januskey_benchmarks"
 harness = false
 path = "../../benches/januskey_benchmarks.rs"
 
+[[bench]]
+name = "crypto_shred"
+harness = false
+path = "../../benches/crypto_shred.rs"
+
 [[bin]]
 name = "jk"
 path = "src/main.rs"

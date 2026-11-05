@@ -1,0 +1,266 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= JanusKey proof-statement audit (2026-10-27)
+:toc: left
+
+[IMPORTANT]
+.Status on 2026-11-04 — read this first
+====
+This report records the audit as it was run on `main` at 10f0bc2. Since then:
+
+* *Fixed*: P4 and P5 (content store). A damaged blob is now repaired, writes go by temporary file and rename (by construction; no test injects a mid-write failure), and a malformed hash cannot leave the store root (#163). These are now ledger rows S-1 and S-2.
+* *Fixed*: transaction-log persistence and resumable rollback (T-4 and T-5, #162 and #164).
+* *Still open*:
+** P1 to P3 (attestation log): uncovered fields, the last entry, and tail truncation. These are now ledger rows L-1 and L-2.
+** P6 (`ObliterationProof` proves nothing about erasure). This is now ledger row O-1.
+
+The obligation statements in `PROOF-NEEDS.adoc` are the authority. Where this report and the ledger differ, the ledger wins.
+====
+
+Audited: januskey `main` at 10f0bc2, 2026-10-27. Purpose: before anyone proves anything, decide
+which of the open obligations in `PROOF-NEEDS.adoc` are provable as written, which need a code
+change first, and which are assumptions. No proofs were written.
+
+== How to read this
+
+* *Read*: `content_store.rs`, `obliteration.rs` (struct, `obliterate`, `obliterate_path`,
+`secure_overwrite`), `transaction.rs`, `attestation.rs` (entry, hash, MAC, log, verify),
+`keys.rs` (init/unlock/retrieve/rotate/revoke/KDF/wrap), `Types.idr` (`Knows`),
+`PROOF-NEEDS.adoc`.
+* *Not read*: the filesystem rollback executor (in `januskey-cli`), `metadata.rs`,
+`operations.rs`, `keys.rs` `load_store`/`verify_kek`/`unwrap_key` bodies, `Proofs.idr` and
+`Layout.idr` beyond the ledger, the Agda module beyond its header.
+* *Run*: seven probe tests (a throwaway test file, not committed), on a
+scratch copy of the repo, against the unmodified code. Each asserts what the code _does_, so a
+passing probe is evidence the property is _false_. A control probe (an edit to a covered field is
+detected) passes, so the harness itself is sound. P1 initially failed because my test edited a
+protected field as well; I fixed the test and say so here.
+* *Not run*: the Idris and Agda checkers. I rely on CI having passed on the #159 commits.
+* Everything marked _unverified_ below is a hypothesis, not a finding.
+
+== Verdicts at a glance
+
+[cols=",,,",options="header",]
+|===
+|# |Obligation (PROOF-NEEDS "What Needs Proving") |Verdict on the claim as written |Prove after
+|1 |Content store integrity |Read-side is sound; *write side is not crash-safe* (P4) and a hash string can *steer paths outside the store* (P5) |code fix
+|2 |Transaction atomicity |State machine already proven; *log persistence is not atomic*; rollback needs a failure model |code fix + model
+|3 |Attestation chain "unforgeable" |*False as written*: three gaps confirmed by test (P1, P2, P3) |restate + code fix
+|4 |Key derivation |Mostly not a proof job: parameters = compile-time assertion, nonces = bound, primitives = ASSUMED |restate
+|5 |Obliteration |Logical (CAS) part provable as a model theorem; *"proof" object proves nothing* (P6); *key obliteration is not implemented*; physical erasure unprovable |restate + design
+|6 |reversible-core undo/redo |Provable abstractly (nearly done: C-1 + per-op cancellation); the link to the Rust is the real work |model + conformance
+|E-1 |Adversary cannot recover / revoked key unusable |*Vacuous as modelled*; revocation is an API guard, not a cryptographic one |delete or replace
+|— |"Every operation is reversible (MPR)" |*Contradicts proven C-3* (obliteration is by design not reversible) |restate
+|===
+
+== Findings from the probes (evidence)
+
+[cols=",,",options="header",]
+|===
+|Probe |Result |Meaning
+|P0 control |actor edit detected |harness is valid
+|P1 |editing `rotated_from` and `new_state` of a middle audit entry: `verify_integrity` still *valid* |those fields are in neither the MAC nor the chain hash
+|P2 |editing `reason` of the *last* entry: still valid |the last entry's chain-hashed fields have no successor to protect them
+|P3 |deleting trailing entries: still valid |verification accepts any prefix; no external anchor or count
+|P4 |truncate a stored blob, call `store` again, `retrieve` -> integrity error |dedupe (`path.exists()`) never repairs a crash-truncated blob
+|P5 |`ContentHash("sha256:ab" + absolute path)`: `content_path` is outside the root and `delete` removed my temp file |path is built by `Path::join`, and an absolute right-hand side replaces the root
+|P6 |`ObliterationProof::generate` on content never stored: `verify_commitment` true, `storage_cleared` true |the proof is a public hash plus a hard-coded flag
+|===
+
+Reachability caveat for P5: it shows the _store API_ accepts such a hash. I have not shown that
+attacker-controlled metadata can reach `delete`/`obliterate`. `ContentHash` derives `Deserialize` with a
+public field and no validation, so that is where to look. Treat it as a security issue and fix it before
+publishing details (the repository is public).
+
+[[1-content-store-integrity]]
+== 1. Content store integrity
+
+*As written:* "Content-addressed storage never returns wrong content."
+
+* *Provable statement (R):* `retrieve(h) = Ok(x)` implies `H(x) = h`. This follows directly from the
+guard in `retrieve`. It is true, cheap, and low value on its own. Combined with collision resistance
+(X-1) it gives "x equals any content that was stored under h".
+* *Round trip (W):* `store(c) = h` then `retrieve(h) = Ok(c)`. TESTED by the property test, *false under
+a crash* (P4): a truncated file at the final path makes every later `store` of that content a no-op
+and every `retrieve` fail.
+* *Path confinement (C):* for every `h`, `content_path(h)` is inside `root`. *False* (P5).
+
+Do: fix C (validate `ContentHash` on construction/deserialization: `sha256:` plus 64 hex) and W (write to a
+temp file, fsync, rename). Then prove R and C as lemmas about the validated type. Statements to avoid:
+anything that restates the `verify` call.
+
+Difficulty: low.  Kani or Verus can prove R and C
+on the real function; unproven here (spike first).
+
+[[2-transaction-atomicity]]
+== 2. Transaction atomicity
+
+*As written:* "Delta application is atomic and reversible."
+
+Split it:
+
+* *T1, lifecycle* (Pending -> Active -> Committed | RolledBack): PROVEN in `Proofs.idr`. Note the Rust
+enum has three states (no `Pending`), so the Idris model and the Rust type already differ by one
+state. The correspondence is assumed (same status as G-2).
+* *T2, rollback restores state:* abstractly, undoing o1..on in reverse on state s gives s, given the
+per-operation premise `undo o ∘ o = id`. That is C-1 (`seqCNO`) plus the TESTED premise
+`execute_then_undo_is_identity`. Provable now; mostly done. What is missing is *partial failure*: what
+if undo of o_k fails mid-way? The statement needs an error model (is undo idempotent and resumable?).
+I did not read the executor, so I cannot say.
+* *T3, crash atomicity of the log:* `TransactionManager::save` is `fs::write` (truncate, then write; no
+temp file, no fsync, no rename). A crash mid-save leaves a truncated `transactions.json`, and
+`TransactionManager::new` then fails with `MetadataCorrupted`. So "atomic" is *false for the
+persistence layer*. After switching to temp + fsync + rename it is provable under a stated crash
+model (POSIX rename atomicity is an assumption).
+
+Difficulty: T2 low-moderate; the crash model is the hard design choice (what does a crash do to a
+directory and to file contents?).
+
+[[3-attestation-chain-unforgeable]]
+== 3. Attestation chain "unforgeable"
+
+What the code actually does: each entry carries `attestation = HMAC-SHA256(k, scheme || 0 || event_id: timestamp:event_type:actor || 0 || previous_hash)`, and `previous_hash` is SHA-256 over a _different,
+larger_ field set (adds `key_id`, `fingerprint`, `reason`). `k = SHA-256(KEK || "attestation")`, KEK from
+Argon2id.
+
+Coverage, confirmed by probes:
+
+[cols=",,,",options="header",]
+|===
+|Field |In MAC |In chain hash |Net
+|event_id, timestamp, event_type, actor |yes |yes |protected
+|key_id, fingerprint, reason |no |yes |protected except on the *last* entry (P2)
+|algorithm, purpose, old_state, new_state, rotated_to, rotated_from |*no* |*no* |*unprotected* (P1)
+|entries after the last kept one |n/a |n/a |*deletable* (P3)
+|===
+
+So "unforgeable" is false as written. Better statement, once fixed:
+
+____
+*A-1.* For an adversary without `k`: if `verify_integrity(L') = valid` then `L'` is a prefix of an
+honestly produced log, or the adversary has forged an HMAC-SHA256 tag or found a SHA-256 collision.
+____
+
+Needed code changes first: MAC (or hash) over a canonical encoding of _every_ field; an anchor against
+truncation (signed counter or head hash stored elsewhere, or an external witness). Also name the
+adversary: the passphrase holder can always rewrite the log, since the MAC key is derived from the KEK
+they hold. And `read_all` silently skips unparseable lines (a corrupted or injected line becomes a
+deletion); decide whether that should fail.
+
+How to prove it, with ratings (first elegance/correctness, then dependability/security):
+
+[cols=",,,",options="header",]
+|===
+|Option |Elegance |Dependability |Note
+|Symbolic model in Agda (HMAC as an unforgeable function) |★★ |★★ |Cheap, but it assumes the conclusion for the crypto part. Same weakness as E-1.
+|Game-based reduction on paper + conformance tests, mark HMAC security ASSUMED |★★★ |★★★ |Honest and sufficient for this repo. Recommended.
+|Mechanised computational proof (EasyCrypt, CryptoVerif) |★★★ |★★★ |Correct but research-grade effort for a small gain. Different path, unexplored here.
+|Replace the home-made chain with an existing transparency-log or signed-log design |★★ |★★★ |Removes the bespoke construction; real design change.
+|===
+
+Difficulty: statement and fix moderate; mechanised crypto proof very hard.
+
+
+[[4-key-derivation]]
+== 4. Key derivation
+
+"Sound keys" splits three ways, and only one part is a proof:
+
+* *Parameters* (Argon2id 64 MiB, t=3, p=4, 16-byte salt): a theorem about literals is exactly what the
+ledger removed (`defaultMeetsOWASP`). Do it as a compile-time assertion
+(`const _: () = assert!(...)`) in Rust. Status: TESTED (compile-time).
+* *Nonce uniqueness* for AES-GCM key wrapping: nonces are random 96-bit per wrap. Statement:
+after q wraps under one KEK, `P[collision] <= q(q-1)/2^97`. A birthday-bound lemma; paper-grade, and
+NIST SP 800-38D caps random-nonce use near 2^32 invocations per key. Provable, practically irrelevant
+at this scale; write it down as ASSUMED-with-bound unless you want a probability library in Agda.
+* *Primitive security* (Argon2, AES-GCM, HMAC): ASSUMED (X-1 family).
+
+Smaller findings (unverified consequences): `attestation_key` is a plain `[u8;32]` in `AuditLog`, not
+`Zeroize`d; the attestation key is `SHA-256(KEK || "attestation")` rather than HKDF (acceptable for a
+uniform 32-byte KEK but non-standard).
+
+Not read: `load_store`, `verify_kek`, `unwrap_key`, and what the store-header `nonce` is used for.
+
+Difficulty: low.
+
+[[5-obliteration]]
+== 5. Obliteration
+
+Three different claims are bundled:
+
+* *O-1, logical (CAS) completeness:* after `obliterate_path(p)`, no blob reachable only via `p` remains,
+no log entry mentions `p`, shared blobs survive. TESTED today by three Rust tests. Provable as a model
+theorem over (store map, log, reference sets): a partition argument, moderate. Ordering is sound
+(shred, then purge) but not crash-atomic; a crash between them leaves entries that point to missing
+blobs. Unverified hypothesis worth a test: if the store's compression flag differs from when a blob was
+written, `content_path` misses the blob, `exists` is false, the shred is skipped silently, and the log
+purge proceeds.
+* *O-2, "proof of obliteration":* `ObliterationProof` is `SHA-256(content_hash || nonce || timestamp)`
+plus a hard-coded `storage_cleared: true`. Anyone can produce one for any hash without erasing anything
+(P6). The statement "a verifying proof implies the content was obliterated" is *false*. This is a
+naming and documentation problem first (the module header says "formal obliteration proofs").
+* *O-3, physical erasure:* the code already says overwrite-in-place does not guarantee erasure on
+CoW/journaling filesystems or flash. ASSUMED (X-1). Not provable.
+* *Key obliteration:* `KeyState::Obliterated` is defined and read but *never assigned* anywhere in
+`crates/`. The module comment itself recommends encrypt-then-shred. So the design that would make O-3
+tractable is not built.
+
+Options for the strong guarantee:
+
+[cols=",,,",options="header",]
+|===
+|Option |Elegance |Dependability |Note
+|Keep overwrite, relabel as best-effort, drop "proof" wording |★★ |★★ |Cheapest; honest. Does the least for users.
+|Crypto-shredding: per-blob key, erasing the key is the erasure |★★★ |★★★ |Reduces the claim to AES-GCM secrecy + key erasure; key bytes still face the SSD problem, but 32 bytes can live in an OS keyring or memory only. Real design work.
+|Two-tier: crypto-shred plus best-effort overwrite of blobs |★★ |★★★ |Defence in depth; most code.
+|===
+
+Difficulty: O-1 moderate; O-2 trivial once renamed (prove nothing, claim nothing); O-3 unprovable.
+
+[[6-reversible-core-undoredo-preserves-data-integrity]]
+== 6. reversible-core: undo/redo preserves data integrity
+
+Same shape as T2. Abstract theorem: for a sequence of operations with the cancellation premise, undo
+restores state. Provable now (nearly proven). I did not locate a "redo" in the code I read; the claim
+should say what it covers. The expensive part is the *refinement link to the Rust* (G-2, G-3, capstone).
+
+Options for the link, with ratings:
+
+[cols=",,,",options="header",]
+|===
+|Option |Elegance |Dependability |Note
+|Keep the verified model; conformance tests against the Rust (current approach) |★★ |★★★ |Already working (`execute_then_undo_is_identity`); no proof of the code itself.
+|Bounded model checking (Kani) on small kernels |★★★ |★★ |Proves the real code, bounded. Unproven on this repo; spike first.
+|Verus/Creusot deductive proofs on kernels |★★★ |★★ |Heaviest; only for `content_store`-sized kernels. Not tried here.
+|===
+
+== E-1 and the capstone
+
+* *E-1 (`adversaryCannotKnow`):* `Knows` has no `Adversary` constructor, so `Knows Adversary a -> Void`
+is true of _any_ model that omits the constructor. It states nothing. Delete it from the claims set (keep
+as a note), or replace it with a symbolic derivability model plus an explicit assumption list. Likewise
+`systemKnowsNewKey` is documented as not stating the negative. Revocation: `revoke`/`rotate` set a
+`Revoked` flag and `retrieve` refuses it; the wrapped ciphertext stays in the store and anyone with the
+KEK can unwrap it directly. So "a revoked key cannot be used" is an *API-level* property, not a
+cryptographic one. Say that.
+* *Capstone "every operation is reversible (MPR)":* C-3 proves a transaction containing an obliteration
+is _not_ all-reversible. The capstone must be restated as the graded version G-1 already encodes:
+every non-obliterating sequence is reversible; an obliterating step absorbs.
+
+== Recommended order
+
+[arabic]
+. *Fix, then pin with tests* (no proof tooling): P5 path confinement, P4 atomic write, transaction log
+atomic write, attestation field coverage + anchor, rename/qualify `ObliterationProof`. These are bugs,
+not proof obligations; they change what is true.
+. *Rewrite the six statements* in `PROOF-NEEDS.adoc` per this document, each with status
+PROVEN / TESTED / ASSUMED / OPEN and the adversary named. This is the high-judgment step.
+. *Then prove*, easiest first: R and C (content store), T2/item 6 (abstract), O-1 (model), A-1 (paper).
+. Decide the crypto-shredding design before any proof of strong obliteration.
+
+== Beyond this repo (worth a list)
+
+* The five-status vocabulary and the dashboard-check ledger live in the estate canon (standards).
+* `resource-algebra` must define homomorphisms before G-3 can move.
+* The probe tests assert _current bad behaviour_. Do not merge them as-is. Turn each into a test that
+fails today and passes after its fix.
