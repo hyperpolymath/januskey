@@ -47,7 +47,7 @@ workflows:
         - 'hyperpolymath/standards@a85aa8e70326cceedae169013a47daee554918b7'
     '.github/workflows/squabble.yml':
         - 'actions/checkout@v7.0.1'
-        - 'hyperpolymath/cicd-squabbler@b625e05da04c0b72fe2ca19bd009841ff982f43d'
+        - 'hyperpolymath/cicd-squabbler@79d7dbacc8a02b4a4388b4a36fe46893b5b7ce73'
 dependencies:
     'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9':
         ref: 'v6.1.0'
@@ -141,9 +141,9 @@ dependencies:
         commit: 'sha1-0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d'
         owner_id: 75048950
         repo_id: 623796603
-    'hyperpolymath/cicd-squabbler@b625e05da04c0b72fe2ca19bd009841ff982f43d':
+    'hyperpolymath/cicd-squabbler@79d7dbacc8a02b4a4388b4a36fe46893b5b7ce73':
         ref: 'main'
-        commit: 'sha1-b625e05da04c0b72fe2ca19bd009841ff982f43d'
+        commit: 'sha1-79d7dbacc8a02b4a4388b4a36fe46893b5b7ce73'
         owner_id: 6759885
         repo_id: 1284026967
     'hyperpolymath/deed-ecosystem@main':
