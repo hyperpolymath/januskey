@@ -1,0 +1,240 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= ADR-0002 — Obliteration by crypto-shredding
+:toc: left
+
+* *Status:* proposed. Not accepted, and nothing is built. The benchmark in `benches/crypto_shred.rs` is the only code.
+* *Precondition for acceptance:* §2's key-table, journal and rotation protocol is a sketch refined through nine rounds of review, and §9 lists what is still open. Before acceptance it must be written as a state machine and checked mechanically for crash consistency at every step, either in TLA+ or in the Agda kernel beside T-1 to T-3. The checked properties are: every live (not tombstoned or shredded) blob has an openable key and every shredded blob has none, at least one openable generation, no reused subkey, and a final shred leaving no openable copy of the victim's key. Prose review cannot close this class of question; a model can.
+* *Date:* 2026-11-04
+* *Related:*
+** ADR-0001: `jk` is reversible file operations, not a key system.
+** `PROOF-NEEDS.adoc` rows O-1 (OPEN), X-1 (ASSUMED) and E-1m (PROVEN).
+** `docs/reports/audit/proof-statement-audit-2026-10-27.adoc` §5.
+
+== 1. Context
+
+`jk obliterate` today calls `secure_overwrite`: three passes over the file, an fsync after each pass, then an unlink. It records an `ObliterationProof` whose `storage_cleared` is hard-coded to `true` (row O-1).
+
+Two things are wrong with treating this as erasure.
+
+* *The overwrite does not reach the old bytes on the media that matter.*
+** On an SSD, the flash translation layer writes each pass to fresh cells.
+** On a copy-on-write file system (btrfs, ZFS, APFS) each pass is a new extent.
+** A journal, a snapshot or a backup keeps its own copy.
+** NIST SP 800-88 Rev. 1 warns that overwriting may not reach all of the storage on a flash device. DoD 5220.22-M, which the code cites, dropped its overwrite procedure in the 2006 revision. Row X-1 is therefore an assumption that is false on most current disks.
+* *The content address survives the erasure.* A blob is addressed by SHA-256 of its plaintext. That address stays in `obliterations.json` and in the proof (`content_hash`). Anyone who can guess low-entropy content, such as a short password or a yes/no field, can confirm the guess after obliteration.
+
+== 2. Proposal
+
+*Crypto-shredding:* each blob is stored encrypted under its own random key, and erasing a blob means erasing its key.
+
+[arabic]
+. *Sealing.* `store` seals the content with AES-256-GCM under a fresh 256-bit key from the OS CSPRNG and a 96-bit random nonce. The blob file is `version byte ‖ nonce ‖ ciphertext ‖ tag`.
+** *Never* use a convergent key (key = H(content)). Such a key can be recomputed from the content, so it cannot be shredded.
+. *Deduplication is unchanged.* The key belongs to the blob, not to a path. A blob shared by two paths keeps its key until the last path that needs it is obliterated, which is the rule `obliterate_path` already applies to blobs.
+. *Key storage.* Keep all blob keys in *one key table* (`.januskey/keys`), sealed as a whole under the current *epoch key*, plus an append-only *key journal*. See §4 for where the epoch key comes from.
+** A `store` appends one entry, sealed under the current epoch key, to the journal and syncs it. That costs the same at any number of keys; rewriting the whole table on every store would not.
+** *Key before blob.* The journal entry is synced *before* the sealed blob is renamed into place.
+*** A crash in between leaves a key with no blob. That is harmless, and the next fold drops it.
+*** It never leaves a blob with no key. That case would be permanent loss, because deduplication would accept the existing blob on a retry.
+*** Deduplication accepts an existing blob only if it *authenticates* (the AEAD open succeeds) under the key the table or journal maps to its address. Otherwise the blob is rewritten. A key merely being present is not enough: a repair can crash after syncing a new key but before replacing the old ciphertext, and that key would not open the old blob.
+** A shred folds the journal into the table as part of the rewrite it does anyway.
+** Journal entries are sealed under the same epoch key as the table, so the rotation below covers retained copies of the journal too.
+** An earlier draft proposed one key file per blob, because dropping a single file is cheap. But making a shred final requires every live key to be re-sealed under a fresh epoch key. With per-blob files that is one synced write per live key: 1.2 s for only 1 000 keys (§3). The table makes a final shred one synced write.
+. *Shred.* `obliterate` and `gc` drop the blob's entry, fold in the journal, and write the table again under a *fresh* epoch key, starting an empty journal. Then they destroy the old epoch key, then delete the blob.
+** Destroying the old epoch key is what makes the shred final. A snapshot, a backup or a copy-on-write extent can keep an old copy of the table, but that copy is sealed under an epoch key that no longer exists.
+** If the old epoch key is not destroyed, for example because the new table is written but the old key survives, the shred is only *pending*. Every retained copy of the old table, and so of the blob's key, can still be opened.
+** The cost of a final shred is O(live keys + journal entries since the last rotation).
+*** Opening, dropping and re-sealing the table took about 1 ms at 1 000 keys and 26 ms at 100 000.
+*** Folding the journal adds 0.7 ms at 100 entries and 19 ms at 10 000 (§3). Each entry needs its own subkey derivation and AES key schedule.
+** *Stores and rotations are serialised.* Suppose a `jk` process appended to the journal under generation _n_ after a concurrent shred had folded that journal but before it removed secret _n_. That blob's key would be in no table and sealed under a destroyed secret, and its undo content would be lost permanently.
+*** So every journal append and every whole rotation runs under one exclusive store lock (`.januskey/keys.lock`, an OS file lock).
+*** Readers take the same lock *shared*, for the whole of a `retrieve` or `undo` that uses a key. Without it, a process could open generation _n_, keep the victim's key or plaintext, and finish an undo after the shred reported the content gone. That would recreate obliterated data. A final shred waits for readers to finish.
+*** As a second guard, each journal entry carries the generation it was sealed under. A store that finds `current` changed while it waited for the lock re-seals under the new generation.
+*** This is stricter than the rest of `jk` today: concurrent writers are out of scope for the transaction log (T-5). It is required here because the failure is permanent key loss, not a lost update.
+** *Rotation is crash-safe only with generations.* The keyring and the file system cannot be updated in one atomic step, so tables and epoch secrets are numbered by generation.
+*** A shred moving from generation _n_ to _n+1_:
+**** stores the new epoch secret in the keyring under _n+1_, keeping _n_;
+**** writes `keys.<n+1>`, with an empty journal for _n+1_, syncs both files, then syncs the directory so their entries are durable;
+**** writes a small `current` pointer naming _n+1_ by temporary file, fsync and rename, then fsyncs the directory, so the switch is durable *before* the next step;
+**** removes secret _n_ from the keyring;
+**** deletes `keys.<n>`, its journal, and the blob.
+*** On open, a store whose keyring holds both _n_ and _n+1_ is mid-rotation:
+**** recovery chooses the generation that actually opens, not merely the one `current` names: it tries `current`'s generation first, then the other;
+**** it finishes or undoes the rotation from there, and never discards the only generation whose secret is still present.
+*** A crash at any point leaves *at least one* openable generation. Between steps 2 and 4 both are openable by design. Recovery then selects deterministically: the generation `current` names if it opens, else the other. It then finishes or rolls back the rotation, so after recovery exactly one remains.
+*** The shred is final only once secret _n_ has left the keyring.
+** Shreds could instead be batched, so that one rotation finalises many. A batched shred appends a *tombstone* for the blob to the key journal and syncs it (0.2 ms, §3); the blob is unusable through `jk` at once, but the old table and journal, and so the key, stay openable under the live epoch key until the next rotation. The ADR's default is a final shred every time; batching, and how long a shred may stay pending, are decisions for acceptance.
+. *Scope: content-store copies only.* The guarantee covers what JanusKey writes: blobs and keys. It does not cover the working file itself, which `jk obliterate` targets too.
+** That file existed in plaintext on the same medium before JanusKey ever saw it, so CoW extents, flash remapping, snapshots or backups may still hold its plaintext.
+** Covering it needs encryption from the file's creation, meaning an encrypted volume underneath, which is outside JanusKey.
+** The record says which copies the shred covers, and the docs say the working file is overwritten best-effort only.
+. *Addresses.* Use HMAC-SHA-256 under a per-store *index key* instead of a bare SHA-256, so that an address alone does not confirm a guessed plaintext.
+** That only holds if the attacker who reads the store cannot also read the index key. The index key is therefore part of the protected hierarchy and never sits beside the store in plaintext.
+** It is derived from the root of §4 with HKDF-SHA-256 under its own label. It is never written down, and is recomputed when the store is opened.
+** It is stable for the store's lifetime, because rotating it would re-address every blob. So it is not rotated per shred.
+** Destroying the root destroys it too, which is a whole-store erasure.
+** The protection is exactly as strong as the root. An attacker who holds the store *and* the passphrase (or the hardware root) can still confirm guesses.
+. *Proof object.* `ObliterationProof` loses `storage_cleared` and `overwrite_passes`. It records the key id that was destroyed, and is honestly named a *record*, not a proof.
+
+== 3. Measured cost (E1, done)
+
+`cargo bench -p januskey --bench crypto_shred` measured these figures on 2026-11-04, after eight rounds of review corrections.
+
+* *Conditions:* 4 vCPU, a container's virtual disk, one run, and medians, with Criterion's 95% intervals in the raw output.
+* *Payloads:* random, so incompressible. That is the worst case for gzip: it costs time and saves nothing. Compressible content would make every gzip row faster, and the sealed row with it, since that row compresses before sealing.
+* *Limits:* these figures are evidence about *shape*, not about real disks. fsync on a virtual disk is not fsync on an SSD.
+
+[cols="2,1,1,1,1",options="header"]
+|===
+|Store (per blob) |4 KiB |64 KiB |1 MiB |16 MiB
+|`ContentStore::store`, compression off |0.92 ms |2.10 ms |6.05 ms |40.1 ms
+|`ContentStore::store`, compression on (the `jk` default, today) |1.34 ms |3.98 ms |36.3 ms |525 ms
+|proposed: gzip, then seal, then a synced blob write and one synced append to the key journal (entry unwrapped) |1.63 ms |3.66 ms |39.1 ms |588 ms
+|seal only, no I/O |3.7 µs |55 µs |1.65 ms |38.6 ms
+|===
+
+The default-store and proposed rows come from one paired re-run, made after the layout moved to the key journal. An earlier run of the default store measured 1.70 / 4.40 / 35.7 / 545 ms. The spread at 4 and 64 KiB between those runs is as large as the difference between the two rows, so read small-blob differences as noise.
+
+[cols="2,1",options="header"]
+|===
+|Erase |Time
+|today: `obliterate_file` on the blob, 4 KiB / 64 KiB / 1 MiB / 16 MiB |0.71 / 0.98 / 6.76 / 124 ms
+|*pending* shred (batched): append a tombstone to the key journal and sync it |0.20 ms
+|*final* shred, one table: open (authenticate and decrypt) the sealed table, drop the entry, re-seal it under a fresh epoch key, one synced write; 64-byte rows; 1 000 / 10 000 / 100 000 live keys |0.96 / 2.91 / 26.2 ms
+|*final* shred, add for the journal (reading and clearing only; merging the rows into the table is part of the table row above, which re-seals the whole table anyway): read the journal from disk, derive each entry's subkey from the epoch key and its salt, open it, and start an empty journal, one synced write; 10 / 100 / 1 000 / 10 000 entries |0.48 / 0.74 / 2.43 / 19.1 ms
+|*final* shred, one file per key: rewrap every key file under a fresh epoch key, 1 000 live keys |1 210 ms
+|===
+
+Not in any row:
+
+* *Destroying the old epoch secret.* Its cost depends on where it lives (§4).
+* *The generation protocol's extra writes:* one keyring write and one pointer rename (§2).
+* *Reading the sealed table from disk.* The table row opens a table already in memory, so the file read (up to about 6.4 MiB at 100 000 keys) is excluded.
+
+Adding the table row and the journal row also overcounts by one directory fsync: each row does its own, while §2's protocol syncs the directory once for both files. The sum is therefore an upper bound on that part, and a lower bound overall because of the exclusions above.
+
+The journal row is never zero in practice, even when every shred is final: any store since the last rotation leaves an entry, including the victim's own. An earlier version of this section claimed it was zero. An earlier journal row (0.42 / 0.45 / 0.77 / 3.44 ms) used keys derived before timing began; the current row reads the journal from disk and derives every subkey inside the measurement.
+
+What the numbers say:
+
+* *Sealing is cheap next to today's default.* Against the store `jk` actually runs (gzip on), the proposed path is within run-to-run noise at 4 and 64 KiB, and adds about 8% at 1 MiB and 12% at 16 MiB. The cost is in compression and fsync count, not in the cipher.
+** Two earlier versions of this section were wrong.
+** One said sealing doubles large-blob store time. That compared against the store with compression off, which is not the default.
+** The other gave 1.7× at 4 KiB. That measured a separate key *file* per blob, with its own temp file, rename and directory fsync, which the chosen layout does not do.
+* *Compression is the large-blob cost today.* gzip on incompressible input is the slowest step by an order of magnitude: 545 against 40 ms at 16 MiB.
+** That observation is independent of this ADR.
+** Skipping compression when it does not pay, or a faster codec, would help either design.
+* *A final shred costs O(live keys), not O(blob size).* With one sealed table it is one synced write. The *measured portion* (opening, dropping and re-sealing the table: 26 ms at 100 000 keys) is below today's 124 ms overwrite of a 16 MiB blob and above the 6.8 ms overwrite of a 1 MiB blob. The complete shred adds the table read, a non-empty journal, the keyring writes and the pointer rename, and the keyring cost depends on §4's backend. So these figures do not establish that a complete shred beats overwriting at any size; E5 measures that.
+* *Unlike overwriting, the claim holds on any medium*, subject to §4.
+* *Key layout.* One file per key makes final shreds unworkable (1.2 s at 1 000 keys). It is why §2 chose the single table.
+** The pending-shred row is only the first step of a batched shred, not an erasure.
+** An earlier version measured a pending shred as deleting a per-blob key file (0.72 ms). That operation belongs to the rejected layout.
+** An earlier version also compared that figure with today's overwrite (a "166×" saving). That comparison was wrong, and it is withdrawn.
+** Earlier final-shred figures (1.17 / 3.91 / 33.8 ms) re-sealed rows sized as if each key were wrapped on its own (92 bytes). They also skipped opening the old table. The current row times the whole open, drop and re-seal on 64-byte rows.
+
+== 4. Where the recursion ends (the honest limit)
+
+Crypto-shredding does not remove the physical-erasure assumption. It *shrinks* it: from "every copy of every blob, of any size, on any medium" to "one small secret held where erasure is real".
+
+An old copy of the key table can itself survive on flash. That is why the table is sealed under an epoch key, why each shred rotates that key, and why the root of the epoch keys must live somewhere else.
+
+[cols="3,1,1,4",options="header"]
+|===
+|Root of the key hierarchy |Elegance |Dependability |Aspects
+|Passphrase plus a keyring-held epoch secret (see the hierarchy below) |★★ |★★ |Usable everywhere. Privacy is only as good as the passphrase. A shred becomes final when the epoch secret is replaced and the old one is gone from the keyring.
+|OS keyring or TPM / Secure Enclave sealed key |★★★ |★★★ |Hardware erase semantics. Platform-specific, so a Rust/SPARK seam and an Idris2 ABI per platform. This is the estate's FFI pattern.
+|No root at rest: the key is supplied per session, for example by a hardware token |★★★ |★★ |The strongest privacy. Undo needs the token present, which changes how `jk` is used, and ADR-0001 says that is not the product.
+|===
+
+Recommended for a first build: the passphrase plus epoch rotation, with the TPM/keyring root as a later, separate seam.
+
+*The hierarchy has two roots, because the index key must stay stable while epoch keys must change.*
+
+* *Store root.* Argon2id over the passphrase, with a salt fixed when the store is created and stored beside it.
+** It never changes.
+** It is never written down.
+* *Index key.* HKDF-SHA-256 over the store root, under the label `"index"` (§2).
+** It is stable for the store's lifetime, so rotation never re-addresses blobs.
+* *Epoch secret.* 256 random bits, held in the OS keyring (or TPM), never on the store's medium.
+** Every final shred replaces it.
+** It is not derivable from the passphrase, so a retained copy of the store together with the passphrase does not recover it.
+* *Epoch key.* HKDF-SHA-256 over the store root, salted with the epoch secret, under the label `"epoch"`.
+** Opening the table needs both the passphrase and the current epoch secret.
+** Removing the old epoch secret from the keyring finalises every shred made under it.
+* *Erasure scope.* "Erasing the epoch secret is real erasure" is now an assumption about the keyring's storage, not about the store's medium. On platforms whose keyring persists to the same flash, the honest claim is no stronger than that keyring's own deletion. E2 must check this per platform.
+
+== 5. Statements this makes provable
+
+* *O-1, restated:* "after `shred(h)` and the epoch rotation that follows it, no reachable state, retained copies of the key table included, holds an openable key for `h`; and every stored copy of `h` is a sealed blob under a key with that id". The working file is outside this statement (§2).
+** This is a finite-map model in the Agda kernel.
+** It has the same shape as `obliterate-cuts-recovery` (E-1m): recovery needs the key, and the key is not in any reachable state.
+** It is provable, and then TESTED against the Rust through a conformance test.
+* *X-1 becomes three assumptions:*
+** *AEAD security.* AES-256-GCM is IND-CPA and INT-CTXT for *one message per key*.
+*** Blob keys meet that by construction.
+*** The epoch key would not, because the table and every journal entry under one epoch are separate messages.
+*** So each of them is sealed under its own subkey: HKDF-SHA-256 over the epoch key with a random 256-bit salt that the message carries in its header.
+*** Every AEAD key therefore still encrypts exactly one message, and random-nonce collisions and per-key GCM usage limits stop being part of the assumption.
+*** A salt rather than a sequence number, because a sequence can be reused. Recovery that drops a torn final journal entry would hand its number to the next append, while a snapshot or CoW extent may still hold the torn entry's ciphertext. Two messages would then share one subkey. A fresh random salt is reused only with negligible probability (2^-128 by the birthday bound at 2^64 messages), and needs no durable counter.
+** *Erasure.* Erasing the epoch secret where §4 keeps it is real erasure.
+** *Key derivation.* HKDF-SHA-256 is a PRF and Argon2id resists offline guessing at the chosen cost.
+* *C-3 is unchanged:* obliteration stays by design irreversible, and `undo` after a shred has nothing to restore, as today.
+
+== 6. Consequences
+
+* *Identity (ADR-0001).* Encryption is a *storage* detail here, as SHA-256 addressing already is. `jk` gains no key lifecycle, rotation UI or key export. The `jk-keys` lifecycle manager stays out of the product. The only shared code is the AEAD and KDF crates already in the dependency graph, so no new dependency is needed.
+* *Format and migration.* Blobs gain a version byte. A store with plaintext blobs is read as today, and new writes are sealed. Old plaintext blobs need an explicit `jk migrate` that seals and shreds them. Until that runs, the old plaintext is exactly as exposed as it is now, and the docs must say so.
+** *Addresses are part of the history.* The operation log serialises each blob's `ContentHash`, and `undo` passes that exact value to `ContentStore::retrieve`. Moving blobs to HMAC addresses would leave every historical operation pointing at a blob that no longer exists.
+** `ContentHash` therefore becomes versioned (`sha256:` or `hmac-sha256:`), and `retrieve` resolves either form.
+** Migration proceeds in three steps: seal each blob at its new address; rewrite every reference in the operation log in one atomic save (the log already saves by write, sync and rename, row T-8); only then shred the SHA-addressed copies.
+** A crash between the steps leaves both copies, never neither. That cuts both ways.
+*** The old SHA-addressed blobs are plaintext with predictable names. Migration records itself as incomplete, in a marker it writes first and removes last. Every `jk` invocation resumes cleanup until no reachable old file remains.
+*** Even then, cleanup removes only the *reachable* files. Plaintext the store wrote before migration may still exist in copy-on-write extents, on remapped flash, in snapshots and in backups. That is §1's own premise, and no epoch key covers those copies.
+*** So a migrated store is never reported as unexposed. `jk status` reports "plaintext from before migration may persist on the medium, its snapshots and backups", permanently, for any store that ever held plaintext blobs.
+*** Removing that exposure needs the medium, its snapshots and its backups to be sanitised outside JanusKey.
+*** For data whose exposure matters, the ADR recommends starting a fresh sealed store over migrating an old one.
+** *Obliteration records hold addresses too.* Each `ObliterationRecord` and its nested proof in `obliterations.json` carry the old SHA-256 `ContentHash`, together with the nonce and commitment derived from it. For a blob already obliterated there is no plaintext left from which to compute an HMAC address.
+*** Rewriting those records is impossible, so migration must either *redact* or *retain*.
+*** *Redact:* keep the record's id, time, reason and legal basis, and remove the hash, nonce and commitment. The record can then no longer answer "was this content obliterated?".
+*** *Retain:* keep the hash, with the dictionary exposure stated in the docs.
+*** Proposed default: redact, because the record exists to say *that* something was erased, not *what*. This is a decision for acceptance, because some legal-basis uses may need the "what".
+*** New records written after migration carry only the key id and the HMAC address.
+* *Reversibility.* Every `undo` now needs the store key. A lost passphrase loses history. That is a new failure mode, and it needs a recovery story (an escrow file, or an accepted loss) before acceptance.
+* *Wording.* The DoD 5220.22-M and "cryptographic proof of erasure" claims are removed from the code, docs and ledger.
+
+== 7. Experiments before building (proposed)
+
+* *E2: real media.* Repeat E1 on ext4 over an NVMe SSD and on btrfs. Report the fsync share of store time.
+* *E3: cipher choice.* Compare ChaCha20-Poly1305 with AES-256-GCM on a CPU without AES-NI. Check that the 16 MiB seal is limited by allocation, not by the cipher, by sealing in place (`encrypt_in_place`).
+* *E4: forensic acceptance test.* This is the decisive one. Build a btrfs file system on a loop device, run the steps below, then scan the raw image for a marker payload.
+** *Compression is off in both arms.* `jk` compresses by default, and a gzip stream would hide a literal marker from the scan even with no erasure at all. That false negative would make the sealed path look as if it passed.
+** *A positive control is required.* Before any shred or obliterate, the scan must find the marker in today's store. If it does not, the run is invalid, not a pass.
+** There are two cases.
+** *Store-only.* Store the marker straight into the content store, then shred it and rotate the epoch.
+*** Expected for today's overwrite: the marker is found, because the CoW extents survive.
+*** Expected with sealing: the marker is never found, because the store never writes plaintext.
+*** It becomes a TESTED row if it holds.
+** *Product flow.* Create a working file containing the marker, record it with `jk`, then `jk obliterate` it.
+*** Expected in both designs: the marker *is* found, from the working file's own extents.
+*** This case is kept as a test of the scope limit in §2, so that no one later reads the store-only result as covering the working file.
+* *E5: the full final shred.* Time the generation protocol of §2 end to end, including the keyring writes for §4's chosen root and the pointer rename. Confirm the cost stays independent of blob size and linear in live keys plus journal entries.
+** Inject a crash after each of the protocol's steps. Check that every crash point leaves at least one openable generation, that recovery selects the committed one and ends with exactly one, and that no step leaves the shred reported final while secret _n_ is still in the keyring.
+* *E6: compression.* Repeat the store rows with compressible payloads (text, source code). Then measure skipping gzip when it does not shrink the input. This is a candidate fix to today's store whatever happens to this ADR.
+
+== 8. Beyond this repository
+
+* The same erasure-on-flash problem applies to any estate repository that promises deletion: consent and retention tooling, and obliteration in other stores. If this ADR is accepted, the root-key seam (§4) is a candidate for a shared crate rather than a januskey-only module.
+* `docs/security/THREAT_MODEL.adoc` covers only the key store. It needs a section on the obliteration path whichever way this ADR is decided.
+
+== 9. Open questions before acceptance
+
+These were raised in review and are *not* resolved by this proposal. Each belongs to the formal model required above, or to E5, rather than to further prose.
+
+* *Duplicate keys after a key-first crash.* A store can sync its journal entry and then crash before publishing the blob. A retry can then append a second key for the same address and publish under it. A fold must not keep the older key just because it exists. Either a retry reuses the pending key, or the fold keeps only the mapping that authenticates the published blob.
+* *Hashes with no stored plaintext.* `Modify` and `Create` record a `new_content_hash` whose content is never stored, and the working file may since have changed or gone. Migration cannot compute an HMAC address for such references. Like legacy obliteration records (§6), they must be redacted or retained with the exposure stated.
+* *Keys in process memory.* A rotation loads the old epoch secret, derives the epoch key and decrypts a table holding the victim's key. Under the threat model's memory-disclosure vector (AV-2: core dumps, swap, cold boot), dropping the old secret from the keyring is not enough. The secret, the derived keys, the decrypted table and the removed row must be held in locked memory and zeroized before the shred is reported final.
+* *Benchmark completeness.* The exclusions listed in §3 (table I/O, the shared directory fsync, the keyring and pointer writes) are measured together in E5, as one end-to-end final shred.
+* *Retrying a store after a key-first crash.* If the first attempt staged ciphertext before crashing, re-sealing under the same pending key would make that key protect two messages (a retained temporary file or CoW extent may keep the first). So a retry either publishes the exact authenticated staged ciphertext, or creates a new key and lets the fold discard the stale mapping. It never re-seals under a pending key.
+* *Durable migration marker.* The marker must be written by temporary file, fsync, rename and directory fsync *before* any migration mutation, as the generation pointer is. Otherwise a power loss can lose it after the log has been rewritten, and nothing then resumes the cleanup.
+* *Benchmark baselines.* Two comparisons in §3 are not like for like. The sealed-store arm writes every blob into one directory, while `ContentStore::store` uses its two-level hash-prefix layout. Today's erase baseline times `obliterate_file`, which also reads and hashes the whole file before overwriting it, whereas the content-store path (`ObliterationManager::obliterate`) already holds the hash. The first can distort small-blob overhead and its scaling; the second inflates today's overwrite figures. E2 and E5 use the product layout and the manager path.
