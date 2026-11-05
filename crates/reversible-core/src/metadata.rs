@@ -278,16 +278,24 @@ impl MetadataStore {
         Ok(Self { path, log })
     }
 
-    /// Append an operation to the log
+    /// Append an operation to the log.
+    ///
+    /// Unlike the other mutators, an append is applied in memory even when its
+    /// save fails. The record describes a filesystem change that has already
+    /// happened, and callers such as `jk delete` carry on with the next file
+    /// after an error; keeping the record pending means the next successful
+    /// save persists it, rather than losing the only record that makes that
+    /// change undoable (T-8; the crash case is T-9).
     pub fn append(&mut self, metadata: OperationMetadata) -> Result<()> {
-        let mut next = self.log.clone();
-        next.operations.push(metadata);
-        self.persist(next)
+        self.log.operations.push(metadata);
+        Self::save(&self.path, &self.log)
     }
 
     /// Save `next` and, only once it is on disk, make it the in-memory log, so a
-    /// failed save leaves memory and disk both at the previous log (T-8; the
-    /// transaction log does the same for T-5).
+    /// failed save leaves memory and disk both at the previous log. Used by the
+    /// mutators that only edit the log (mark_undone, prune, purge); see
+    /// [`Self::append`] for why an append differs (T-8; the transaction log
+    /// does the same for T-5).
     fn persist(&mut self, next: OperationLog) -> Result<()> {
         Self::save(&self.path, &next)?;
         self.log = next;
@@ -582,15 +590,57 @@ mod tests {
         assert!(store2.get(&id).is_some());
     }
 
-    /// T-8: a save replaces the log by rename, so a reader never sees a torn
-    /// log and no temporary file survives the save. A stale temporary file left
-    /// by an earlier crash is not read and does not stop the next save.
-    /// T-8: a mutation whose save fails is not applied in memory; once the
-    /// fault is cleared the retry applies it exactly once, and memory and disk
-    /// agree. The save is made to fail at its last step by replacing the log
-    /// with a non-empty directory (which refuses the rename and works for root
-    /// too), so this test cannot also show the old log surviving on disk; that
-    /// half is `transaction::tests::a_failed_save_leaves_the_existing_log_intact`,
+    /// Replace the log with a non-empty directory so the next save fails at
+    /// its last step (the rename is refused), for root too.
+    fn block_log(path: &Path) {
+        fs::remove_file(path).ok();
+        fs::create_dir_all(path).unwrap();
+        fs::write(path.join("blocker"), b"x").unwrap();
+    }
+
+    /// The in-memory log and the log reloaded from disk, as comparable rows.
+    fn rows(store: &MetadataStore) -> Vec<(String, bool, Option<String>)> {
+        store
+            .operations()
+            .iter()
+            .map(|op| (op.id.clone(), op.undone, op.undo_operation_id.clone()))
+            .collect()
+    }
+
+    /// T-8: an append whose save fails keeps its record in memory, and the
+    /// next successful save persists it exactly once. The record describes a
+    /// filesystem change that already happened (`jk delete` carries on to the
+    /// next file after an error), so dropping it would leave that change with
+    /// no record to undo it by.
+    #[test]
+    fn a_failed_append_keeps_its_record_for_the_next_save() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("metadata.json");
+        let mut store = MetadataStore::new(path.clone()).unwrap();
+        store.append(modify_entry("/a.txt", b"a0", b"a1")).unwrap();
+
+        block_log(&path);
+        let pending = modify_entry("/b.txt", b"b0", b"b1");
+        let pending_id = pending.id.clone();
+        assert!(store.append(pending).is_err());
+        assert!(
+            store.get(&pending_id).is_some(),
+            "the record is kept pending"
+        );
+        fs::remove_dir_all(&path).unwrap();
+
+        store.append(modify_entry("/c.txt", b"c0", b"c1")).unwrap();
+        let disk = MetadataStore::new(path).unwrap();
+        assert_eq!(rows(&store), rows(&disk), "memory and disk agree");
+        assert_eq!(disk.count(), 3, "the pending record is saved, once");
+        assert!(disk.get(&pending_id).is_some());
+    }
+
+    /// T-8: a mark_undone, prune or purge whose save fails is not applied in
+    /// memory; once the fault is cleared each retry applies exactly once, and
+    /// memory and disk agree. The fault replaces the log with a directory, so
+    /// this test cannot also show the old log surviving on disk; that half is
+    /// `transaction::tests::a_failed_save_leaves_the_existing_log_intact`,
     /// which fails a save without touching the log.
     #[test]
     fn failed_save_leaves_every_mutation_unapplied() {
@@ -601,50 +651,40 @@ mod tests {
         let first_id = first.id.clone();
         store.append(first).unwrap();
         store.append(modify_entry("/b.txt", b"b0", b"b1")).unwrap();
+        store.append(modify_entry("/c.txt", b"c0", b"c1")).unwrap();
 
-        let block = || {
-            fs::remove_file(&path).ok();
-            fs::create_dir_all(&path).unwrap();
-            fs::write(path.join("blocker"), b"x").unwrap();
-        };
-        let unblock = || fs::remove_dir_all(&path).unwrap();
-
-        block();
-        assert!(store.append(modify_entry("/c.txt", b"c0", b"c1")).is_err());
-        assert_eq!(store.count(), 2, "a failed append is not recorded");
+        block_log(&path);
         assert!(store.mark_undone(&first_id, "undo-1").is_err());
         assert!(
             !store.get(&first_id).unwrap().undone,
             "a failed mark is not applied"
         );
         assert!(store.prune(1).is_err());
-        assert_eq!(store.count(), 2, "a failed prune removes nothing");
+        assert_eq!(store.count(), 3, "a failed prune removes nothing");
         assert!(store.purge_path_entries(Path::new("/a.txt")).is_err());
         assert!(
             store.get(&first_id).is_some(),
             "a failed purge removes nothing"
         );
-        unblock();
+        fs::remove_dir_all(&path).unwrap();
 
-        // Retry every mutator once the fault is cleared: each applies exactly
-        // once, and after each one memory and the reloaded disk agree.
+        // Retry each mutator once the fault is cleared: each applies exactly
+        // once, and after each one memory and the reloaded disk agree. The log
+        // was removed with the fault, so the first retry rewrites all of it.
         let agree = |store: &MetadataStore| {
-            let disk = MetadataStore::new(path.clone()).unwrap();
-            let view = |s: &MetadataStore| -> Vec<(String, bool)> {
-                s.operations()
-                    .iter()
-                    .map(|op| (op.id.clone(), op.undone))
-                    .collect()
-            };
-            assert_eq!(view(store), view(&disk), "memory and disk agree");
+            assert_eq!(
+                rows(store),
+                rows(&MetadataStore::new(path.clone()).unwrap()),
+                "memory and disk agree"
+            )
         };
-
-        store.append(modify_entry("/c.txt", b"c0", b"c1")).unwrap();
-        assert_eq!(store.count(), 3, "the retried append is recorded once");
-        agree(&store);
 
         store.mark_undone(&first_id, "undo-1").unwrap();
         assert!(store.get(&first_id).unwrap().undone);
+        assert_eq!(
+            store.get(&first_id).unwrap().undo_operation_id.as_deref(),
+            Some("undo-1")
+        );
         agree(&store);
 
         let purged = store.purge_path_entries(Path::new("/b.txt")).unwrap();
@@ -683,6 +723,9 @@ mod tests {
         assert_ne!(fs::read(&path).unwrap(), before, "the new log is in place");
     }
 
+    /// T-8: a save replaces the log by rename, so a reader never sees a torn
+    /// log and no temporary file survives the save. A stale temporary file left
+    /// by an earlier crash is not read and does not stop the next save.
     #[test]
     fn save_replaces_the_log_atomically() {
         let tmp = TempDir::new().unwrap();
