@@ -15,8 +15,9 @@
 ## Definition
 
 **RMR (Reversible Transaction)** is the property JanusKey aims at: for every
-operation `F` it applies to state `S`, it records enough to apply an inverse
-`F⁻¹` with `F⁻¹(F(S)) = S`.
+operation `F` it applies to state `S`, producing a new state `S′` and a record
+`r`, an inverse `F⁻¹` applied to the pair gives `F⁻¹(S′, r) = S`. The inverse
+needs `r`: the new state alone does not say what undo restores.
 
 Whether that holds in general is **open**. That sentence is one-sided and leaves
 the equality on states implicit; the precise statement — both directions

@@ -138,7 +138,7 @@ The key insight of MAA is that RMR and RMO are not alternatives—they are compl
 
 2.  **RMO-on-request**: Users can invoke RMO to permanently erase
 
-3.  **Audit of RMO**: The *fact* that RMO was invoked is logged (but not the erased content)
+3.  **Audit of RMO**: The *fact* that RMO was invoked is logged (but not the erased content) when a JanusKey store exists and the record saves; see Property 3 for the cases where it is not
 
 4.  **No silent deletion**: RMO requires explicit user action
 
@@ -162,20 +162,33 @@ says nothing about any finer equality. Two are in use:
   `verification/proofs/agda/TransactionAtomicity.agda`, with no mechanical link
   to the filesystem.
 
-For an operation $F$ with precondition domain $D_F$ and recorded inverse $F^{-1}$:
+Executing an operation produces a state *and* a record. Write $S$ for states
+(the working tree, or the model state) and $R$ for records: the operation's
+`OperationMetadata` log entry together with the content-store blobs it names.
+An operation $F$ with precondition domain $D_F \subseteq S$ is a map
+$F : D_F \to S \times R$, with components $F(s) = (F_S(s),\, r_F(s))$. Its
+recorded inverse consumes both, $F^{-1} : S \times R \to S$, because undo reads
+the record (`OperationExecutor::undo` looks the operation up in the log and
+retrieves the stored content by its hash):
 
-$$\text{RMR-L:}\quad \forall s \in D_F.\; F^{-1}(F(s)) \sim s \qquad\qquad \text{RMR-R:}\quad \forall t \in F(D_F).\; F(F^{-1}(t)) \sim t$$
+$$\text{RMR-L:}\quad \forall s \in D_F.\; F^{-1}(F_S(s),\, r_F(s)) \sim s \qquad\qquad \text{RMR-R:}\quad \forall s \in D_F.\; F_S\big(F^{-1}(F_S(s),\, r_F(s))\big) \sim F_S(s)$$
 
-Together they say that, up to $\sim$, the recorded inverse undoes $F$ on $D_F$
-and $F$ undoes it on $F(D_F)$. They do not say that the resulting state
-identifies the state before it: deleting a file from two trees that differ only
-in that file's content gives $\sim$-equal results, and the recorded metadata,
-not the resulting state, selects what undo restores.
+Together they say that, up to $\sim$, the inverse given the record undoes $F$
+on $D_F$, and $F$ undoes the inverse on the image of $D_F$. The post-state
+alone does not determine what undo restores: deleting a file from two trees
+that differ only in that file's content gives $\sim$-equal post-states with
+different records, so no $F^{-1}$ of the post-state alone could satisfy RMR-L
+for both. RMR-R compares states only; re-executing $F$ writes a new record (a
+new id and timestamp), so it is not stated for records.
 
 RMR-R is over the image only: $\text{Copy}^{-1}$ is a delete of the
 destination, and copying again does not restore arbitrary destination content.
-RMR-R follows from RMR-L when $F$ respects $\sim$; that congruence is not stated
-or tested.
+RMR-R follows from RMR-L when $F_S$ respects $\sim$ and the restored state is
+again in $D_F$; neither is stated or tested.
+
+Both equations assume the record was saved. `execute_*` changes the filesystem
+and then appends the record, so a stop between the two leaves a post-state with
+no record for undo to consume (T-9, OPEN).
 
 | Part | Status |
 |---|---|
@@ -192,11 +205,23 @@ E-1; only its model-level shadow E-1m is proved). Hash one-wayness and physical
 erasure are **ASSUMED**, external to this repository (X-1). See
 [RMO Primitive Specification](rmo-primitive.md).
 
-### Property 3: Accountability Preservation
+### Property 3: Accountability Preservation — store-backed path only
 
-$$\forall \text{RMO}(d): \text{log}(\text{timestamp}, \text{user}, \text{hash}(d))$$
+The target, stated only for an RMO run in a directory with an initialized
+JanusKey store, on the path where each record save succeeds:
 
-The fact of deletion is logged, maintaining accountability without content preservation.
+$$\forall\, \text{RMO}(d) \text{ store-backed, record saved}:\; \text{log}(\text{timestamp}, \text{user}, \text{hash}(d))$$
+
+The record (`ObliterationRecord`) holds the timestamp, user and content hash,
+never the content, and it is not tamper-evident (see RMO above). Outside that
+path the property is not claimed:
+
+| Part | Status |
+|---|---|
+| Store-backed `jk obliterate` of a path with a working file and unshared blobs, every save succeeding: one record for the file and one per shredded blob, persisted | **TESTED** — `obliteration_cas_test::obliterate_scrubs_blobs_log_and_undo` reopens the obliteration log and counts one record for the file plus one per blob (the ledger row "Obliterating a path shreds its unshared blobs and log entries, and undo then has nothing") |
+| `jk obliterate` with no initialized store | **OPEN**, false today, no ledger row — `cmd_obliterate` calls `obliterate_file` alone, which overwrites and removes the file and writes no record |
+| Store-backed, a record save fails | **OPEN**, no ledger row — `record_proof` and `ObliterationManager::obliterate` remove the content first and save the record after, so a failed save leaves the erasure with no durable record unless a later save in the same run writes the pending one |
+| Store-backed, working file absent and every blob shared with another path | **OPEN**, no ledger row, by inspection — `obliterate_path` purges the path's log entries and writes no obliteration record |
 
 ## Implementation in JanusKey
 
