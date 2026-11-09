@@ -110,46 +110,50 @@ IO do-notation at all.
 The dashboards (README, TOPOLOGY, READINESS) carry the proof count that
 `+dashboard-check+` measures from the PROVEN rows of the ledger below.
 
-=== Proof grades under mathesis (2026-11-01)
+=== Proof Witness Grades (PROOF-POLICY §8)
 
 The five statuses above are this repository's claim vocabulary — the estate's
-README-EXPLAINME ledger, as used across it. A *proof grade* is a second,
-orthogonal axis, governed by `+hyperpolymath/mathesis+`
-(`+estate-mathematical-architecture+` §5 and §6) and by
-`+hyperpolymath/standards+` `+3-practice/PROOF-POLICY.adoc+`. Neither uses a
-confidence percentage and this repository does not publish one.
+README-EXPLAINME ledger, as used across it. A *Proof Witness Grade* is a second,
+orthogonal axis, governed by `+hyperpolymath/standards+`
+`+3-practice/PROOF-POLICY.adoc+` §8 (owner ruling 2026-11-04). The mathesis
+brief (`+estate-mathematical-architecture+` §5 and §6) first proposed the ladder
+and is kept for provenance only. Neither uses a confidence percentage and this
+repository does not publish one.
 
 Of the 12 PROVEN rows, five are the theory rows — **G-1, T-1, T-2, T-3, E-1m** — and
-their artefact is Agda (`+verification/proofs/agda/+`). They are **Grade 3**:
-each type-checks in Agda and none has been translated to an independent
-foundational system, which is mathesis §5's definition as written. The receipt
-is a green `+agda-proofs.yml+` run
-(https://github.com/hyperpolymath/januskey/actions/runs/41687715055[41687715055])
-at commit `+fc188c4+`, Agda 2.6.4.3, with `+resource-algebra+` pinned at
-`+cf9235c+`. That run used the current gate (`+Reversibility+`,
-`+TransactionAtomicity+` and `+Epistemic+` under `+--safe --without-K
---cubical-compatible+`), and the modules, the gate script, the sibling fetch and
-the workflow are byte-identical at that commit and at this one, so the receipt
-covers these rows, E-1m included, as they stand. (An earlier receipt cited here,
-run 40867211509 at `+4afb710+`, predates `+Epistemic.agda+` and the
-`+--cubical-compatible+` flag, so it never covered E-1m.) Mathesis status for them:
-`+AGDA-VERIFIED+`.
+their artefact is Agda (`+verification/proofs/agda/+`). They are **`+PWG-3+`,
+receipt pending re-run** (PROOF-POLICY §8, owner ruling 2026-11-04, which
+governs over the mathesis brief):
+each is `+PROVEN+` under the §2.1 invocation and no Rocq or Lean leg exists. The
+last receipt for the modules is a green `+agda-proofs.yml+` run
+(https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251])
+at commit `+23bc8c3+`, Agda 2.6.4.3, with `+resource-algebra+` pinned at
+`+cf9235c+`, running `+Reversibility+`, `+TransactionAtomicity+` and
+`+Epistemic+` under `+--safe --without-K --cubical-compatible+`. The gate gained
+an import-cone postulate scan after it, so the first green run of the changed
+gate on `+main+` is the receipt that replaces it. The cone, the axioms (none in
+the development; the prover's four universe-level primitives are checked by
+name and reported) and the superseded receipts (runs 41687715055 at
+`+fc188c4+` and 40867211509 at
+`+4afb710+`) are recorded in
+link:docs/theory/PROOF-GRADES.adoc[`+docs/theory/PROOF-GRADES.adoc+`].
+Correspondence state for them: `+AGDA-VERIFIED+`.
 
 The other seven PROVEN rows — A-1, A-2, C-1 to C-5 — are Idris2 theorems. Under
 PROOF-POLICY §1 those are interface and ABI contracts, so the theory ladder does
 not grade them: they are PROVEN in the vocabulary above and nothing more. The
-same holds for the 27 TESTED rows, which record observed behaviour and never
-grading. First-party Rust behaviour belongs to **Creusot** (not SPARK, and not
-Idris2); no Creusot contract exists in this tree, which is why no Rust row is
-graded.
+same holds for the TESTED rows, which record observed behaviour and never
+grading. First-party Rust behaviour belongs to **Creusot** with **Pearlite**
+contracts, and **Verus** (PROOF-POLICY §1.2, owner ruling 2026-11-07; not SPARK,
+and not Idris2); neither verifier has a contract or proof in this tree yet,
+which is why no Rust row is proved.
 
-No row of this ledger is Grade 2i, Grade 2ii or Grade 1, and none is claimed to
+No row of this ledger is `+PWG-2i+`, `+PWG-2ii+` or `+PWG-1+`, and none is claimed to
 be. The row-by-row mapping and the receipt in full are in
 `+docs/theory/PROOF-GRADES.adoc+`. Since 2026-11-01 the gate runs
 PROOF-POLICY §2.1's canonical invocation
-(`+--safe --without-K --cubical-compatible …+`), which was verified locally
-with Agda 2.6.4.3 before being committed; the CI receipt for that flag set is
-the next `+agda-proofs.yml+` run, not the older one.
+(`+--safe --without-K --cubical-compatible …+`); the CI receipt for that flag
+set is run 42076969251 above.
 
 === Current State
 
