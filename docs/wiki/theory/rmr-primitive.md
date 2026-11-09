@@ -26,8 +26,9 @@ the equality on states implicit; the precise statement — both directions
 - each operation type has a named inverse (`OperationType::inverse`:
   `Delete↔Create`, `Modify↔Modify`, `Move↔Move`, `Copy→Delete`, `Chmod`,
   `Chown` self-inverse);
-- the information needed for that inverse is captured *before* the mutation
-  (content into the store, file metadata into the log);
+- the content a delete or modify needs is stored *before* the mutation, but the
+  operation's metadata is appended to the log *after* it, so a stop between the
+  two leaves the operation unfindable by undo (OPEN, T-9);
 - `execute` then `undo` restores the prior state under property testing
   (`property_tests::execute_then_undo_is_identity`);
 - rolling back a whole transaction in reverse order restores the state it

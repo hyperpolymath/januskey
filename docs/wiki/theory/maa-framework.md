@@ -71,23 +71,25 @@ verified in full; the status of each part is stated below and in the ledger.
 
 ### RMR (Reversible Transaction)
 
-> A primitive for state transitions that records, before each change, what is needed to undo it — so that undo is a metadata lookup rather than a restore from backup. Whether every operation is *in fact* reversible is an open obligation, not a guarantee; see the claims ledger.
+> A primitive for state transitions that records what is needed to undo each change — so that undo is a metadata lookup rather than a restore from backup. For a delete or modify the original content is stored before the change; the operation's metadata is saved to the log after it, so a stop between the two leaves undo unable to find the operation (OPEN, T-9). Whether every operation is *in fact* reversible is an open obligation, not a guarantee; see the claims ledger.
 
-RMR provides:
+RMR aims at the following. These are goals, not established guarantees:
 
-- Complete state capture before changes
+- Capture of everything undo needs (the log record is written after the
+  change; T-9 is OPEN)
 
-- Guaranteed reversal capability
+- Reversal of every operation ("every operation is reversible" is OPEN, and
+  Chown undo is not implemented)
 
-- Full audit trail of all operations
+- A full audit trail of all operations
 
-- Accountability without data loss risk
+- Accountability without risk of data loss
 
 See: [RMR Primitive Specification](rmr-primitive.md)
 
 ### RMO (Obliterative Wipe)
 
-> A primitive for data erasure: best-effort overwrite, removal, store scrub, and a tamper-evident record of what was destroyed.
+> A primitive for data erasure: best-effort overwrite, removal, store scrub, and, when a JanusKey store exists, an unkeyed record of what was destroyed. The record is not tamper-evident.
 
 RMO provides:
 
@@ -164,7 +166,12 @@ For an operation $F$ with precondition domain $D_F$ and recorded inverse $F^{-1}
 
 $$\text{RMR-L:}\quad \forall s \in D_F.\; F^{-1}(F(s)) \sim s \qquad\qquad \text{RMR-R:}\quad \forall t \in F(D_F).\; F(F^{-1}(t)) \sim t$$
 
-Together they make $F$ a bijection from $D_F$ onto its image, up to $\sim$.
+Together they say that, up to $\sim$, the recorded inverse undoes $F$ on $D_F$
+and $F$ undoes it on $F(D_F)$. They do not say that the resulting state
+identifies the state before it: deleting a file from two trees that differ only
+in that file's content gives $\sim$-equal results, and the recorded metadata,
+not the resulting state, selects what undo restores.
+
 RMR-R is over the image only: $\text{Copy}^{-1}$ is a delete of the
 destination, and copying again does not restore arbitrary destination content.
 RMR-R follows from RMR-L when $F$ respects $\sim$; that congruence is not stated
@@ -295,10 +302,11 @@ smaller, differently-shaped things, and the difference matters:
   (`verification/proofs/agda/TransactionAtomicity.agda`, ledger rows T-1..T-3).
   The claim "every operation is reversible" is **OPEN**, as is the mechanical
   correspondence between that model and the Rust.
-- **RMO:** nothing is proved. Overwriting is best effort; the record is
-  tamper-evident, not a certificate of absence. There is no mathematical proof
-  of non-existence, and there cannot be one from inside this process: the tool
-  cannot observe the media, the journal, or the backups.
+- **RMO:** nothing is proved. Overwriting is best effort; the record is an
+  unkeyed ledger that a writer can alter without detection, kept only when a
+  store exists, and it is not a certificate of absence. There is no
+  mathematical proof of non-existence, and there cannot be one from inside this
+  process: the tool cannot observe the media, the journal, or the backups.
 
 The claims ledger in `PROOF-NEEDS.adoc` is the authority for both, and
 `dashboard-check` fails the build when a dashboard's counts disagree with it.

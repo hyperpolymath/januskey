@@ -52,14 +52,17 @@ compiled by, constrained by, or depends on the Oblíbený toolchain
 that the -00 text named.
 
 * **RMR (Reversible Transaction):** A primitive for state transitions
-  that records, before each change, what is needed to undo it. Its
+  that, for a delete or modify, stores the original content before
+  the change, and appends the operation's metadata to its log after
+  the change; together these determine how to undo it. Its
   reversibility claim is relative to a stated equality on states and
   has two directions (Section 3). It supports auditability and
   dependability.
 
 * **RMO (Obliterative Wipe):** A primitive for data erasure that
-  overwrites and removes the data and leaves a tamper-evident record
-  that it did so. It does not prove that the data no longer exists
+  overwrites and removes the data and, when a JanusKey store exists,
+  writes an unkeyed record that it did so. The record is not
+  tamper-evident. It does not prove that the data no longer exists
   (Section 4).
 
 The MAA dynamic dictates that the deployment of RMR (Accountability)
@@ -90,7 +93,12 @@ The key terms defined within this document are:
 Current distributed transaction models (e.g., Two-Phase Commit, Saga)
 are complex and can enter blocking or inconsistent states. RMR
 proposes a simpler mechanism: each operation records the information
-that determines its inverse before it changes anything.
+that determines its inverse. Only part of that is recorded before the
+change: for a delete or modify the original content is stored first,
+but the executor saves the operation's metadata after the filesystem
+change. A process stop between the two leaves normal undo unable to
+find the operation, even though the original content blob exists
+(OPEN, T-9).
 
 3.1. The equality the claim is relative to
 
@@ -120,9 +128,15 @@ and F^-1 the inverse determined by the metadata F recorded.
   RMR-L (left inverse):  for every s in D_F,       F^-1(F(s)) ~ s
   RMR-R (right inverse): for every t in F(D_F),    F(F^-1(t)) ~ t
 
-Together they say that F, restricted to D_F, is a bijection onto its
-image up to ~. RMR-R ranges over the image F(D_F) only, not over every
-state on which F^-1 is defined: Copy^-1 is Delete of the destination,
+Together they say that, up to ~, the recorded inverse undoes F on D_F
+and F undoes it on F(D_F). They do not say that the resulting state
+identifies the state before it: deleting a file from two trees that
+differ only in that file's content gives ~-equal results, and the
+recorded metadata, not the resulting state, selects what undo
+restores.
+
+RMR-R ranges over the image F(D_F) only, not over every state on
+which F^-1 is defined: Copy^-1 is Delete of the destination,
 and copying again does not restore arbitrary destination content.
 RMR-R follows from RMR-L when F respects ~ (s ~ s' implies
 F(s) ~ F(s')), and that congruence is not stated or tested either.
@@ -156,7 +170,11 @@ RMO addresses the chronic failure of data persistence to honour user
 deletion requests. The primitive overwrites the data in place, removes
 it, scrubs the unshared content-store blobs and log entries for it, and
 records a timestamped commitment to what was destroyed. That record is
-tamper-evident; it is not a certificate that the data is gone.
+an unkeyed JSON ledger, kept only when a JanusKey store exists: a
+writer can alter it, or recompute the commitment, without detection.
+It is written after the data is removed, so a failed write can leave
+a removal unrecorded, and a re-run skips the blob that is already
+gone. It is not a certificate that the data is gone.
 
 That an attacker cannot recover obliterated content is OPEN (ledger
 E-1); only a model-level shadow of it is proved (E-1m). Hash

@@ -16,11 +16,11 @@
 
 == 2. What a token would and would not add
 
-A token would turn "undo this operation at most once" from a runtime check into a compile-time one, for Rust callers that hold the value `execute` returned:
+A token would make one narrow thing a compile-time error: using the same token twice. It applies to Rust callers that hold the value `execute_with_token` returned. It does not make the operation undoable only once. `undo(&str)` stays, so a caller can still undo the same operation by its id, before or after using the token, and only the runtime `undone` check refuses the second attempt:
 
 [source,rust]
 ----
-#[must_use = "an UndoToken is the only way to undo this operation"]
+#[must_use = "dropping an UndoToken loses the typed undo path; the operation can still be undone by id"]
 pub struct UndoToken { id: String }          // not Clone, not Copy
 
 impl OperationExecutor<'_> {
@@ -30,7 +30,7 @@ impl OperationExecutor<'_> {
 }
 ----
 
-Because `undo_token` takes the token by value, a second call with the same token fails to compile. A `compile_fail` doctest can pin that without new dependencies. A trybuild test is an alternative, but it adds a dev-dependency.
+Because `undo_token` takes the token by value, a second call with the same token fails to compile. A call to `undo` with the operation id still compiles, whether or not the token was used. A `compile_fail` doctest can pin that without new dependencies. A trybuild test is an alternative, but it adds a dev-dependency.
 
 What it would not add:
 
@@ -50,20 +50,20 @@ What it would not add:
 
 | B. Add a token API next to `undo(&str)`
 | §2's sketch. It is additive, and the CLI keeps the string path.
-| Two undo entry points. The guarantee covers in-process library callers only.
+| Two undo entry points. The compile-time guarantee covers reuse of the same token by in-process library callers only. Undo by id stays available for the same operation, and the failed-`mark_undone` window (T-8, OPEN) is untouched.
 
 | C. Put tokens on the `ReversibleExecutor` trait
 | `type Token; fn undo(&mut self, t: Self::Token)`.
 | Breaking. The trait has no implementor in this workspace today, and it is described as the intended mirror of ochrance's `VerifiedSubsystem`, so its shape is a cross-repository decision.
 
 | D. Close T-8's retry half first
-| Persist an "undo in progress" intent before changing the file, then reconcile it on the next start. This makes a retried undo idempotent.
+| Persist an "undo in progress" intent before changing the file. Reconciling it on the next start covers a restart only: in the same process, `mark_undone` failing leaves the in-memory log unchanged, so a retry would change the file again and could overwrite a later edit. A retry is idempotent only if every undo attempt, in the same process as well as after a restart, first looks for a pending intent on that id and finishes it (records the undo, clears the intent) instead of changing the file again. How it tells whether the file change was applied before a crash is part of this design and not settled here.
 | A log-format change and a recovery path. It addresses the real double-undo window that B and C do not.
 |===
 
 == 4. Recommendation
 
-D is the most correct long-term option, because it removes the double-undo that can actually happen. B is cheap and makes library misuse visible at compile time, but it does not touch that path. B on its own would let a reader believe double-undo is ruled out when it is not. If B is built, its docs must say that it covers in-process callers only and that T-8 remains open.
+D is the most correct long-term option, because it removes the double-undo that can actually happen. B is cheap and makes reuse of the same token a compile error, but it does not touch that path, and it does not stop a caller undoing the same operation by id. B on its own would let a reader believe double-undo is ruled out when it is not. If B is built, its docs must say that it covers reuse of one token by in-process callers only, that undo by id remains available and is guarded only at run time, and that T-8 remains open.
 
 == 5. Open questions for the owner
 

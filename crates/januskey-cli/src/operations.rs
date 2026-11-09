@@ -534,14 +534,31 @@ mod tests {
         // A later edit that a second undo would clobber.
         fs::write(&file, "three").unwrap();
 
+        let already_undone = format!("Operation {} already undone", modify.id);
+
         let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
-        assert!(executor.undo(&modify.id).is_err());
+        match executor.undo(&modify.id) {
+            Err(JanusError::OperationFailed(msg)) => assert_eq!(msg, already_undone),
+            other => panic!("expected the already-undone refusal, got {other:?}"),
+        }
         assert_eq!(fs::read(&file).unwrap(), b"three");
 
-        // The refusal survives a reload: the undone flag is persisted.
+        // The refusal survives a reload: the operation is still in the log and
+        // its undone flag is persisted, so the refusal is the already-undone one
+        // and not an unknown-id error.
         let mut reloaded = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        assert!(
+            reloaded
+                .get(&modify.id)
+                .expect("operation persisted")
+                .undone,
+            "reloaded operation is marked undone"
+        );
         let mut executor = OperationExecutor::new(&content_store, &mut reloaded);
-        assert!(executor.undo(&modify.id).is_err());
+        match executor.undo(&modify.id) {
+            Err(JanusError::OperationFailed(msg)) => assert_eq!(msg, already_undone),
+            other => panic!("expected the already-undone refusal, got {other:?}"),
+        }
         assert_eq!(fs::read(&file).unwrap(), b"three");
     }
 
