@@ -14,8 +14,9 @@ bash scripts/fetch-siblings.sh
 # infectious in principle — direct imports must use it too — but Agda 2.6.4.3
 # accepts a --without-K sibling on the include path and reports the pattern
 # matches that will not compute under transports as UnsupportedIndexedMatch
-# warnings (14 in Reversibility, 16 in TransactionAtomicity, 2 in Epistemic; the
-# sibling's ≤-trans, obliterate-absorbs and just-inj). Those are warnings about
+# warnings (14 in Reversibility, 20 in TransactionAtomicity, 2 in Epistemic, 14
+# in SingleActiveLog; among them the sibling's ≤-trans, obliterate-absorbs and
+# just-inj). Those are warnings about
 # computation under transport, not about the propositions, so the gate keeps
 # them visible rather than silencing them with -WnoUnsupportedIndexedMatch.
 flags=(--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check
@@ -24,13 +25,13 @@ flags=(--safe --without-K --cubical-compatible --no-libraries --ignore-interface
 # scan's controls. Removed on exit.
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
-modules=(Reversibility TransactionAtomicity Epistemic)
+modules=(Reversibility TransactionAtomicity Epistemic SingleActiveLog)
 for module in "${modules[@]}"; do
   "$prover" "${flags[@]}" --dependency-graph="$work/$module.dot" "verification/proofs/agda/$module.agda"
 done
 
 # PROOF-POLICY §8.4: a comment-aware postulate scan of the import cone. The cone
-# is the module set Agda itself reports for the three roots (Agda.Primitive and
+# is the module set Agda itself reports for the roots (Agda.Primitive and
 # the Agda.Builtin modules included); each module is resolved to its source on
 # the include path or in Agda's own library, and an unresolved module fails.
 agda_prim="$("$prover" --print-agda-dir)/lib/prim"

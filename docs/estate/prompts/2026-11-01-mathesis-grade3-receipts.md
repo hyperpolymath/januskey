@@ -1,5 +1,17 @@
 # Paste-ready prompt — `hyperpolymath/mathesis` (`estate-mathematical-architecture`)
 
+> **Status (2026-11-09): mostly answered; do not send as written.** The owner
+> adopted the ladder as Proof Witness Grades in standards
+> `3-practice/PROOF-POLICY.adoc` §8 (2026-11-04, standards#1410), which now
+> governs over the Mathesis brief. Question 1: a `PWG-3` receipt records the
+> Agda version, standard-library pin, flags and import cone (§8.2), and
+> receipts of execution come from CI (§2.3). Question 3: a receipt that is no
+> longer current carries `state: superseded` with a reason, and a grade is never
+> carried forward from an older commit (§8.4). Question 2 (where a non-axiom
+> caveat such as `UnsupportedIndexedMatch` is recorded) is still open; §8.4.6
+> covers axioms only. januskey records it as a separate "Caveat" line on the
+> receipt (`docs/theory/PROOF-GRADES.adoc`).
+
 Scope: **this repo only.** Do not edit `januskey`. Latest stable versions only
 (Agda 2.8.0.2; Rocq/Lean only if §2's transport work is in scope).
 

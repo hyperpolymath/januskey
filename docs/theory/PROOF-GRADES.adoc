@@ -1,4 +1,4 @@
-= Proof grades under mathesis and PROOF-POLICY
+= Proof Witness Grades (PROOF-POLICY §8)
 :toc: preamble
 :icons: font
 
@@ -9,6 +9,26 @@ to reconstruct: *which of these claims is a proof, and how good a proof is it?*
 
 It grades nothing by confidence. There is no percentage anywhere in this
 repository, and none is introduced here.
+
+[NOTE]
+====
+*PWG census, theory theorems of this repository (denominator 5):*
+`PWG-3` 4 (G-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 1 (T-1) · `PWG-1` 0 ·
+`ungraded` 0. `+foundation-diverse`: none. Axioms: none.
+
+The denominator is the ledger rows whose source of truth is an Agda theorem.
+PROOF-POLICY §1 puts a statement that names one repository's type, function or
+wire format in engineering, so these rows are outside it: G-3 (the FFI bridge
+preserves grade 𝟙, `OPEN`), E-1 (a security property of the implementation; its
+model half is E-1m), the MPR row (a refinement claim about Rust, which §1 sends
+to Creusot and Verus) and G-2 (a bridge, `ASSUMED`). By the same test, T-2
+and T-3 used to be stated over a hand-transcribed model of this repository's
+`TransactionManager`. On the owner's ruling of 2026-11-09 they were split. The
+theorems now live in `SingleActiveLog.agda`, over any record type with a key and
+an active or settled phase: theory, in the census. The claim that januskey's
+Rust refines that log is the new engineering row T-10 (`OPEN`, for Creusot or
+Verus).
+====
 
 == What governs the grades
 
@@ -142,6 +162,19 @@ pending re-run.
   propositions, and are kept visible
 |===
 
+*The comment edits of hyperpolymath/januskey#171 (2026-11-09) are covered by
+the same re-run.* #171 edits the explanatory comments of `Reversibility.agda`
+and `TransactionAtomicity.agda`: the "What is NOT claimed" block named failure
+modes since fixed by T-4, T-5 and T-8, and a G-1 comment implied that the grade
+was derived from the cancellation law. No statement or proof term changed, but
+the bytes did, so the receipt above does not cover them either. #171 also adds a fourth root, `SingleActiveLog.agda` (the T-2/T-3 split), so
+the cone the next receipt records has seven first-party modules, not six. The first green
+`agda-proofs.yml` run on `main` after both pull requests is the receipt for the
+new gate and the new bytes together. On the branch the same gate passed on each
+revision of the comments (for example run
+https://github.com/hyperpolymath/januskey/actions/runs/42623188471[42623188471]
+at `a71dc76`; branch evidence, not a receipt).
+
 Earlier receipts, kept with their lineage (§8.4):
 
 [cols="1,1,3",options="header"]
@@ -159,16 +192,18 @@ Earlier receipts, kept with their lineage (§8.4):
 Those are the `PWG-3` facts: the propositions type-check in Agda under the
 §2.1 invocation, in CI, at a named commit, with the prover version pinned and
 the import cone recorded; the receipt is re-earned by the first run of the
-changed gate, as above. Nothing here has been translated to Rocq or Lean, so no
-recheck leg counts and the grade is not `PWG-2i`; no witness in another
-foundation exists, so `foundation_diverse` is false.
+changed gate, as above. For G-1, T-2, T-3 and E-1m no Rocq or Lean leg exists, so
+no recheck leg counts and their grade is `PWG-3`. T-1 has both legs and is
+`PWG-2ii` (§T-1 below). No witness in another foundation exists, so
+`foundation_diverse` is false throughout.
 
-=== Why it stops at PWG-3
+=== Why four rows stop at PWG-3
 
-PWG-2i and above would require an Agda → Dedukti → Rocq/Lean transport or a
+PWG-2i and above require an Agda → Dedukti → Rocq/Lean transport or a
 re-proof, with the outcome recorded as `transported`, `re-proved` or
-`unavailable` (PROOF-POLICY §2). That work has not been done, is not claimed,
-and would not change what these modules prove: §2.2 is explicit that compiling
+`unavailable` (PROOF-POLICY §2). For T-1 that work is done (§T-1 below, now
+`PWG-2ii`); for G-1, T-2, T-3 and E-1m it has not been done and is not
+claimed. A recheck would not change what these modules prove: §2.2 is explicit that compiling
 in a second prover does not establish the same proposition unless the
 correspondence is checked too.
 
@@ -256,21 +291,204 @@ repeated the counts, and the two copies drifted apart.
 | Row | Proposition | Theorem
 
 | G-1 | A lossless trace has only lossless steps; an obliterating step absorbs;
-  wrap/unwrap is grade 𝟙 given cancellation | `Reversibility.agda::lossless-trace-all`,
-  `obliterate-absorbs`, `wrap-unwrap-id`
+  a wrap/unwrap pair carries its cancellation law. The pair's grade 𝟙 is
+  *assigned* by `wrapStep`/`unwrapStep`, not derived from that law:
+  `wrap-unwrap-𝟙` holds by definition and does not use `cancels` |
+  `Reversibility.agda::lossless-trace-all`, `obliterate-absorbs`,
+  `wrap-unwrap-id`
 | T-1 | Undoing a fully executed transaction in reverse order restores the state
   it began in, given each step's undo restores its execute |
   `TransactionAtomicity.agda::rollback-restores`
-| T-2 | The four lifecycle transitions preserve the log invariant and rewrite
-  only the Active transaction | `TransactionAtomicity.agda::lifecycle-preserves-good`
-| T-3 | At most one transaction is Active, exactly one when the pointer is set |
-  `TransactionAtomicity.agda::at-most-one-active`
+| T-2 | In any single-active log, opening a fresh active record, a key- and
+  phase-preserving edit, and a settling transition each preserve the invariant
+  and rewrite only the active record |
+  `SingleActiveLog.agda::begin-good`, `modify-good`, `finish-good`,
+  `update-active` (januskey's instance: `TransactionAtomicity.agda::lifecycle-preserves-good`)
+| T-3 | In any single-active log satisfying the invariant, at most one record is
+  active, and exactly one when the pointer is set |
+  `SingleActiveLog.agda::at-most-one-active`
 | E-1m | In a world model, an agent whose observation excludes the store does not
   know what the store holds; obliteration leaves nothing to recover; rotation
-  leaves no agent — the system included — able to use the old key |
+  to a different key (premise `old ≠ new`) leaves no agent — the system included
+  — able to use the old one (true by the definition of `rotate` in the model) |
   `Epistemic.agda::adversary-ignorant`, `obliterate-cuts-recovery`,
   `obliterate-ignorance`, `rotate-forgets-old`
 |===
+
+==== Leg records (PROOF-POLICY §8.5)
+
+The same record holds for each of G-1, T-2, T-3 and E-1m, so it is given once.
+`pwg: 3`, `foundation_diverse: false`. T-1 has its own record below
+(§T-1: the first recheck legs).
+
+[cols="1,1,1,1,3",options="header"]
+|===
+| Leg | Route | §5 token | §2.2 state | Receipts
+
+| Agda (source)
+| source of truth
+| `PROVEN`
+| `AGDA-VERIFIED`
+| §The PWG-3 receipt above, with its lineage
+
+| Rocq
+| none: not attempted
+| `OPEN`
+| none: no target statement exists to compare
+| none
+
+| Lean
+| none: not attempted
+| `OPEN`
+| none: no target statement exists to compare
+| none
+|===
+
+§8.5's route values (`transported`, `re-proved`, `waived`, `unavailable`) each
+describe a leg that was tried, excused or found impossible. None applies to a
+leg nobody has started, so the route field says that instead of borrowing one.
+When a leg is started, its row gets the route, the target statement, the
+comparison with the Agda statement and its receipts, and the PWG is recomputed.
+
+==== T-1: the first recheck legs (2026-11-09)
+
+T-1 is the pilot for PROOF-POLICY §2, chosen because its statement is small and
+abstract. Its Agda module imports `ResourceAlgebra.Prelude` from the pinned
+sibling, but the `Rollback` part uses only three things from it: `_≡_` (Agda's
+builtin equality, re-exported) and the elementary `trans` and `cong`. Those are
+accounted for in the comparison below. `pwg: 2ii`, `foundation_diverse:
+false`.
+
+[cols="1,1,1,1,3",options="header"]
+|===
+| Leg | Route | §5 token | §2.2 state | Receipts
+
+| Agda (source)
+| source of truth
+| `PROVEN`
+| `AGDA-VERIFIED`
+| §The PWG-3 receipt above
+
+| Rocq
+| `re-proved`
+| `PROVEN`
+| `RECONCILED`
+| `agda-proofs.yml` job "Rocq and Lean recheck legs", on this change and then
+  on `main`
+
+| Lean
+| `re-proved`
+| `PROVEN`
+| `RECONCILED`
+| the same job
+|===
+
+*Why re-proved.* §2 asks for transport first. The Agda → Dedukti translator
+(`Deducteam/Agda2Dedukti`, last changed 2022-01-24 at `c7c7d67`) builds against
+a forked Agda branch of that period and its documentation pins Lambdapi 2.1.0.
+It cannot read modules checked by the pinned Agda 2.6.4.3, so no transport
+route exists for this toolchain. For Lean, §2 already says to re-prove until a
+released Lambdapi has a Lean exporter. Both legs are therefore re-proved by
+hand, in each prover's core library: no Mathlib, no imports in the Lean file,
+only the prelude in the Rocq file.
+
+*The statements, side by side.*
+
+[cols="1,3",options="header"]
+|===
+| Prover | Proposition
+
+| Agda (`TransactionAtomicity.agda`, module `Rollback (S : Set)`)
+| `rollback-restores : ∀ {os x z} → Executed os x z → rollback os z ≡ x`
+
+| Rocq (`verification/proofs/rocq/Rollback.v`)
+| `rollback_restores : forall (S : Type) (os : list (Op S)) (x z : S),
+  Executed os x z -> rollback os z = x`
+
+| Lean (`verification/proofs/lean/Rollback.lean`)
+| `rollback_restores {S : Type} {os : List (Op S)} {x z : S} :
+  Executed os x z → rollback os z = x`
+|===
+
+*How the comparison was made.* By reading, definition by definition. It was not
+done by a round trip, since no translator exists.
+
+* `Op`: a record of `execute : S → Maybe S`, `undo : S → S` and
+  `undoes : execute x ≡ just y → undo y ≡ x`. The targets have the same three
+  fields over `option`/`Option`. Agda binds `x` and `y` implicitly and Rocq
+  explicitly, which is the same proposition.
+* `Executed`: an inductive family in `Set` with constructors `done` and `next`.
+  The targets put it in `Type`, the same universe level, with the same two
+  constructors and the same indices.
+* `rollback`: the same structural recursion on the list, undoing the head after
+  the tail.
+* The source type `S` is a parameter in `Set` in all three (`Type` at level 0).
+* Builtins: Agda's `List`/`Maybe` and the targets' `list`/`option` and
+  `List`/`Option` are the same free inductive types.
+* The sibling's prelude: `_≡_` is `Agda.Builtin.Equality` re-exported, and
+  `trans` and `cong` are the usual one-clause definitions by pattern matching on
+  `refl`. Rocq's `eq` with `eq_trans`/`f_equal`, and Lean's `Eq` with
+  `Eq.trans`/`congrArg`, are the same inductive equality and the same
+  eliminations. The re-proofs use `rewrite` instead, which needs nothing beyond
+  the equality type. No other sibling definition reaches T-1's statement or
+  proof.
+
+*Residual differences, listed rather than hidden.* The logics differ in
+what they add to equality. Axiom-free Rocq has neither K nor uniqueness of
+identity proofs, like Agda under `--without-K`, and `Print Assumptions` confirms
+that this leg adds no axiom that would supply them. Lean is stronger: its `Eq`
+lives in a proof-irrelevant `Prop`, so it has uniqueness of identity proofs
+definitionally. Neither proof uses these: each is the same
+induction on `Executed`, a rewrite with the induction hypothesis and one use of
+`undoes`. Proving the statement in a stronger logic adds no assumption to the
+Agda source.
+
+*Axioms.* Rocq `Print Assumptions rollback_restores` reports "Closed under the
+global context". Lean `#print axioms` reports that it "does not depend on any
+axioms". The gate (`scripts/check-recheck.sh`) fails if either line is missing:
+a mutant with `Admitted` in Rocq and one with `sorry` in Lean were each caught.
+
+*Non-vacuity.* `tests/reject-rocq/ForwardRollback.v` and
+`tests/reject-lean/ForwardRollback.lean` are twins of
+`tests/reject-agda/ForwardRollback.agda`. They build real double and increment
+operations against the leg's own definitions and claim that undoing them in
+execution order restores the start. Rocq refuses with `Unable to unify "1" with
+"0"`, and Lean with "`decide` proved that the proposition … is false". The gate
+checks each refusal message.
+
+*Pins and inputs.*
+
+[cols="1,3",options="header"]
+|===
+| Field | Value
+
+| Rocq | The Coq Proof Assistant 8.18.0, Ubuntu `coq=8.18.0+dfsg-1build2` on the
+  `ubuntu-24.04` runner, asserted by version string. `coqc -q -Q . JanusKey`.
+| Lean | Lean 4.35.0 (commit `eb6cafb7290e8bd5f2937522d8d804f58f02bafc`), the
+  release tarball `lean-4.35.0-linux.tar.zst`, SHA-256
+  `7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d`, checked
+  before unpacking. `lean -o <module>.olean <file>`.
+| Inputs (SHA-256) | `Rollback.v`
+  `662d51bf0b642ac28f816853c7d2c6a851583487a15e9f79c3b8184a53ff28e2`,
+  `Rollback.lean`
+  `808c32585ad582fced7497b93607668f92d9140b36ae4bd90b14f6b26bcd36c6`, the Rocq
+  fixture `4b2c01d4f70d1b60080babdf64aeaf873ec4db98c4682a6694e1981127160410`,
+  the Lean fixture
+  `813cae57494bee9c6457a63553489d83ad47c2ac538c18a0de8e86956cc477ee`,
+  `check-recheck.sh`
+  `5171d9d27a888e79dc9544f7b84d2a3557428c918a25194f9a88bcb2944f8483`
+| Observed | Locally, with the same two versions: both legs check with no
+  axioms, both fixtures refused as named, `[check-recheck] OK`. The CI job on
+  this change is the receipt.
+|===
+
+The pilot answers the question the pilot was for. The transport route is not
+available for any of the five theorems, for the reason above. A hand re-proof
+in core Rocq and core Lean costs about forty lines per statement. The remaining
+four take the same route. G-1 needs the Loss grade algebra restated, since the
+targets cannot import `resource-algebra`. T-2 and T-3 are now stated over the abstract
+log in `SingleActiveLog.agda`, built from builtins only, so their legs can
+restate it directly.
 
 These five are the only rows in this repository with a Proof Witness Grade (PWG). Each
 rests on a premise it names rather than assumes silently — the per-step
@@ -319,7 +537,7 @@ observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) i
   other, and where both cover it the correspondence is recorded. Not Idris2 and
   not Agda.
 
-| T-6, T-7, X-1, G-2, E-1, G-3 (`ASSUMED` / `OPEN`)
+| T-6, T-7, X-1, G-2, E-1, G-3 (`ASSUMED` / `OPEN`; G-3 is engineering under §1)
 | Premises, external assumptions, or filed obligations.
 | Each names its own gap in `PROOF-NEEDS.adoc`; none may be counted as proved
   by the grade of a neighbouring row (README-EXPLAINME: "a row is only as
@@ -329,11 +547,15 @@ observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) i
 | Downstream consumption designed, never exercised.
 | A dependency edge in the consumer's manifest and a green test there.
 
-| T-8 (`OPEN`)
-| The metadata log now saves through the same write → sync → rename path as the
-  transaction log, but the crate has not been built since that change.
-| The new test `metadata::tests::save_replaces_the_log_atomically` green in CI.
-  Its half of the row — retry after a failed `mark_undone` — is untouched.
+| T-9 and T-11 (`OPEN`)
+| Two different windows. T-9: `execute_*` changes the filesystem and then
+  appends, so a crash between them leaves a change with no record. T-11:
+  `undo` records the inverse as its own operation and then marks the original,
+  so a failed mark leaves the original unmarked and a retry re-applies the
+  inverse. (T-8, the metadata log's own saves, is TESTED since #168.)
+| T-9: a write-ahead intent record, which is a design decision. T-11: an
+  idempotent undo that finds the existing inverse record before re-applying.
+  Each then needs a test that injects the failure between its two steps.
 |===
 
 == The epistemic rewrite: E-1 becomes E-1m
@@ -364,7 +586,9 @@ ignorance is a proposition. Knowledge is indiscriminability over an observation
   (`obliterate-ignorance`);
 * rotation is an update to a `usable` predicate, so "no agent can use the old
   key" is a theorem with a Bool on the right (`rotate-forgets-old`), and the
-  deleted Idris lemma now has a proved counterpart.
+  deleted Idris lemma now has a proved counterpart. It follows from the
+  definition of `rotate`; its content is that the statement is now
+  *expressible*, which the Idris modality could not manage, not that it is deep.
 
 Two fixtures pin the refusals: `AdversaryKnows.agda` (asserting the two stores
 are identical — refused, `2 != 1`) and `OldKeyStillUsable.agda` (asserting the
@@ -391,5 +615,11 @@ PROOF-POLICY §1 and the ABI belongs in Idris2.
   and neither receipt is deleted from the history.
 * `AGDA-PENDING` is the correct correspondence state for a module committed but
   not yet checked. No row in this repository is in that state today: the five
-  graded rows are `AGDA-VERIFIED` at the commit above, and their Rocq and Lean
-  legs are `unavailable`, so the grade is `PWG-3`.
+  graded rows are `AGDA-VERIFIED` at the commit above. Except for T-1, whose
+  legs are re-proved and reconciled, their Rocq and Lean legs have not been
+  attempted, so each is `OPEN` with no route and no §2.2 record,
+  and the grade is `PWG-3`. They are not `unavailable`: under §2 that route
+  means a leg that cannot be built, and a hand re-proof is always available as
+  the fallback, so the legs are owed, not excused (§8.4.1).
+* Grade counts appear only as the census at the top of this page: a count per
+  rung, with the denominator and the `ungraded` rung in the same line.
