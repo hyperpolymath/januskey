@@ -327,7 +327,8 @@ smaller, differently-shaped things, and the difference matters:
   (`verification/proofs/agda/TransactionAtomicity.agda`, ledger rows T-1..T-3).
   The claim "every operation is reversible" is **OPEN**, as is the mechanical
   correspondence between that model and the Rust.
-- **RMO:** nothing is proved. Overwriting is best effort; the record is an
+- **RMO:** E-1m proves properties of an abstract model, not the Rust
+  implementation. Overwriting is best effort; the record is an
   unkeyed ledger that a writer can alter without detection, kept only when a
   store exists, and it is not a certificate of absence. There is no
   mathematical proof of non-existence, and there cannot be one from inside this
