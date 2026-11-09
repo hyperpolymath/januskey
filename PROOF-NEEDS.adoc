@@ -124,13 +124,16 @@ Of the 12 PROVEN rows, five are the theory rows — **G-1, T-1, T-2, T-3, E-1m**
 their artefact is Agda (`+verification/proofs/agda/+`). They are **`+PWG-3+`**
 (PROOF-POLICY §8, owner ruling 2026-11-04, which governs over the mathesis brief):
 each is `+PROVEN+` under the §2.1 invocation and no Rocq or Lean leg exists. The
-receipt is a green `+agda-proofs.yml+` run
+last receipt for the modules is a green `+agda-proofs.yml+` run
 (https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251])
 at commit `+23bc8c3+`, Agda 2.6.4.3, with `+resource-algebra+` pinned at
 `+cf9235c+`, running `+Reversibility+`, `+TransactionAtomicity+` and
-`+Epistemic+` under `+--safe --without-K --cubical-compatible+`. Its import cone,
-axioms (none) and the receipts it supersedes (runs 41687715055 at `+fc188c4+`
-and 40867211509 at `+4afb710+`) are recorded in
+`+Epistemic+` under `+--safe --without-K --cubical-compatible+`. The gate gained
+an import-cone postulate scan after it, so the first green run of the changed
+gate on `+main+` is the receipt that replaces it. The cone, the axioms (none in
+the development; the prover's universe-level primitives are reported) and the
+superseded receipts (runs 41687715055 at `+fc188c4+` and 40867211509 at
+`+4afb710+`) are recorded in
 link:docs/theory/PROOF-GRADES.adoc[`+docs/theory/PROOF-GRADES.adoc+`].
 Correspondence state for them: `+AGDA-VERIFIED+`.
 

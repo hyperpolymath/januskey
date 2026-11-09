@@ -86,8 +86,15 @@ The theory artefacts are three Agda modules:
   (row E-1m, §The epistemic rewrite below).
 
 All three are checked by `scripts/check-agda.sh` (`just test-agda`), which is
-also the ledger's recorded checker for rows G-1, T-1, T-2, T-3 and E-1m. The
-current receipt (PROOF-POLICY §8.2, `PWG-3`):
+also the ledger's recorded checker for rows G-1, T-1, T-2, T-3 and E-1m.
+
+The gate changed in hyperpolymath/januskey#170: it now derives the import cone
+from Agda and scans it for postulates. A changed checker has to re-earn its
+receipt (§8.4), so the receipt below is the **last receipt for the three
+modules**, not yet a receipt for this gate. The first green `agda-proofs.yml` run
+on `main` after #170 is the receipt for the gate, and replaces this row, which
+then becomes `state: superseded`. Until then the grade is `PWG-3`, receipt
+pending re-run.
 
 [cols="1,3",options="header"]
 |===
@@ -95,7 +102,8 @@ current receipt (PROOF-POLICY §8.2, `PWG-3`):
 
 | Workflow, run | `agda-proofs.yml`, run
   https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251],
-  branch `main`, conclusion **success**, `state: current`
+  branch `main`, conclusion **success**; last receipt for the modules, before
+  the gate change above
 | Commit | `23bc8c38160a25c37917bce69cf05d91899b07e5` (started 2026-11-05T17:40:46Z)
 | Prover | `agda-bin=2.6.4.3-1+b2` on Debian trixie-slim
   (`@sha256:a29215f6…`), asserted by a passing step:
@@ -105,16 +113,23 @@ current receipt (PROOF-POLICY §8.2, `PWG-3`):
 | Flags | `--safe --without-K --cubical-compatible --no-libraries
   --ignore-interfaces --double-check`: the §2.1 canonical invocation, plus two
   stricter options
-| Import cone | roots `Reversibility`, `TransactionAtomicity`, `Epistemic`; the
-  cone is those modules and `resource-algebra` at
-  `cf9235c532712a783a404c359a1055f40134794a`, fetched by
+| Import cone | the module set Agda reports with `--dependency-graph` for the
+  roots `Reversibility`, `TransactionAtomicity` and `Epistemic`: 14 modules.
+  First-party (6): the three roots and `ResourceAlgebra.Prelude`,
+  `ResourceAlgebra.Core` and `ResourceAlgebra.Instances.Loss` from
+  `resource-algebra` at `cf9235c532712a783a404c359a1055f40134794a`, fetched by
   `scripts/fetch-siblings.sh` and re-checked from source under the same flags
-  (`--ignore-interfaces`); consumed by pin, not re-declared here
-| Axioms | none. `--safe` refuses `postulate`; postulate count 0. The
-  comment-aware scan of the cone (`scripts/scan-postulates.sh`, wired into the
-  gate with a positive and a negative control on every run) was added after this
-  run, so its first CI receipt is the next `agda-proofs.yml` run on `main`;
-  a local run at this receipt's sources reported 10 files, 0 postulates
+  (`--ignore-interfaces`). Supplied with the prover (8): `Agda.Primitive` and
+  `Agda.Builtin.{Bool,Equality,List,Maybe,Nat,Sigma,Unit}`
+| Axioms | none in the development. `--safe` refuses `postulate`, and the
+  comment-aware scan (`scripts/scan-postulates.sh`) finds 0 postulates in the
+  six first-party modules. The prover-supplied `Agda.Primitive` declares the
+  universe-level primitives (`Level`, `lzero`, `lsuc`, `_⊔_`) by two `postulate`
+  blocks, each bound by a `BUILTIN` pragma: they are the prover's trusted base,
+  not axioms of this development, and the gate reports them rather than hiding
+  them; a postulate in any other prover-supplied module fails it. The scan is
+  new in #170, so its first CI receipt is the run that replaces this row; the
+  figures here are from a local run at this receipt's sources
 | Result | The three modules type-check; the fixtures under
   `tests/reject-agda/` are refused *with the message each fixture names*, so a
   fixture that starts passing, or starts failing for the wrong reason, fails the
@@ -137,9 +152,10 @@ Earlier receipts, kept with their lineage (§8.4):
 | Before `--cubical-compatible` and before `Epistemic.agda`; it never covered E-1m
 |===
 
-That is a `PWG-3` receipt: the propositions type-check in Agda under the §2.1
-invocation, in CI, at a named commit, with the prover version pinned and the
-import cone recorded. Nothing here has been translated to Rocq or Lean, so no
+Those are the `PWG-3` facts: the propositions type-check in Agda under the
+§2.1 invocation, in CI, at a named commit, with the prover version pinned and
+the import cone recorded; the receipt is re-earned by the first run of the
+changed gate, as above. Nothing here has been translated to Rocq or Lean, so no
 recheck leg counts and the grade is not `PWG-2i`; no witness in another
 foundation exists, so `foundation_diverse` is false.
 
@@ -268,10 +284,10 @@ C-3, C-4, C-5, checked by
 are interface and wire-format contracts, so the theory ladder does not grade
 them — they are `PROVEN` in the ledger's own vocabulary and that is the whole
 of the claim. The `Rust/SPARK` shorthand is withdrawn; the mapping that
-replaces it is Rust → **Creusot**, Ada → SPARK, API/ABI → Idris2, theory →
-Agda.
+replaces it is Rust → **Creusot** with **Pearlite** contracts, and **Verus**
+(§1.2), Ada → SPARK, API/ABI → Idris2, theory → Agda.
 
-The same heading covers every `TESTED` row (23): a test proves behaviour was
+The same heading covers every `TESTED` row: a test proves behaviour was
 observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) is
 `ASSUMED` by transcription and would have to become mechanical before any
 "every operation is reversible" theorem could cite both halves.
@@ -291,10 +307,13 @@ observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) i
   this repository would record that as an external assumption with its source.
 
 | `TESTED` rows describing Rust behaviour (T-4, T-5, the property tests)
-| Claimed, tested. No Creusot annotation exists and Creusot is not installed in
-  the session that wrote this file.
-| Creusot contracts on the Rust functions, run in CI: PROOF-POLICY §1 sends
-  first-party Rust behaviour to Creusot, not to Idris2 and not to Agda.
+| Claimed, tested. No Creusot/Pearlite contract or Verus proof exists, and
+  neither verifier is installed in the session that wrote this file.
+| Contracts and proofs on the Rust functions, run in CI: PROOF-POLICY §1.2
+  plans first-party Rust for both Creusot (with Pearlite) and Verus, whose
+  scopes may differ; a property proved by one need not be duplicated in the
+  other, and where both cover it the correspondence is recorded. Not Idris2 and
+  not Agda.
 
 | T-6, T-7, X-1, G-2, E-1, G-3 (`ASSUMED` / `OPEN`)
 | Premises, external assumptions, or filed obligations.
