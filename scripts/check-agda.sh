@@ -49,32 +49,58 @@ echo "import cone: ${#own[@]} first-party modules, ${#prover_lib[@]} supplied wi
 # The proofs and the pinned sibling: no postulate at all.
 bash scripts/scan-postulates.sh "${own[@]}"
 # Modules supplied with the prover are its trusted base. The only postulates
-# allowed there are Agda.Primitive's universe-level primitives (Level, lzero,
-# lsuc, _⊔_, each bound by a BUILTIN pragma); they are reported, not hidden, and
-# a postulate in any other prover-supplied module of the cone fails the gate.
+# allowed there are Agda.Primitive's universe-level primitives: exactly Level,
+# lzero, lsuc and _⊔_, each bound by its BUILTIN pragma. The gate checks the
+# declared names and the bindings, not the file name, so a prover pin that adds
+# a postulate to Agda.Primitive fails here; a postulate in any other
+# prover-supplied module of the cone fails too.
 if [ "${#prover_lib[@]}" -gt 0 ]; then
   status=0; bash scripts/scan-postulates.sh "${prover_lib[@]}" >"$work/prover.log" 2>&1 || status=$?
   [ "$status" -le 1 ] || { cat "$work/prover.log"; exit 1; }
-  if grep -E '^[^ ]+:[0-9]+: ' "$work/prover.log" | grep -vqF -- "/Agda/Primitive.agda:"; then
-    cat "$work/prover.log"; echo "ERROR: a postulate in a prover-supplied module other than Agda.Primitive" >&2; exit 1
+  grep -E '^[^ ]+:[0-9]+: ' "$work/prover.log" >"$work/prover.hits" || true
+  prim="$agda_prim/Agda/Primitive.agda"
+  # Every hit is in Agda.Primitive and is a bare `postulate` line opening a block,
+  # the only shape the name check below reads.
+  if grep -vqE -- "^$prim:[0-9]+: postulate[[:space:]]*\$" "$work/prover.hits"; then
+    cat "$work/prover.log"; echo "ERROR: a prover-supplied postulate outside the Agda.Primitive level blocks" >&2; exit 1
   fi
-  echo "prover-supplied: $(grep -cE '^[^ ]+:[0-9]+: ' "$work/prover.log" || true) postulate block(s), all in Agda.Primitive (universe-level primitives)"
+  # The names those blocks declare: the indented lines after `postulate`, up to the
+  # next line that is not indented; line comments removed.
+  declared="$(LC_ALL=C awk '
+    { sub(/--.*/, "") }
+    /^postulate[ \t]*$/ { inblock = 1; next }
+    inblock && /^[ \t]*$/ { next }
+    inblock && /^[ \t]/ { split($0, lhs, ":"); n = split(lhs[1], names, /[ \t]+/)
+                          for (k = 1; k <= n; k++) if (names[k] != "") print names[k]; next }
+    { inblock = 0 }
+  ' "$prim" | LC_ALL=C sort | tr '\n' ' ')"
+  expected="Level _⊔_ lsuc lzero "
+  [ "$declared" = "$expected" ] || {
+    echo "ERROR: Agda.Primitive postulates '$declared', expected exactly '$expected'" >&2; exit 1; }
+  for binding in "LEVEL Level" "LEVELZERO lzero" "LEVELSUC lsuc" "LEVELMAX _⊔_"; do
+    LC_ALL=C grep -qE -- "^\{-#[[:space:]]+BUILTIN[[:space:]]+${binding% *}[[:space:]]+${binding#* }[[:space:]]+#-\}" "$prim" || {
+      echo "ERROR: Agda.Primitive does not bind ${binding#* } with BUILTIN ${binding% *}" >&2; exit 1; }
+  done
+  echo "prover-supplied: Agda.Primitive postulates exactly ${expected% }, each bound by its BUILTIN pragma ($(wc -l <"$work/prover.hits" | tr -d ' ') block(s)); no other postulate"
 fi
 
 # The controls are written at run time, so no file in the tree carries a real
 # postulate for another scanner to count. Each must give exactly its exit code.
 printf '%s\n' 'module CommentsOnly where' '-- postulate in a line comment' \
-  '--postulate with no space after the dashes' \
+  '--postulate postulate: no space after the dashes' \
   '{- postulate {- nested postulate -} postulate -}' \
   'x--postulate : Set₁' 'x--postulate = Set' \
   's : String' 's = "a postulate in a string \" still the string"' \
   > "$work/CommentsOnly.agda"
-printf '%s\n' 'module Planted where' '{- c -} postulate X : Set' > "$work/Planted.agda"
+# Line 2: a postulate after a block comment. Line 3: one bounded by NO-BREAK
+# SPACE (U+00A0) on both sides, which Agda reads as whitespace.
+printf '%s\n' 'module Planted where' '{- c -} postulate X : Set' \
+  $'\302\240postulate\302\240Y : Set' > "$work/Planted.agda"
 status=0; bash scripts/scan-postulates.sh "$work/CommentsOnly.agda" >"$work/neg.log" 2>&1 || status=$?
 [ "$status" -eq 0 ] || { cat "$work/neg.log"; echo "ERROR: the comments-only control did not exit 0 (got $status)" >&2; exit 1; }
 status=0; bash scripts/scan-postulates.sh "$work/Planted.agda" >"$work/pos.log" 2>&1 || status=$?
-if [ "$status" -ne 1 ] || ! grep -qF -- "Planted.agda:2:" "$work/pos.log"; then
-  cat "$work/pos.log"; echo "ERROR: the planted control did not exit 1 naming Planted.agda:2 (got $status)" >&2; exit 1
+if [ "$status" -ne 1 ] || ! grep -qF -- "Planted.agda:2:" "$work/pos.log" || ! grep -qF -- "Planted.agda:3:" "$work/pos.log"; then
+  cat "$work/pos.log"; echo "ERROR: the planted control did not exit 1 naming Planted.agda:2 and :3 (got $status)" >&2; exit 1
 fi
 echo "[PASS] postulate scan: cone clean, both controls behave"
 mkdir -p _build/check-logs

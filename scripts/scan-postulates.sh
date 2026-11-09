@@ -11,20 +11,29 @@
 # {- -} comments, after a `--` that starts a token (with or without a space
 # after it), and inside string or character literals is ignored; pragmas
 # ({-# … #-}) are code. A `--` inside a name such as `x--y` is part of the name.
+# Whitespace is Agda's: its lexer reads every character Haskell's isSpace accepts,
+# other than tab and newline, as a space (Agda.Syntax.Parser.Alex, toASCII), so
+# CR, FF, VT, NO-BREAK SPACE and the Unicode space separators (category Zs) are
+# turned into spaces before the line is lexed.
 #
 # Usage: scan-postulates.sh FILE...   Prints each hit as path:line: text and the
 # count; exits 1 if there is any hit, 2 on a usage error or an unreadable file.
 set -euo pipefail
 [ "$#" -gt 0 ] || { echo "usage: $0 FILE..." >&2; exit 2; }
 for f in "$@"; do
-  [ -f "$f" ] && [ -r "$f" ] || { echo "ERROR: not a readable file: $f" >&2; exit 2; }
+  [[ -f $f && -r $f ]] || { echo "ERROR: not a readable file: $f" >&2; exit 2; }
 done
-hits="$(awk '
+# The non-ASCII spaces as UTF-8 byte sequences: U+00A0, U+1680, U+2000-U+200A,
+# U+202F, U+205F, U+3000. awk runs in the C locale, so it matches bytes the same
+# way whichever awk is installed.
+ws="$(printf '\302\240|\341\232\200|\342\200[\200-\212]|\342\200\257|\342\201\237|\343\200\200')"
+hits="$(LC_ALL=C awk -v ws="$ws" '
   # Agda name characters are everything except whitespace and .;{}()@"
   function namechar(c) { return c != "" && c !~ /[ \t.;{}()@"]/ }
   FNR == 1 { depth = 0 }
   {
-    line = $0; code = ""; i = 1; n = length(line)
+    line = $0; gsub(/[\r\f\v]/, " ", line); gsub(ws, " ", line)
+    code = ""; i = 1; n = length(line)
     while (i <= n) {
       c = substr(line, i, 1); two = substr(line, i, 2)
       prev = (i > 1) ? substr(line, i - 1, 1) : ""
@@ -48,7 +57,7 @@ hits="$(awk '
       code = code c; i++
     }
     if (code ~ /(^|[ \t.;{}()@])postulate([ \t.;{}()@]|$)/)
-      printf "%s:%d: %s\n", FILENAME, FNR, line
+      printf "%s:%d: %s\n", FILENAME, FNR, $0
   }
 ' "$@")"
 count=0

@@ -126,10 +126,14 @@ pending re-run.
   six first-party modules. The prover-supplied `Agda.Primitive` declares the
   universe-level primitives (`Level`, `lzero`, `lsuc`, `_⊔_`) by two `postulate`
   blocks, each bound by a `BUILTIN` pragma: they are the prover's trusted base,
-  not axioms of this development, and the gate reports them rather than hiding
-  them; a postulate in any other prover-supplied module fails it. The scan is
-  new in #170, so its first CI receipt is the run that replaces this row; the
-  figures here are from a local run at this receipt's sources
+  not axioms of this development. The gate checks that those blocks declare
+  exactly those four names and that each has its `BUILTIN` binding, and fails on
+  any other prover-supplied postulate, so a prover pin that adds one does not
+  pass. The scan is new in #170, so its first receipt on `main` is the run that
+  replaces this row. The same figures came from the #170 branch in CI under
+  Agda 2.6.4.3 (run
+  https://github.com/hyperpolymath/januskey/actions/runs/42624327510[42624327510]
+  at `77fcedb`; branch evidence, not a receipt)
 | Result | The three modules type-check; the fixtures under
   `tests/reject-agda/` are refused *with the message each fixture names*, so a
   fixture that starts passing, or starts failing for the wrong reason, fails the
