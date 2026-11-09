@@ -1,4 +1,4 @@
-= Proof grades under mathesis and PROOF-POLICY
+= Proof Witness Grades (PROOF-POLICY §8)
 :toc: preamble
 :icons: font
 
@@ -9,6 +9,17 @@ to reconstruct: *which of these claims is a proof, and how good a proof is it?*
 
 It grades nothing by confidence. There is no percentage anywhere in this
 repository, and none is introduced here.
+
+[NOTE]
+====
+*PWG census, theory theorems of this repository (denominator 6):*
+`PWG-3` 5 (G-1, T-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 0 · `PWG-1` 0 ·
+`ungraded` 1 (G-3, `OPEN`: no Agda statement yet). `+foundation-diverse`: none.
+Axioms: none. The denominator is the ledger rows whose source of truth is, or is
+to be, an Agda theorem. E-1 (a security property of the implementation; its
+model half is E-1m), the MPR row (a refinement claim about Rust, which §1 sends
+to Creusot and Verus) and G-2 (a bridge, `ASSUMED`) are outside it.
+====
 
 == What governs the grades
 
@@ -123,6 +134,17 @@ current receipt (PROOF-POLICY §8.2, `PWG-3`):
   propositions, and are kept visible
 |===
 
+*Re-earn pending (2026-11-09).* The change that follows this receipt edits the
+explanatory comments of `Reversibility.agda` and `TransactionAtomicity.agda`.
+The "What is NOT claimed" block named failure modes since fixed by T-4, T-5 and
+T-8, and a G-1 comment implied that the grade was derived from the cancellation
+law. No statement or proof term changed, but the bytes did, so this receipt
+does not cover them. The `agda-proofs.yml` run on that change, and after merge
+the run on `main`, re-earns it; this receipt then becomes `state: superseded`.
+A local run of the same invocation with the same Agda version passes on the new
+bytes (three modules checked, six fixtures refused); that is a reproduction, not
+a receipt (§2.3).
+
 Earlier receipts, kept with their lineage (§8.4):
 
 [cols="1,1,3",options="header"]
@@ -236,8 +258,11 @@ repeated the counts, and the two copies drifted apart.
 | Row | Proposition | Theorem
 
 | G-1 | A lossless trace has only lossless steps; an obliterating step absorbs;
-  wrap/unwrap is grade 𝟙 given cancellation | `Reversibility.agda::lossless-trace-all`,
-  `obliterate-absorbs`, `wrap-unwrap-id`
+  a wrap/unwrap pair carries its cancellation law. The pair's grade 𝟙 is
+  *assigned* by `wrapStep`/`unwrapStep`, not derived from that law:
+  `wrap-unwrap-𝟙` holds by definition and does not use `cancels` |
+  `Reversibility.agda::lossless-trace-all`, `obliterate-absorbs`,
+  `wrap-unwrap-id`
 | T-1 | Undoing a fully executed transaction in reverse order restores the state
   it began in, given each step's undo restores its execute |
   `TransactionAtomicity.agda::rollback-restores`
@@ -247,7 +272,8 @@ repeated the counts, and the two copies drifted apart.
   `TransactionAtomicity.agda::at-most-one-active`
 | E-1m | In a world model, an agent whose observation excludes the store does not
   know what the store holds; obliteration leaves nothing to recover; rotation
-  leaves no agent — the system included — able to use the old key |
+  leaves no agent — the system included — able to use the old key (true by the
+  definition of `rotate` in the model) |
   `Epistemic.agda::adversary-ignorant`, `obliterate-cuts-recovery`,
   `obliterate-ignorance`, `rotate-forgets-old`
 |===
@@ -306,11 +332,12 @@ observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) i
 | Downstream consumption designed, never exercised.
 | A dependency edge in the consumer's manifest and a green test there.
 
-| T-8 (`OPEN`)
-| The metadata log now saves through the same write → sync → rename path as the
-  transaction log, but the crate has not been built since that change.
-| The new test `metadata::tests::save_replaces_the_log_atomically` green in CI.
-  Its half of the row — retry after a failed `mark_undone` — is untouched.
+| T-9 (`OPEN`)
+| A file change whose log record fails to persist: `execute_*` changes the
+  filesystem and then appends, and `undo` runs the inverse and then marks it.
+  (T-8, the metadata log's own saves, is TESTED since #168.)
+| A write-ahead intent record, which is a design decision, then a test that
+  injects the failure between the two steps.
 |===
 
 == The epistemic rewrite: E-1 becomes E-1m
@@ -341,7 +368,9 @@ ignorance is a proposition. Knowledge is indiscriminability over an observation
   (`obliterate-ignorance`);
 * rotation is an update to a `usable` predicate, so "no agent can use the old
   key" is a theorem with a Bool on the right (`rotate-forgets-old`), and the
-  deleted Idris lemma now has a proved counterpart.
+  deleted Idris lemma now has a proved counterpart. It follows from the
+  definition of `rotate`; its content is that the statement is now
+  *expressible*, which the Idris modality could not manage, not that it is deep.
 
 Two fixtures pin the refusals: `AdversaryKnows.agda` (asserting the two stores
 are identical — refused, `2 != 1`) and `OldKeyStillUsable.agda` (asserting the
@@ -368,5 +397,10 @@ PROOF-POLICY §1 and the ABI belongs in Idris2.
   and neither receipt is deleted from the history.
 * `AGDA-PENDING` is the correct correspondence state for a module committed but
   not yet checked. No row in this repository is in that state today: the five
-  graded rows are `AGDA-VERIFIED` at the commit above, and their Rocq and Lean
-  legs are `unavailable`, so the grade is `PWG-3`.
+  graded rows are `AGDA-VERIFIED` at the commit above. Their Rocq and Lean legs
+  have not been attempted, so each is `OPEN` with no route and no §2.2 record,
+  and the grade is `PWG-3`. They are not `unavailable`: under §2 that route
+  means a leg that cannot be built, and a hand re-proof is always available as
+  the fallback, so the legs are owed, not excused (§8.4.1).
+* Grade counts appear only as the census at the top of this page: a count per
+  rung, with the denominator and the `ungraded` rung in the same line.

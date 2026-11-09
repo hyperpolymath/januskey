@@ -25,19 +25,20 @@
 --
 -- What is NOT claimed (the model is hand-transcribed from the Rust, like
 -- G-2, and these are deliberate limits):
---   * No I/O. The Rust mutates the in-memory log and then calls save()?;
---     a save failure after the mutation leaves memory and disk disagreeing.
---     fs::write is not an atomic replace, so a crash mid-write can corrupt
---     the log. Neither is modelled.
+--   * No I/O. Saving is not modelled. The Rust's behaviour on a failed or
+--     interrupted save is TESTED, not proved: a failed save leaves the
+--     in-memory log unchanged, and the log is replaced by write, sync and
+--     rename (ledger rows T-5 and T-8). A file change whose log record fails
+--     to persist is OPEN (T-9).
 --   * A failed execute is assumed to leave the state unchanged. Part A only
 --     speaks about operations that executed; nothing here proves the Rust
---     executor is a no-op on failure.
---   * Rollback is assumed to succeed on every step. cmd_rollback stops at
---     the first undo error (`?`) and leaves the transaction Active with the
---     later operations already undone; a retry then meets "already undone".
---     Part A does not cover that case; see the OPEN ledger rows.
+--     executor is a no-op on failure (ASSUMED, T-6).
+--   * Rollback is assumed to succeed on every step. In the Rust a rollback
+--     that fails part-way stops, and a retry skips the operations already
+--     undone (TESTED, T-4); Part A does not model the failure or the retry.
 --   * Transaction ids are assumed fresh (Fresh below). The Rust draws a
---     UUID v4; a collision would break Good, and nothing here rules it out.
+--     UUID v4; a collision would break Good, and nothing here rules it out
+--     (ASSUMED, T-7).
 --   * Obliterating operations have no undo, so they have no `Op` here
 --     (cf. C-3); a transaction containing one is outside this theorem.
 --   * Concurrency: one process, no locking, is the whole model.
