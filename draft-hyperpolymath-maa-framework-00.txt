@@ -61,9 +61,11 @@ that the -00 text named.
 
 * **RMO (Obliterative Wipe):** A primitive for data erasure that
   overwrites and removes the data and, when a JanusKey store exists,
-  writes an unkeyed record that it did so. The record is not
-  tamper-evident. It does not prove that the data no longer exists
-  (Section 4).
+  writes an unkeyed record for each removal whose record save succeeds.
+  If the working file is absent and all stored blobs are shared with
+  other paths, the path's history can be purged without an obliteration
+  record. A record that is written is not tamper-evident. It does not
+  prove that the data no longer exists (Section 4).
 
 The MAA dynamic dictates that the deployment of RMR (Accountability)
 must be coupled with RMO (Control).
@@ -122,24 +124,32 @@ Two equivalences are in use:
 
 3.2. The claim, in both directions
 
-Let F be an operation, D_F the states on which its precondition holds,
-and F^-1 the inverse determined by the metadata F recorded.
+Let F be the saved-execution relation of an operation, D_F the states
+on which its precondition holds, and s F (t, r) mean an execution from
+s produces state t and saves record r (metadata and referenced blobs).
+Multiple records, including different IDs or timestamps, can accompany
+the same state. F^-1(t, r) uses that execution's record to undo it.
 
-  RMR-L (left inverse):  for every s in D_F,       F^-1(F(s)) ~ s
-  RMR-R (right inverse): for every t in F(D_F),    F(F^-1(t)) ~ t
+  RMR-L (left inverse): for every s in D_F and saved output (t, r),
+    s F (t, r) implies F^-1(t, r) ~ s.
+  RMR-R (right inverse): for every s in D_F and saved output (t, r),
+    s F (t, r) implies that u = F^-1(t, r) is in D_F, has a saved
+    execution output, and every u F (t', r') satisfies t' ~ t.
 
-Together they say that, up to ~, the recorded inverse undoes F on D_F
-and F undoes it on F(D_F). They do not say that the resulting state
-identifies the state before it: deleting a file from two trees that
-differ only in that file's content gives ~-equal results, and the
-recorded metadata, not the resulting state, selects what undo
-restores.
+Together they say that, up to ~, the inverse given that execution's
+record undoes it, and every saved re-execution restores its post-state.
+Both laws require a saved record. They do not say that the resulting
+state identifies the state before it: deleting a file from two trees
+that differ only in that file's content gives ~-equal results, and
+the record, not the resulting state, selects what undo restores.
+RMR-R compares states only; the new record r' need not equal r.
 
-RMR-R ranges over the image F(D_F) only, not over every state on
-which F^-1 is defined: Copy^-1 is Delete of the destination,
-and copying again does not restore arbitrary destination content.
-RMR-R follows from RMR-L when F respects ~ (s ~ s' implies
-F(s) ~ F(s')), and that congruence is not stated or tested either.
+RMR-R ranges over saved outputs only, not over every state on which
+F^-1 is defined: Copy^-1 is Delete of the destination, and copying
+again does not restore arbitrary destination content. RMR-R follows
+from RMR-L if all state outputs on ~-equivalent inputs are ~-equivalent
+and the restored state is again in D_F with a saved output. These
+additional conditions are not established or tested either.
 
 3.3. What is established today
 
@@ -169,9 +179,12 @@ statements above, at the strength the ledger gives them.
 RMO addresses the chronic failure of data persistence to honour user
 deletion requests. The primitive overwrites the data in place, removes
 it, scrubs the unshared content-store blobs and log entries for it, and
-records a timestamped commitment to what was destroyed. That record is
-an unkeyed JSON ledger, kept only when a JanusKey store exists: a
-writer can alter it, or recompute the commitment, without detection.
+records a timestamped commitment to each removal whose record save
+succeeds, when a JanusKey store exists. If the working file is absent
+and all stored blobs are shared with other paths, the path's history
+can be purged without an obliteration record. When a record is written,
+it is kept in an unkeyed JSON ledger: a writer can alter it, or
+recompute the commitment, without detection.
 It is written after the data is removed, so a failed write can leave
 a removal unrecorded, and a re-run skips the blob that is already
 gone. It is not a certificate that the data is gone.

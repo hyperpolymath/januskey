@@ -165,26 +165,41 @@ says nothing about any finer equality. Two are in use:
 Executing an operation produces a state *and* a record. Write $S$ for states
 (the working tree, or the model state) and $R$ for records: the operation's
 `OperationMetadata` log entry together with the content-store blobs it names.
-An operation $F$ with precondition domain $D_F \subseteq S$ is a map
-$F : D_F \to S \times R$, with components $F(s) = (F_S(s),\, r_F(s))$. Its
-recorded inverse consumes both, $F^{-1} : S \times R \to S$, because undo reads
-the record (`OperationExecutor::undo` looks the operation up in the log and
-retrieves the stored content by its hash):
+<!-- coderabbit-ai-generated:v1 -->
 
-$$\text{RMR-L:}\quad \forall s \in D_F.\; F^{-1}(F_S(s),\, r_F(s)) \sim s \qquad\qquad \text{RMR-R:}\quad \forall s \in D_F.\; F_S\big(F^{-1}(F_S(s),\, r_F(s))\big) \sim F_S(s)$$
+<!-- coderabbit-ai-generated-section:v1:21ff3da5a38a4ba78758707df325c3722d28af0b88ad9babec973ec93e3e4e59 -->
 
-Together they say that, up to $\sim$, the inverse given the record undoes $F$
-on $D_F$, and $F$ undoes the inverse on the image of $D_F$. The post-state
-alone does not determine what undo restores: deleting a file from two trees
-that differ only in that file's content gives $\sim$-equal post-states with
-different records, so no $F^{-1}$ of the post-state alone could satisfy RMR-L
-for both. RMR-R compares states only; re-executing $F$ writes a new record (a
-new id and timestamp), so it is not stated for records.
+An operation with precondition domain $D_F \subseteq S$ has a saved-execution
+relation $F \subseteq D_F \times (S \times R)$. Write $s\;F\;(t,r)$ when an
+execution from $s$ produces post-state $t$ and saves record $r$. The same input
+state can have multiple outputs, including records differing only in IDs or
+timestamps. Its recorded inverse consumes both, $F^{-1} : S \times R \to S$,
+because undo reads the record (`OperationExecutor::undo` looks the operation up
+in the log and retrieves the stored content by its hash).
 
-RMR-R is over the image only: $\text{Copy}^{-1}$ is a delete of the
+The target laws range over **every** saved output, including each such record:
+
+$$\text{RMR-L:}\quad \forall s \in D_F,\,(t,r).\; s\;F\;(t,r) \implies F^{-1}(t,r) \sim s$$
+
+$$\text{RMR-R:}\quad \forall s \in D_F,\,(t,r).\; s\;F\;(t,r) \implies \big(\forall (t',r').\; F^{-1}(t,r)\;F\;(t',r') \implies t' \sim t\big)$$
+
+RMR-R additionally requires that $F^{-1}(t,r)$ is in $D_F$ and has at least one
+saved execution output; the universal clause must not hold merely because
+re-execution is impossible. Together the laws say that, up to $\sim$, the
+inverse given that execution's record undoes it, and every saved re-execution
+restores its post-state. The post-state alone does not determine what undo
+restores: deleting a file from two trees that differ only in that file's
+content gives $\sim$-equal post-states with different records, so no $F^{-1}$
+of the post-state alone could satisfy RMR-L for both. RMR-R compares states
+only; the new record $r'$ need not equal $r$ (IDs and timestamps may differ).
+
+RMR-R is over saved outputs only: $\text{Copy}^{-1}$ is a delete of the
 destination, and copying again does not restore arbitrary destination content.
-RMR-R follows from RMR-L when $F_S$ respects $\sim$ and the restored state is
-again in $D_F$; neither is stated or tested.
+RMR-R follows from RMR-L if all state outputs on $\sim$-equivalent inputs are
+$\sim$-equivalent and the restored state is again in $D_F$ with a saved output;
+these additional conditions are not established or tested.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Both equations assume the record was saved. `execute_*` changes the filesystem
 and then appends the record, so a stop between the two leaves a post-state with
