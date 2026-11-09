@@ -68,7 +68,7 @@ tables must agree.
 | E-1 | An attacker cannot recover obliterated content or use a revoked key | OPEN | `+Types.adversaryCannotKnow+` holds only because `+Knows+` has no Adversary constructor; the *model-level* half is now proved in Agda as row E-1m (#145 item 3)
 | E-1m | In a world model, an adversary whose observation excludes the store does not know what it holds; obliteration leaves nothing to recover; rotation to a different key leaves no agent able to use the old one (premise `+old ≠ new+`; true by the definition of `+rotate+` in the model; that an unusable key cannot decrypt is X-1) | PROVEN | `+verification/proofs/agda/Epistemic.agda+`; `+tests/reject-agda/{AdversaryKnows,OldKeyStillUsable}.agda+` refused
 | X-1 | Hash one-wayness; physical erasure (cryptographic and physical assumptions, external to this repository) | ASSUMED | not theorems of this repo
-| T-1 | Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute (the sequential Theorem 3.4) | PROVEN | `+TransactionAtomicity.rollback-restores+`; `+tests/reject-agda/ForwardRollback.agda+` refused
+| T-1 | Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute (the sequential Theorem 3.4) | PROVEN | `+TransactionAtomicity.rollback-restores+`; rechecked in Rocq and Lean (`+verification/proofs/{rocq,lean}/Rollback+`, `+PWG-2ii+`); `+tests/reject-agda/ForwardRollback.agda+` refused
 | T-2 | begin, add_operation, commit and mark_rolled_back each preserve the log invariant (given a fresh id for begin) and rewrite only the Active transaction, so a completed one is never modified | PROVEN | `+TransactionAtomicity.lifecycle-preserves-good+`; `+tests/reject-agda/CommitWhenIdle.agda+` refused
 | T-3 | At most one transaction is Active, and exactly one when the active pointer is set | PROVEN | `+TransactionAtomicity.at-most-one-active+`
 | T-4 | A rollback that fails part-way can be retried to completion | TESTED | `+rollback_resume_test+` drives the real `+jk+`: after one undo error and a repair, `+jk rollback+` skips the already undone operation and finishes (before the fix the retry stopped at it every time, reproduced 2026-10-26); fixed in `+cmd_rollback+`
@@ -141,11 +141,12 @@ name and reported) and the superseded receipts (runs 41687715055 at
 link:docs/theory/PROOF-GRADES.adoc[`+docs/theory/PROOF-GRADES.adoc+`].
 Correspondence state for them: `+AGDA-VERIFIED+`.
 
-*PWG census, theory theorems of this repository (denominator 5):* `+PWG-3+` 5
-(G-1, T-1, T-2, T-3, E-1m) · `+PWG-2i+` 0 · `+PWG-2ii+` 0 · `+PWG-1+` 0 ·
+*PWG census, theory theorems of this repository (denominator 5):* `+PWG-3+` 4
+(G-1, T-2, T-3, E-1m) · `+PWG-2i+` 0 · `+PWG-2ii+` 1 (T-1) · `+PWG-1+` 0 ·
 `+ungraded+` 0. G-3 names this repository's FFI bridge, so PROOF-POLICY §1
-classes it as engineering and it is outside the ladder. The Rocq and Lean legs of all five have not been
-attempted; each row still owes both (§8.4: a grade is not a discharge).
+classes it as engineering and it is outside the ladder. T-1's Rocq and Lean legs are re-proved and reconciled
+(`+docs/theory/PROOF-GRADES.adoc+`, §T-1); the other four have not been
+attempted, and each still owes both (§8.4: a grade is not a discharge).
 
 The other seven PROVEN rows — A-1, A-2, C-1 to C-5 — are Idris2 theorems. Under
 PROOF-POLICY §1 those are interface and ABI contracts, so the theory ladder does

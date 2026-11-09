@@ -1,0 +1,67 @@
+DIGEST cd56b56c27b6d23fd6e71c9323d886c7
+FForwardRollback
+R522:529 JanusKey.Rollback <> <> lib
+R547:551 Coq.Arith.Arith <> <> lib
+R553:555 Coq.micromega.Lia <> <> lib
+def 568:582 <> rollbackForward
+binder 585:585 <> S:1
+R601:604 Coq.Init.Datatypes <> list ind
+R607:608 JanusKey.Rollback <> Op rec
+R610:610 ForwardRollback <> S:1 var
+binder 596:597 <> os:2
+R619:619 ForwardRollback <> S:1 var
+binder 615:615 <> z:3
+R624:624 ForwardRollback <> S:1 var
+R637:638 ForwardRollback <> os:2 var
+R649:651 Coq.Init.Datatypes <> nil constr
+R656:656 ForwardRollback <> z:3 var
+R662:665 Coq.Init.Datatypes <> cons constr
+R676:690 ForwardRollback <> rollbackForward:4 def
+R697:700 JanusKey.Rollback <> undo proj
+R704:704 ForwardRollback <> z:3 var
+def 726:733 <> doubleOp
+R737:738 JanusKey.Rollback <> Op rec
+R740:742 Coq.Init.Datatypes <> nat ind
+R762:765 JanusKey.Rollback <> mkOp constr
+R791:798 Coq.Arith.PeanoNat Nat div2 def
+binder 772:772 <> x:6
+R777:780 Coq.Init.Datatypes <> Some constr
+R784:786 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R783:783 ForwardRollback <> x:6 var
+R787:787 ForwardRollback <> x:6 var
+R762:765 JanusKey.Rollback <> mkOp constr
+R791:798 Coq.Arith.PeanoNat Nat div2 def
+binder 772:772 <> x:7
+R777:780 Coq.Init.Datatypes <> Some constr
+R784:786 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R783:783 ForwardRollback <> x:7 var
+R787:787 ForwardRollback <> x:7 var
+R851:853 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R864:866 Coq.Init.Peano <> ::nat_scope:x_'*'_x not
+R851:853 Coq.Init.Peano <> ::nat_scope:x_'+'_x not
+R864:866 Coq.Init.Peano <> ::nat_scope:x_'*'_x not
+R884:898 Coq.Arith.PeanoNat Nat div2_double thm
+R884:898 Coq.Arith.PeanoNat Nat div2_double thm
+def 922:926 <> incOp
+R930:931 JanusKey.Rollback <> Op rec
+R933:935 Coq.Init.Datatypes <> nat ind
+R955:958 JanusKey.Rollback <> mkOp constr
+R982:985 Coq.Init.Peano <> pred abbrev
+binder 965:965 <> x:8
+R970:973 Coq.Init.Datatypes <> Some constr
+R976:976 Coq.Init.Datatypes <> S constr
+R978:978 ForwardRollback <> x:8 var
+R955:958 JanusKey.Rollback <> mkOp constr
+R982:985 Coq.Init.Peano <> pred abbrev
+binder 965:965 <> x:9
+R970:973 Coq.Init.Datatypes <> Some constr
+R976:976 Coq.Init.Datatypes <> S constr
+R978:978 ForwardRollback <> x:9 var
+def 1141:1156 <> forward_restores
+R1212:1214 Coq.Init.Logic <> ::type_scope:x_'='_x not
+R1162:1176 ForwardRollback <> rollbackForward def
+R1179:1182 Coq.Init.Datatypes <> cons constr
+R1194:1197 Coq.Init.Datatypes <> cons constr
+R1205:1207 Coq.Init.Datatypes <> nil constr
+R1199:1203 ForwardRollback <> incOp def
+R1184:1191 ForwardRollback <> doubleOp def

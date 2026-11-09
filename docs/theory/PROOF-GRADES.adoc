@@ -13,7 +13,7 @@ repository, and none is introduced here.
 [NOTE]
 ====
 *PWG census, theory theorems of this repository (denominator 5):*
-`PWG-3` 5 (G-1, T-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 0 · `PWG-1` 0 ·
+`PWG-3` 4 (G-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 1 (T-1) · `PWG-1` 0 ·
 `ungraded` 0. `+foundation-diverse`: none. Axioms: none.
 
 The denominator is the ledger rows whose source of truth is an Agda theorem.
@@ -193,12 +193,13 @@ changed gate, as above. Nothing here has been translated to Rocq or Lean, so no
 recheck leg counts and the grade is not `PWG-2i`; no witness in another
 foundation exists, so `foundation_diverse` is false.
 
-=== Why it stops at PWG-3
+=== Why four rows stop at PWG-3
 
-PWG-2i and above would require an Agda → Dedukti → Rocq/Lean transport or a
+PWG-2i and above require an Agda → Dedukti → Rocq/Lean transport or a
 re-proof, with the outcome recorded as `transported`, `re-proved` or
-`unavailable` (PROOF-POLICY §2). That work has not been done, is not claimed,
-and would not change what these modules prove: §2.2 is explicit that compiling
+`unavailable` (PROOF-POLICY §2). For T-1 that work is done (§T-1 below, now
+`PWG-2ii`); for G-1, T-2, T-3 and E-1m it has not been done and is not
+claimed. A recheck would not change what these modules prove: §2.2 is explicit that compiling
 in a second prover does not establish the same proposition unless the
 correspondence is checked too.
 
@@ -308,8 +309,9 @@ repeated the counts, and the two copies drifted apart.
 
 ==== Leg records (PROOF-POLICY §8.5)
 
-The same record holds for each of G-1, T-1, T-2, T-3 and E-1m, so it is given
-once. `pwg: 3`, `foundation_diverse: false`.
+The same record holds for each of G-1, T-2, T-3 and E-1m, so it is given once.
+`pwg: 3`, `foundation_diverse: false`. T-1 has its own record below
+(§T-1: the first recheck legs).
 
 [cols="1,1,1,1,3",options="header"]
 |===
@@ -339,6 +341,127 @@ describe a leg that was tried, excused or found impossible. None applies to a
 leg nobody has started, so the route field says that instead of borrowing one.
 When a leg is started, its row gets the route, the target statement, the
 comparison with the Agda statement and its receipts, and the PWG is recomputed.
+
+==== T-1: the first recheck legs (2026-11-09)
+
+T-1 is the pilot for PROOF-POLICY §2, chosen because its statement is small,
+abstract and free of the sibling library. `pwg: 2ii`, `foundation_diverse:
+false`.
+
+[cols="1,1,1,1,3",options="header"]
+|===
+| Leg | Route | §5 token | §2.2 state | Receipts
+
+| Agda (source)
+| source of truth
+| `PROVEN`
+| `AGDA-VERIFIED`
+| §The PWG-3 receipt above
+
+| Rocq
+| `re-proved`
+| `PROVEN`
+| `RECONCILED`
+| `agda-proofs.yml` job "Rocq and Lean recheck legs", on this change and then
+  on `main`
+
+| Lean
+| `re-proved`
+| `PROVEN`
+| `RECONCILED`
+| the same job
+|===
+
+*Why re-proved.* §2 asks for transport first. The Agda → Dedukti translator
+(`Deducteam/Agda2Dedukti`, last changed 2022-01-24 at `c7c7d67`) builds against
+a forked Agda branch of that period and its documentation pins Lambdapi 2.1.0.
+It cannot read modules checked by the pinned Agda 2.6.4.3, so no transport
+route exists for this toolchain. For Lean, §2 already says to re-prove until a
+released Lambdapi has a Lean exporter. Both legs are therefore re-proved by
+hand, in each prover's core library: no Mathlib, no imports in the Lean file,
+only the prelude in the Rocq file.
+
+*The statements, side by side.*
+
+[cols="1,3",options="header"]
+|===
+| Prover | Proposition
+
+| Agda (`TransactionAtomicity.agda`, module `Rollback (S : Set)`)
+| `rollback-restores : ∀ {os x z} → Executed os x z → rollback os z ≡ x`
+
+| Rocq (`verification/proofs/rocq/Rollback.v`)
+| `rollback_restores : forall (S : Type) (os : list (Op S)) (x z : S),
+  Executed os x z -> rollback os z = x`
+
+| Lean (`verification/proofs/lean/Rollback.lean`)
+| `rollback_restores {S : Type} {os : List (Op S)} {x z : S} :
+  Executed os x z → rollback os z = x`
+|===
+
+*How the comparison was made.* By reading, definition by definition. It was not
+done by a round trip, since no translator exists.
+
+* `Op`: a record of `execute : S → Maybe S`, `undo : S → S` and
+  `undoes : execute x ≡ just y → undo y ≡ x`. The targets have the same three
+  fields over `option`/`Option`. Agda binds `x` and `y` implicitly and Rocq
+  explicitly, which is the same proposition.
+* `Executed`: an inductive family in `Set` with constructors `done` and `next`.
+  The targets put it in `Type`, the same universe level, with the same two
+  constructors and the same indices.
+* `rollback`: the same structural recursion on the list, undoing the head after
+  the tail.
+* The source type `S` is a parameter in `Set` in all three (`Type` at level 0).
+* Builtins: Agda's `List`/`Maybe` and the targets' `list`/`option` and
+  `List`/`Option` are the same free inductive types.
+
+*Residual differences, listed rather than hidden.* The targets' logics are
+stronger than the source's. Rocq and Lean both have uniqueness of identity
+proofs for their equality, which `--without-K` withholds from Agda, and Lean
+has definitional proof irrelevance. Neither proof uses these: each is the same
+induction on `Executed`, a rewrite with the induction hypothesis and one use of
+`undoes`. Proving the statement in a stronger logic adds no assumption to the
+Agda source.
+
+*Axioms.* Rocq `Print Assumptions rollback_restores` reports "Closed under the
+global context". Lean `#print axioms` reports that it "does not depend on any
+axioms". The gate (`scripts/check-recheck.sh`) fails if either line is missing:
+a mutant with `Admitted` in Rocq and one with `sorry` in Lean were each caught.
+
+*Non-vacuity.* `tests/reject-rocq/ForwardRollback.v` and
+`tests/reject-lean/ForwardRollback.lean` are twins of
+`tests/reject-agda/ForwardRollback.agda`. They build real double and increment
+operations against the leg's own definitions and claim that undoing them in
+execution order restores the start. Rocq refuses with `Unable to unify "1" with
+"0"`, and Lean with "`decide` proved that the proposition … is false". The gate
+checks each refusal message.
+
+*Pins and inputs.*
+
+[cols="1,3",options="header"]
+|===
+| Field | Value
+
+| Rocq | The Coq Proof Assistant 8.18.0, Ubuntu `coq=8.18.0+dfsg-1build2` on the
+  `ubuntu-24.04` runner, asserted by version string. `coqc -q -Q . JanusKey`.
+| Lean | Lean 4.35.0 (commit `eb6cafb7290e8bd5f2937522d8d804f58f02bafc`), the
+  release tarball `lean-4.35.0-linux.tar.zst`, SHA-256
+  `7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d`, checked
+  before unpacking. `lean -o <module>.olean <file>`.
+| Inputs (SHA-256) | `Rollback.v` `662d51bf…ff28e2`, `Rollback.lean`
+  `808c3258…36c6`, the fixtures `4b2c01d4…0410` (Rocq) and `813cae57…77ee`
+  (Lean), `check-recheck.sh` `be20e857…b2a3`
+| Observed | Locally, with the same two versions: both legs check with no
+  axioms, both fixtures refused as named, `[check-recheck] OK`. The CI job on
+  this change is the receipt.
+|===
+
+The pilot answers the question the pilot was for. The transport route is not
+available for any of the five theorems, for the reason above. A hand re-proof
+in core Rocq and core Lean costs about forty lines per statement. The remaining
+four take the same route. G-1 needs the Loss grade algebra restated, since the
+targets cannot import `resource-algebra`. T-2 and T-3 wait for the split into an
+abstract log algebra.
 
 These five are the only rows in this repository with a Proof Witness Grade (PWG). Each
 rests on a premise it names rather than assumes silently — the per-step
@@ -462,8 +585,9 @@ PROOF-POLICY §1 and the ABI belongs in Idris2.
   and neither receipt is deleted from the history.
 * `AGDA-PENDING` is the correct correspondence state for a module committed but
   not yet checked. No row in this repository is in that state today: the five
-  graded rows are `AGDA-VERIFIED` at the commit above. Their Rocq and Lean legs
-  have not been attempted, so each is `OPEN` with no route and no §2.2 record,
+  graded rows are `AGDA-VERIFIED` at the commit above. Except for T-1, whose
+  legs are re-proved and reconciled, their Rocq and Lean legs have not been
+  attempted, so each is `OPEN` with no route and no §2.2 record,
   and the grade is `PWG-3`. They are not `unavailable`: under §2 that route
   means a leg that cannot be built, and a hand re-proof is always available as
   the fallback, so the legs are owed, not excused (§8.4.1).
