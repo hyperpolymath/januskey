@@ -351,8 +351,11 @@ comparison with the Agda statement and its receipts, and the PWG is recomputed.
 
 ==== T-1: the first recheck legs (2026-11-09)
 
-T-1 is the pilot for PROOF-POLICY §2, chosen because its statement is small,
-abstract and free of the sibling library. `pwg: 2ii`, `foundation_diverse:
+T-1 is the pilot for PROOF-POLICY §2, chosen because its statement is small and
+abstract. Its Agda module imports `ResourceAlgebra.Prelude` from the pinned
+sibling, but the `Rollback` part uses only three things from it: `_≡_` (Agda's
+builtin equality, re-exported) and the elementary `trans` and `cong`. Those are
+accounted for in the comparison below. `pwg: 2ii`, `foundation_diverse:
 false`.
 
 [cols="1,1,1,1,3",options="header"]
@@ -421,6 +424,13 @@ done by a round trip, since no translator exists.
 * The source type `S` is a parameter in `Set` in all three (`Type` at level 0).
 * Builtins: Agda's `List`/`Maybe` and the targets' `list`/`option` and
   `List`/`Option` are the same free inductive types.
+* The sibling's prelude: `_≡_` is `Agda.Builtin.Equality` re-exported, and
+  `trans` and `cong` are the usual one-clause definitions by pattern matching on
+  `refl`. Rocq's `eq` with `eq_trans`/`f_equal`, and Lean's `Eq` with
+  `Eq.trans`/`congrArg`, are the same inductive equality and the same
+  eliminations. The re-proofs use `rewrite` instead, which needs nothing beyond
+  the equality type. No other sibling definition reaches T-1's statement or
+  proof.
 
 *Residual differences, listed rather than hidden.* The targets' logics are
 stronger than the source's. Rocq and Lean both have uniqueness of identity
@@ -455,9 +465,15 @@ checks each refusal message.
   release tarball `lean-4.35.0-linux.tar.zst`, SHA-256
   `7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d`, checked
   before unpacking. `lean -o <module>.olean <file>`.
-| Inputs (SHA-256) | `Rollback.v` `662d51bf…ff28e2`, `Rollback.lean`
-  `808c3258…36c6`, the fixtures `4b2c01d4…0410` (Rocq) and `813cae57…77ee`
-  (Lean), `check-recheck.sh` `be20e857…b2a3`
+| Inputs (SHA-256) | `Rollback.v`
+  `662d51bf0b642ac28f816853c7d2c6a851583487a15e9f79c3b8184a53ff28e2`,
+  `Rollback.lean`
+  `808c32585ad582fced7497b93607668f92d9140b36ae4bd90b14f6b26bcd36c6`, the Rocq
+  fixture `4b2c01d4f70d1b60080babdf64aeaf873ec4db98c4682a6694e1981127160410`,
+  the Lean fixture
+  `813cae57494bee9c6457a63553489d83ad47c2ac538c18a0de8e86956cc477ee`,
+  `check-recheck.sh`
+  `5171d9d27a888e79dc9544f7b84d2a3557428c918a25194f9a88bcb2944f8483`
 | Observed | Locally, with the same two versions: both legs check with no
   axioms, both fixtures refused as named, `[check-recheck] OK`. The CI job on
   this change is the receipt.

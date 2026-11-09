@@ -78,8 +78,8 @@ statement about bytes on a device.
 |---|---|
 | Commit/rollback settle a group of operations | yes — `TransactionManager`, states `Active`/`Committed`/`RolledBack`; at most one active (T-3, PROVEN) |
 | A rollback that fails part-way can be retried | yes (T-4, TESTED — `rollback_resume_test`, driving the real `jk`) |
-| A failed save leaves memory and disk agreeing | yes for the transaction log (T-5, TESTED, write→fsync→rename with permission preservation) |
-| The **operation metadata** log has the same guarantee | **unverified** — `MetadataStore::save` now calls `crate::transaction::write_atomic` (write → sync → rename), but that edit has not been built or run (T-8, **OPEN**); an undo whose `mark_undone` fails to persist still leaves the file undone and the log unchanged |
+| A failed save leaves memory and disk agreeing | yes for the transaction log (T-5, TESTED: replaced by rename, never overwritten in place, with permission preservation; the fsync before the rename is by construction, not tested) |
+| The **operation metadata** log has the same guarantee | yes for the log itself (T-8, TESTED): an edit whose save fails is not applied and applies exactly once on retry, and an append whose save fails keeps its record for the next save. **Not** for the file change it records: `execute_*` changes the filesystem before appending, and `undo` runs the inverse before `mark_undone`, so a crash or failed save between the two leaves a change the log does not know about (T-9, **OPEN**) |
 | A failed execute leaves the filesystem unchanged | assumed, not checked (T-6) |
 | Intermediate states are invisible to other processes | **false** — operations are applied to the filesystem one at a time as they are executed. A transaction gives you a recorded, resumable rollback, not isolation. Nothing in this tool locks, stages, or hides the working tree |
 
@@ -144,7 +144,7 @@ fn execute(op: Operation) -> Result<()> {
 Ordering note, because this is where the guarantee is thinnest: in
 `execute_delete` the content is stored **before** the unlink and the metadata is
 appended **after** it (`operations.rs`). A crash between the unlink and the
-append loses the ability to undo that delete. T-6 and T-8 are the ledger rows
+append loses the ability to undo that delete. T-6 and T-9 are the ledger rows
 that would have to close to remove that window.
 
 ### Phase 5: Reversal
@@ -155,7 +155,7 @@ fn undo(operation_id: &str) -> Result<()> {
     let content = content_store.retrieve(&metadata.content_hash)?;
     let inverse = construct_inverse(&metadata, content);
     inverse.perform()?;
-    metadata_store.mark_undone(operation_id)?;   // T-8: save atomic since 2026-11-01, unbuilt
+    metadata_store.mark_undone(operation_id)?;   // T-9: runs after the inverse (OPEN)
     Ok(())
 }
 ```
@@ -189,13 +189,15 @@ present one until it exists. What exists, by ledger row:
 | Row | Statement | Status |
 |---|---|---|
 | T-1 | Undoing a fully executed transaction in reverse order restores the state it began in, given each step's undo restores its execute | **PROVEN** (Agda, model) |
-| T-2 | The lifecycle preserves the log invariant and rewrites only the Active transaction | **PROVEN** (Agda, model) |
-| T-3 | At most one transaction is Active | **PROVEN** (Agda, model) |
+| T-2 | In any single-active log, the transitions preserve the invariant and rewrite only the active record (januskey's transactions are an instance) | **PROVEN** (Agda, abstract) |
+| T-3 | In any single-active log, at most one record is active | **PROVEN** (Agda, abstract) |
 | T-4 | A partially failed rollback can be retried to completion | **TESTED** |
-| T-5 | The transaction log is replaced atomically, with permissions preserved | **TESTED** |
+| T-5 | A failed transaction-log save leaves memory unchanged; the log is replaced by rename with permissions preserved (fsync by construction) | **TESTED** |
 | T-6 | A failed execute leaves the filesystem unchanged; each undo restores its execute's pre-state | **ASSUMED** |
 | T-7 | Transaction ids never collide | **ASSUMED** |
-| T-8 | The operation metadata log is saved atomically | **OPEN** — saves by rename since 2026-11-01, not yet built or run |
+| T-8 | The operation metadata log is replaced by rename; a failed edit is unapplied and retries once; a failed append keeps its record | **TESTED** |
+| T-9 | A file change whose log record fails to persist is recorded or reverted | **OPEN** — needs a write-ahead intent record |
+| T-10 | The Rust `TransactionManager` refines the abstract single-active log | **OPEN** — engineering, for Creusot or Verus |
 | — | "Every operation is reversible" as a theorem linked to the Rust | **OPEN** |
 | G-2 | The Idris2 and Agda presentations correspond | **ASSUMED** — "by transcription, no mechanical link claimed" |
 
@@ -233,7 +235,7 @@ shared-blob rule in [RMO](rmo-primitive.md).
 impl MetadataStore {
     pub fn append(&mut self, metadata: OperationMetadata) -> Result<()> {
         self.log.operations.push(metadata);
-        self.save()?;                                  // T-8: write→sync→rename, unbuilt
+        self.save()?;                                  // T-8: rename; a failed save keeps the record
         Ok(())
     }
 
@@ -246,9 +248,10 @@ impl MetadataStore {
 
 The transaction log (`TransactionLog::save`) uses the atomic path in
 `transaction.rs`: a per-save temporary file, mode preservation, fsync and
-rename. The operation metadata log now calls the same helper, so the asymmetry
-is closed in source and still open in evidence — nothing has built or run the
-change, which is why row T-8 stays OPEN.
+rename. The operation metadata log calls the same helper, and row T-8 tests it.
+The sketch above simplifies the metadata store: an edit is saved before it
+becomes the in-memory log, and an append whose save fails keeps its record for
+the next save.
 
 ## Performance
 
@@ -266,8 +269,10 @@ their results are unbaselined (`READINESS.adoc` §Benchmark Classification).
 ## Limitations
 
 1. **The store is the whole guarantee.** Lose `.januskey/` and undo is gone.
-2. **Metadata consistency is weaker than it looks** — T-8 is open; the
-   metadata log now saves by rename, but that change is unverified.
+2. **Metadata consistency is weaker than it looks.** The log itself saves
+   safely (T-8, TESTED), but a file change and its log record are not written
+   together: a crash between them leaves a change the log does not know about
+   (T-9, OPEN).
 3. **Not everything captured is restored** — ownership, mtime and symlink
    identity are recorded but not applied (§2).
 4. **No isolation.** Operations touch the live filesystem as they execute.
@@ -279,5 +284,5 @@ their results are unbaselined (`READINESS.adoc` §Benchmark Classification).
 
 - [RMO: Obliterative Wipe Primitive](rmo-primitive.md)
 - [Formal Model of File System State](formal-model.md)
-- `../../../PROOF-NEEDS.adoc` — the claims ledger, rows T-1..T-8
+- `../../../PROOF-NEEDS.adoc` — the claims ledger, rows T-1..T-10
 - [Architecture](../architecture/index.md)

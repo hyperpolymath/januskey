@@ -56,7 +56,7 @@ receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); no standard library; res
 receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (PROOF-POLICY §2.1 canonical, plus two stricter flags)"
 not-graded = "the 7 Idris2 PROVEN rows (ABI/interface contracts, PROOF-POLICY §8.1); all 33 TESTED rows (observed behaviour); ASSUMED/DESIGNED/OPEN rows"
 open-obligations = "Rocq and Lean legs for the four PWG-3 rows (PROOF-POLICY §2); one Agda version across CI (agda-proofs pins 2.6.4.3, dashboard-check installs 2.6.3); no Creusot or Verus proof on the Rust, so no Rust behaviour is proved"
-claimed-higher = "none — no PWG-2i, PWG-2ii or PWG-1 is claimed"
+claimed-higher = "PWG-2ii for T-1 only (Rocq and Lean legs re-proved and reconciled); no PWG-2i or PWG-1 is claimed"
 
 [test-categories-complete]
 unit = true
