@@ -134,16 +134,18 @@ current receipt (PROOF-POLICY §8.2, `PWG-3`):
   propositions, and are kept visible
 |===
 
-*Re-earn pending (2026-11-09).* The change that follows this receipt edits the
-explanatory comments of `Reversibility.agda` and `TransactionAtomicity.agda`.
-The "What is NOT claimed" block named failure modes since fixed by T-4, T-5 and
-T-8, and a G-1 comment implied that the grade was derived from the cancellation
-law. No statement or proof term changed, but the bytes did, so this receipt
-does not cover them. The `agda-proofs.yml` run on that change, and after merge
-the run on `main`, re-earns it; this receipt then becomes `state: superseded`.
-A local run of the same invocation with the same Agda version passes on the new
-bytes (three modules checked, six fixtures refused); that is a reproduction, not
-a receipt (§2.3).
+*Re-earned on the change that edits the proof comments (2026-11-09).* That
+change edits the explanatory comments of `Reversibility.agda` and
+`TransactionAtomicity.agda`. The "What is NOT claimed" block named failure modes
+since fixed by T-4, T-5 and T-8, and a G-1 comment implied that the grade was
+derived from the cancellation law. No statement or proof term changed, but the
+bytes did, so the receipt above does not cover them. Their receipt is
+`agda-proofs.yml` run
+https://github.com/hyperpolymath/januskey/actions/runs/42623188471[42623188471]
+at `a71dc7610b8978c5edd71df2c44e9c9177af4654` (pull request #171, success, the
+same container, prover, flags and gate as above, with the postulate scan
+included). After merge, the run on `main` is the receipt of record, and run
+42076969251 becomes `state: superseded`.
 
 Earlier receipts, kept with their lineage (§8.4):
 
