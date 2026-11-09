@@ -91,7 +91,7 @@ printf '%s\n' 'module CommentsOnly where' '-- postulate in a line comment' \
   '{- postulate {- nested postulate -} postulate -}' \
   'x--postulate : Set₁' 'x--postulate = Set' \
   's : String' 's = "a postulate in a string \" still the string"' \
-  '{-# FOREIGN GHC postulate = () #-}' \
+  '{-# FOREIGN GHC postulate = () #-}' "c = 'x'-- postulate after a character literal" \
   > "$work/CommentsOnly.agda"
 # One planted postulate per line, 2 to 5: after a block comment; bounded by
 # NO-BREAK SPACE (U+00A0), which Agda reads as whitespace; separated from its
