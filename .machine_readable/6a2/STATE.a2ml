@@ -50,7 +50,7 @@ total = "141 tests + 5 benchmark groups + 12 PROVEN ledger rows — as declared 
 # Proof Witness Grades, standards 3-practice/PROOF-POLICY.adoc §8 (the
 # Mathesis brief's §5/§6 ladder, adopted with corrections). Never a
 # percentage. Receipts, lineage and per-row records: docs/theory/PROOF-GRADES.adoc.
-grade-3 = "PWG-3: G-1, T-2, T-3, E-1m; PWG-2ii: T-1 (Rocq and Lean legs re-proved and reconciled) — census 4 + 1 of 5 theory theorems (G-3 is engineering under PROOF-POLICY §1)"
+grade-3 = "PWG-3: G-1, T-2, T-3, E-1m; PWG-2ii: T-1 (Rocq and Lean legs re-proved and reconciled) — census 4 + 1 of 5 theory theorems (G-3 and T-10 are engineering under PROOF-POLICY §1; T-2 and T-3 are stated over the abstract SingleActiveLog)"
 receipt-commit = "see docs/theory/PROOF-GRADES.adoc, The PWG-3 receipt (the 4afb710 and fc188c4 receipts are superseded)"
 receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); no standard library; resource-algebra pinned at cf9235c"
 receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (PROOF-POLICY §2.1 canonical, plus two stricter flags)"

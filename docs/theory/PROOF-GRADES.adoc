@@ -21,11 +21,13 @@ PROOF-POLICY §1 puts a statement that names one repository's type, function or
 wire format in engineering, so these rows are outside it: G-3 (the FFI bridge
 preserves grade 𝟙, `OPEN`), E-1 (a security property of the implementation; its
 model half is E-1m), the MPR row (a refinement claim about Rust, which §1 sends
-to Creusot and Verus) and G-2 (a bridge, `ASSUMED`). By the same test, T-2 and
-T-3 are stated over a hand-transcribed model of this repository's
-`TransactionManager`, so they may belong in engineering too. That is an open
-classification question for the owner; until it is decided they stay in the
-census as recorded since 2026-11-01.
+to Creusot and Verus) and G-2 (a bridge, `ASSUMED`). By the same test, T-2
+and T-3 used to be stated over a hand-transcribed model of this repository's
+`TransactionManager`. On the owner's ruling of 2026-11-09 they were split. The
+theorems now live in `SingleActiveLog.agda`, over any record type with a key and
+an active or settled phase: theory, in the census. The claim that januskey's
+Rust refines that log is the new engineering row T-10 (`OPEN`, for Creusot or
+Verus).
 ====
 
 == What governs the grades
@@ -165,7 +167,8 @@ the same re-run.* #171 edits the explanatory comments of `Reversibility.agda`
 and `TransactionAtomicity.agda`: the "What is NOT claimed" block named failure
 modes since fixed by T-4, T-5 and T-8, and a G-1 comment implied that the grade
 was derived from the cancellation law. No statement or proof term changed, but
-the bytes did, so the receipt above does not cover them either. The first green
+the bytes did, so the receipt above does not cover them either. #171 also adds a fourth root, `SingleActiveLog.agda` (the T-2/T-3 split), so
+the cone the next receipt records has seven first-party modules, not six. The first green
 `agda-proofs.yml` run on `main` after both pull requests is the receipt for the
 new gate and the new bytes together. On the branch the same gate passed on each
 revision of the comments (for example run
@@ -295,10 +298,14 @@ repeated the counts, and the two copies drifted apart.
 | T-1 | Undoing a fully executed transaction in reverse order restores the state
   it began in, given each step's undo restores its execute |
   `TransactionAtomicity.agda::rollback-restores`
-| T-2 | The four lifecycle transitions preserve the log invariant and rewrite
-  only the Active transaction | `TransactionAtomicity.agda::lifecycle-preserves-good`
-| T-3 | At most one transaction is Active, exactly one when the pointer is set |
-  `TransactionAtomicity.agda::at-most-one-active`
+| T-2 | In any single-active log, opening a fresh active record, a key- and
+  phase-preserving edit, and a settling transition each preserve the invariant
+  and rewrite only the active record |
+  `SingleActiveLog.agda::begin-good`, `modify-good`, `finish-good`,
+  `update-active` (januskey's instance: `TransactionAtomicity.agda::lifecycle-preserves-good`)
+| T-3 | In any single-active log satisfying the invariant, at most one record is
+  active, and exactly one when the pointer is set |
+  `SingleActiveLog.agda::at-most-one-active`
 | E-1m | In a world model, an agent whose observation excludes the store does not
   know what the store holds; obliteration leaves nothing to recover; rotation
   to a different key (premise `old ≠ new`) leaves no agent — the system included
@@ -460,8 +467,9 @@ The pilot answers the question the pilot was for. The transport route is not
 available for any of the five theorems, for the reason above. A hand re-proof
 in core Rocq and core Lean costs about forty lines per statement. The remaining
 four take the same route. G-1 needs the Loss grade algebra restated, since the
-targets cannot import `resource-algebra`. T-2 and T-3 wait for the split into an
-abstract log algebra.
+targets cannot import `resource-algebra`. T-2 and T-3 are now stated over the abstract
+log in `SingleActiveLog.agda`, built from builtins only, so their legs can
+restate it directly.
 
 These five are the only rows in this repository with a Proof Witness Grade (PWG). Each
 rests on a premise it names rather than assumes silently — the per-step
