@@ -25,11 +25,13 @@
 --
 -- What is NOT claimed (the model is hand-transcribed from the Rust, like
 -- G-2, and these are deliberate limits):
---   * No I/O. Saving is not modelled. The Rust's behaviour on a failed or
---     interrupted save is TESTED, not proved: a failed save leaves the
---     in-memory log unchanged, and the log is replaced by write, sync and
---     rename (ledger rows T-5 and T-8). A file change whose log record fails
---     to persist is OPEN (T-9).
+--   * No I/O. Saving is not modelled. Some of the Rust's failed-save
+--     behaviour is TESTED, not proved (ledger rows T-5 and T-8): a
+--     transaction-log mutation, or a metadata-log edit, whose save fails is
+--     not applied in memory, while a metadata append whose save fails keeps
+--     its record for the next save; both logs are replaced by write, sync and
+--     rename. A failure after the temporary file exists is not injected. A
+--     file change whose log record fails to persist is OPEN (T-9).
 --   * A failed execute is assumed to leave the state unchanged. Part A only
 --     speaks about operations that executed; nothing here proves the Rust
 --     executor is a no-op on failure (ASSUMED, T-6).

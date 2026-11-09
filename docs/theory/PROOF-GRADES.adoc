@@ -12,13 +12,20 @@ repository, and none is introduced here.
 
 [NOTE]
 ====
-*PWG census, theory theorems of this repository (denominator 6):*
+*PWG census, theory theorems of this repository (denominator 5):*
 `PWG-3` 5 (G-1, T-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 0 · `PWG-1` 0 ·
-`ungraded` 1 (G-3, `OPEN`: no Agda statement yet). `+foundation-diverse`: none.
-Axioms: none. The denominator is the ledger rows whose source of truth is, or is
-to be, an Agda theorem. E-1 (a security property of the implementation; its
+`ungraded` 0. `+foundation-diverse`: none. Axioms: none.
+
+The denominator is the ledger rows whose source of truth is an Agda theorem.
+PROOF-POLICY §1 puts a statement that names one repository's type, function or
+wire format in engineering, so these rows are outside it: G-3 (the FFI bridge
+preserves grade 𝟙, `OPEN`), E-1 (a security property of the implementation; its
 model half is E-1m), the MPR row (a refinement claim about Rust, which §1 sends
-to Creusot and Verus) and G-2 (a bridge, `ASSUMED`) are outside it.
+to Creusot and Verus) and G-2 (a bridge, `ASSUMED`). By the same test, T-2 and
+T-3 are stated over a hand-transcribed model of this repository's
+`TransactionManager`, so they may belong in engineering too. That is an open
+classification question for the owner; until it is decided they stay in the
+census as recorded since 2026-11-01.
 ====
 
 == What governs the grades
@@ -139,13 +146,14 @@ change edits the explanatory comments of `Reversibility.agda` and
 `TransactionAtomicity.agda`. The "What is NOT claimed" block named failure modes
 since fixed by T-4, T-5 and T-8, and a G-1 comment implied that the grade was
 derived from the cancellation law. No statement or proof term changed, but the
-bytes did, so the receipt above does not cover them. Their receipt is
-`agda-proofs.yml` run
+bytes did, so the receipt above does not cover them. The receipt of record for
+the merged bytes is the `agda-proofs.yml` run on `main` after merge; run
+42076969251 then becomes `state: superseded`. On the pull request the same
+gate passed on each revision of the comments, for example run
 https://github.com/hyperpolymath/januskey/actions/runs/42623188471[42623188471]
-at `a71dc7610b8978c5edd71df2c44e9c9177af4654` (pull request #171, success, the
-same container, prover, flags and gate as above, with the postulate scan
-included). After merge, the run on `main` is the receipt of record, and run
-42076969251 becomes `state: superseded`.
+at `a71dc76` (same container, prover and flags, postulate scan included). A
+later review round reworded one comment again, so that run does not cover the
+final bytes either; the run on the pull request's final head does.
 
 Earlier receipts, kept with their lineage (§8.4):
 
@@ -274,11 +282,45 @@ repeated the counts, and the two copies drifted apart.
   `TransactionAtomicity.agda::at-most-one-active`
 | E-1m | In a world model, an agent whose observation excludes the store does not
   know what the store holds; obliteration leaves nothing to recover; rotation
-  leaves no agent — the system included — able to use the old key (true by the
-  definition of `rotate` in the model) |
+  to a different key (premise `old ≠ new`) leaves no agent — the system included
+  — able to use the old one (true by the definition of `rotate` in the model) |
   `Epistemic.agda::adversary-ignorant`, `obliterate-cuts-recovery`,
   `obliterate-ignorance`, `rotate-forgets-old`
 |===
+
+==== Leg records (PROOF-POLICY §8.5)
+
+The same record holds for each of G-1, T-1, T-2, T-3 and E-1m, so it is given
+once. `pwg: 3`, `foundation_diverse: false`.
+
+[cols="1,1,1,1,3",options="header"]
+|===
+| Leg | Route | §5 token | §2.2 state | Receipts
+
+| Agda (source)
+| source of truth
+| `PROVEN`
+| `AGDA-VERIFIED`
+| §The PWG-3 receipt above, with its lineage
+
+| Rocq
+| none: not attempted
+| `OPEN`
+| none: no target statement exists to compare
+| none
+
+| Lean
+| none: not attempted
+| `OPEN`
+| none: no target statement exists to compare
+| none
+|===
+
+§8.5's route values (`transported`, `re-proved`, `waived`, `unavailable`) each
+describe a leg that was tried, excused or found impossible. None applies to a
+leg nobody has started, so the route field says that instead of borrowing one.
+When a leg is started, its row gets the route, the target statement, the
+comparison with the Agda statement and its receipts, and the PWG is recomputed.
 
 These five are the only rows in this repository with a Proof Witness Grade (PWG). Each
 rests on a premise it names rather than assumes silently — the per-step
@@ -324,7 +366,7 @@ observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) i
 | Creusot contracts on the Rust functions, run in CI: PROOF-POLICY §1 sends
   first-party Rust behaviour to Creusot, not to Idris2 and not to Agda.
 
-| T-6, T-7, X-1, G-2, E-1, G-3 (`ASSUMED` / `OPEN`)
+| T-6, T-7, X-1, G-2, E-1, G-3 (`ASSUMED` / `OPEN`; G-3 is engineering under §1)
 | Premises, external assumptions, or filed obligations.
 | Each names its own gap in `PROOF-NEEDS.adoc`; none may be counted as proved
   by the grade of a neighbouring row (README-EXPLAINME: "a row is only as
