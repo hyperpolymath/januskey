@@ -16,10 +16,11 @@
 -- a TESTED row of the claims ledger in PROOF-NEEDS.adoc.
 --
 -- Pinned sibling: hyperpolymath/resource-algebra, see scripts/fetch-siblings.sh.
--- Kernel ruling (2026-10-12): Agda --safe --without-K is the proof kernel;
--- the Idris2 ABI (src/abi/JanusKey/ABI) is the runtime layer. The Idris2
--- IsCNO / ReversibleOp pair corresponds to ReversiblePair below by
--- transcription (ASSUMED; no mechanical link is claimed).
+-- Kernel: Agda, checked by scripts/check-agda.sh under PROOF-POLICY §2.1
+-- (--safe --without-K --cubical-compatible); the Idris2 ABI
+-- (src/abi/JanusKey/ABI) is the runtime layer. The Idris2 IsCNO /
+-- ReversibleOp pair corresponds to ReversiblePair below by transcription
+-- (ASSUMED; no mechanical link is claimed).
 
 module Reversibility where
 

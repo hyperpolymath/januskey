@@ -20,10 +20,15 @@ bash scripts/fetch-siblings.sh
 # them visible rather than silencing them with -WnoUnsupportedIndexedMatch.
 flags=(--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check
        -i verification/proofs/agda -i _build/dependencies/resource-algebra/src)
-for module in Reversibility TransactionAtomicity Epistemic; do
+modules=(Reversibility TransactionAtomicity Epistemic)
+for module in "${modules[@]}"; do
   "$prover" "${flags[@]}" "verification/proofs/agda/$module.agda"
 done
 mkdir -p _build/check-logs
+# PWG-3 receipt fields beyond the kernel run (PROOF-POLICY §8.2, §8.4 rule 6):
+# the import cone of each module, a comment-aware scan of it for postulates
+# and check-disabling pragmas, and the input digests. Printed into this log.
+AGDA_FLAGS="${flags[*]}" bash scripts/agda-cone.sh "$prover" _build/check-logs/agda-receipt.txt "${modules[@]}"
 shopt -s nullglob
 rejects=(tests/reject-agda/*.agda)
 shopt -u nullglob
