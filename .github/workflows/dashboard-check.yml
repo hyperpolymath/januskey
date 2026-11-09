@@ -47,11 +47,24 @@ jobs:
           # under /root, so idris2 runs as root, and the wrapper then hands any
           # root-owned file it left in the working tree back to the runner: a
           # checker that cannot clean up its scratch copy would fail its row.
+          # The Agda gate writes its dependency graphs under mktemp -d, so the
+          # temporary directory is mounted too. It reads the prover's own
+          # lib/prim (Agda.Primitive, Agda.Builtin.*) on the host, at the path
+          # `agda --print-agda-dir` reports, so that directory is copied out of
+          # the image to the same path here.
           cat > "$RUNNER_TEMP/provers/agda" <<'WRAP'
           #!/usr/bin/env bash
+          tmp="${TMPDIR:-/tmp}"
           exec docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e LC_ALL=C.UTF-8 \
-            -v "$PWD:$PWD" -w "$PWD" --entrypoint agda januskey-agda:2.6.4.3 "$@"
+            -v "$PWD:$PWD" -v "$tmp:$tmp" -w "$PWD" --entrypoint agda januskey-agda:2.6.4.3 "$@"
           WRAP
+          agda_dir="$(docker run --rm --entrypoint agda januskey-agda:2.6.4.3 --print-agda-dir)"
+          sudo mkdir -p "$agda_dir/lib"
+          sudo chown "$(id -u):$(id -g)" "$agda_dir/lib"
+          cid="$(docker create januskey-agda:2.6.4.3)"
+          docker cp "$cid:$agda_dir/lib/prim" "$agda_dir/lib/prim"
+          docker rm -f "$cid" >/dev/null
+          test -f "$agda_dir/lib/prim/Agda/Primitive.agda"
           cat > "$RUNNER_TEMP/provers/idris2" <<'WRAP'
           #!/usr/bin/env bash
           docker run --rm -e LC_ALL=C.UTF-8 -v "$PWD:$PWD" -w "$PWD" --entrypoint "" "$IDRIS2_IMAGE" idris2 "$@"
