@@ -1,292 +1,632 @@
-= Proof Witness Grades: receipts, lineage and review
+= Proof Witness Grades (PROOF-POLICY §8)
 :toc: preamble
 :icons: font
 
-This page backs the Proof Witness Grade records in `PROOF-NEEDS.adoc`
-(§Proof Witness Grades). It answers the question a reader of the ledger should
-not have to reconstruct: *which claims are proofs, how many independent
-witnesses each has, and what the receipts say.* It also records a design
-review of what each graded theorem actually establishes.
+This page grades januskey's proof claims in the vocabulary its owner's estate
+mathematics architecture uses, and records the receipt for every grade. It is
+the answer to a single question a reader of `PROOF-NEEDS.adoc` should not have
+to reconstruct: *which of these claims is a proof, and how good a proof is it?*
 
-No percentage appears here, and none is introduced. Grades are reported as a
-census with their denominator.
+It grades nothing by confidence. There is no percentage anywhere in this
+repository, and none is introduced here.
 
-== What governs
+[NOTE]
+====
+*PWG census, theory theorems of this repository (denominator 5):*
+`PWG-3` 4 (G-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 1 (T-1) · `PWG-1` 0 ·
+`ungraded` 0. `+foundation-diverse`: none. Axioms: none.
 
-[cols="1,3",options="header"]
-|===
-| Source | Rule taken from it
+The denominator is the ledger rows whose source of truth is an Agda theorem.
+PROOF-POLICY §1 puts a statement that names one repository's type, function or
+wire format in engineering, so these rows are outside it: G-3 (the FFI bridge
+preserves grade 𝟙, `OPEN`), E-1 (a security property of the implementation; its
+model half is E-1m), the MPR row (a refinement claim about Rust, which §1 sends
+to Creusot and Verus) and G-2 (a bridge, `ASSUMED`). By the same test, T-2
+and T-3 used to be stated over a hand-transcribed model of this repository's
+`TransactionManager`. On the owner's ruling of 2026-11-09 they were split. The
+theorems now live in `SingleActiveLog.agda`, over any record type with a key and
+an active or settled phase: theory, in the census. The claim that januskey's
+Rust refines that log is the new engineering row T-10 (`OPEN`, for Creusot or
+Verus).
+====
 
-| `metadatastician/standards` `3-practice/PROOF-POLICY.adoc` §8, read at
-  `9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5` (2026-11-08)
-| *Proof Witness Grades* (owner ruling 2026-11-04): `PWG-3`, `PWG-2i`,
-  `PWG-2ii`, `PWG-1`, and `ungraded` below `PWG-3`. Always written with the
-  prefix. Grades apply to theory theorems only (§8.1), are derived from
-  receipts (§8.4 rule 2), never carried forward from an older commit (rule 4),
-  and keep their history on the receipt as `current`, `superseded` or
-  `regressed` (rule 5). For Agda, the axioms travel as `--safe`, a
-  comment-aware postulate scan of the import cone, and the recorded cone
-  (rule 6).
+== What governs the grades
 
-| PROOF-POLICY §2.1
-| The canonical entrypoint invocation
-  `agda --safe --without-K --cubical-compatible <module.agda>`, with the Agda
-  version and the library set recorded per commit. Earlier `--safe` or
-  `--safe --without-K` successes are historical evidence, not receipts.
-
-| PROOF-POLICY §1 and §1.2
-| Theory is proved in Agda and rechecked in Rocq and Lean. API, ABI and
-  engineering contracts are Idris2. First-party Rust is verified with
-  *Creusot* (contracts in *Pearlite*) and *Verus*, by default (owner ruling
-  2026-11-07).
-
-| PROOF-POLICY §5
-| The closed status vocabulary: `PROVEN`, `PROVEN-WITH-AXIOMS`, `TESTED`,
-  `ASSUMED`, `OPEN`. januskey's ledger also uses `DESIGNED` for consumption
-  rows, which are not proof obligations.
-
-| `hyperpolymath/mathesis`, `docs/proposals/estate-mathematical-architecture.adoc`
-| Provenance only. Its §5–§6 grade ladder was adopted with corrections as
-  §8. This page used the brief's wording until 2026-11-09 and
-  no longer does. Mathesis may catalogue the grades below; it derives them
-  from these receipts and does not assign them (§8.5).
-|===
-
-== Census
-
-Theory theorems, counted by ledger row:
-
-*`PWG-3` 5 (G-1, T-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 0 · `PWG-1` 0 ·
-`ungraded` 3 (G-3, E-1, "every operation is reversible") · of 8.*
-
-None of the five `PWG-3` rows rests on an axiom. A `PWG-3` grade is not a
-discharge: each of the five still owes its Rocq and Lean legs.
-
-The three `ungraded` rows are `OPEN`. G-3 (the FFI bridge preserves grade 𝟙)
-and the reversibility theorem need G-2 made mechanical first. E-1 is a claim
-about an implementation under cryptographic assumptions (X-1). Its model-level
-shadow is E-1m, and a model of channels does not grade E-1.
-
-== The `PWG-3` receipt
-
-A receipt is the log of the `agda-proofs.yml` job (*Reversibility as a grade
-(Loss instance), expected rejections*) on the exact source commit. From this
-change on, `scripts/check-agda.sh` prints every §8.2 field into that log:
-
-[cols="1,3",options="header"]
-|===
-| Field | Where it comes from
-
-| Checker and version | `agda --version`. CI pins `agda-bin=2.6.4.3-1+b2` on
-  `debian:trixie-slim@sha256:a29215f6…` and fails unless the version string is
-  exactly `Agda version 2.6.4.3`.
-| Flags in force | `flags:` line:
-  `--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check`
-  plus the two include paths. This is §2.1's canonical form with three
-  tightenings: no library is resolved implicitly, the sibling is re-checked
-  from source rather than trusted from compiled interfaces, and the checker
-  re-verifies its own work.
-| Standard library | `standard-library: none (--no-libraries)`. The modules
-  import only `Agda.Builtin.*` and the pinned sibling.
-| Sibling pin | `sibling:` line: `hyperpolymath/resource-algebra`
-  `cf9235c532712a783a404c359a1055f40134794a`, fetched by
-  `scripts/fetch-siblings.sh`.
-| Import cone | `cone(<module>):` lines, from Agda's own `--dependency-graph`.
-  At this writing:
-  `Reversibility` → `ResourceAlgebra.{Core,Instances.Loss,Prelude}` plus
-  builtins; `TransactionAtomicity` → `ResourceAlgebra.Prelude` plus builtins;
-  `Epistemic` → builtins only.
-| Axioms | `--safe`, which refuses `postulate` and the unsafe pragmas in every
-  module checked; and `escape-hatch-scan:`, a comment-aware scan of every
-  cone file the checker does not ship (3 first-party, 3 sibling) for
-  `postulate`, trust primitives, check-disabling pragmas and unsafe
-  options. The scanner proves itself on every run against one clean control
-  and four planted hatches, so a scanner that stopped matching would fail
-  the gate. `Agda.Primitive` and `Agda.Builtin.*` bind the checker's
-  BUILTINs. They ship with the pinned checker and are attributed to it.
-| Input digest | `input:` lines (SHA-256 per scanned file) and `input-digest:`
-  over them.
-| Source commit | `source:` line, the full 40-character commit.
-| Result | The three modules type-check, and each fixture under
-  `tests/reject-agda/` is refused with the message it names.
-|===
-
-Caveat, not an axiom: Agda reports `UnsupportedIndexedMatch` warnings (14 in
-`Reversibility`, 16 in `TransactionAtomicity`, 2 in `Epistemic`, including the
-sibling's `≤-trans`). These clauses would not compute under cubical
-transports. That is a statement about computation, not about the propositions,
-so the gate leaves the warnings visible.
-
-=== Receipt lineage
-
-[cols="1,2,1,3",options="header"]
-|===
-| Run | Commit | State | Why
-
-| https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509]
-| `4afb710e86646658f667f10bd6274ee47416bfc7`
-| `superseded`
-| Flags `--safe --without-K` without `--cubical-compatible`: §2.1 makes this
-  historical evidence, not a receipt. Predates `Epistemic.agda`, so it never
-  covered E-1m.
-
-| https://github.com/hyperpolymath/januskey/actions/runs/41687715055[41687715055]
-| `fc188c44906faedfe91bfd414be3fda01ff4caf4`
-| `superseded`
-| First run under §2.1's flags, covering all five rows. Replaced by later
-  runs on the same graded bytes. Its log records version and flags, but no
-  import cone and no postulate scan.
-
-| https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251]
-| `23bc8c38160a25c37917bce69cf05d91899b07e5`
-| `superseded` by this change
-| Same graded bytes as 41687715055 and green. Also lacks the cone and the
-  scan. This change edits comments in two graded modules and adds those
-  fields to the gate, so the run on its merge commit supersedes it.
-|===
-
-*The current receipt is the green `agda-proofs.yml` run on the latest commit
-of `main`.* It is the first receipt that carries every field §8.2 lists. Until
-then the grade rests on the kernel runs above. Those runs prove the same
-propositions with `--safe` in force, but they never recorded the cone, so they
-are kept as evidence rather than cited as complete receipts. A red run on
-`main` makes that receipt `regressed`, and the five rows fall to `ungraded`
-until it is fixed (§8.4 rule 4).
-
-=== One checker, one pin (resolved 2026-11-09)
-
-Until 2026-11-09 `dashboard-check.yml` installed Ubuntu's Agda 2.6.3 on the
-Idris2 image, a second pin that differed from the receipt's 2.6.4.3. By owner
-decision the dashboard now runs Agda from the image `agda-proofs.yml` pins:
-the same `debian:trixie-slim` digest and `agda-bin=2.6.4.3-1+b2`. It runs
-Idris2 from the image `idris-abi.yml` pins, and checks the version string as
-the proof job does. A green dashboard therefore re-runs the PROVEN rows with
-the prover version of the receipt.
-
-== Design review of the graded theorems (2026-11-09)
-
-A grade counts witnesses. It does not measure how much a theorem says. This
-review records what each graded row actually establishes, so that a reader
-does not take a `PWG-3` statement for more than it is.
+Since the owner ruling of 2026-11-04, `PROOF-POLICY.adoc` §8 is normative for
+grades, and they are written with their prefix: `PWG-3`, `PWG-2i`, `PWG-2ii`,
+`PWG-1`, or `ungraded`. The mathesis brief that first proposed the ladder is
+kept for provenance only; where the two differ, §8 governs. This page was first
+written against the brief (2026-11-01) and was brought in line with §8 on
+2026-11-09.
 
 [cols="1,2,3",options="header"]
 |===
-| Row and theorem | Kind | What it establishes, and its limits
+| Source | Section | Rule taken from it
 
-| G-1 `all-lossless-trace`, `lossless-trace-all`, `obliterate-absorbs`,
-  `obliterated-not-lossless`
-| Substantive (induction over traces)
-| The grade algebra: a trace is lossless exactly when every step is, and one
-  obliterating step makes the whole trace `inf`. Grades are annotations on
-  steps. Nothing derives a step's grade from its code.
+| `hyperpolymath/standards`,
+  `3-practice/PROOF-POLICY.adoc`
+| §8 Proof Witness Grades
+| `PWG-3`: the Agda proof is `PROVEN` under the §2.1 invocation, with the
+  receipt recording the Agda version, library pin, flags and import cone.
+  `PWG-2i`: plus one counted Rocq or Lean leg (`RECONCILED`). `PWG-2ii`: plus
+  both. `PWG-1`: plus current receipts per commit for every counted witness. A
+  witness in a different foundation (Isabelle/HOL and the like) is the tag
+  `+foundation-diverse`, never a grade: the brief's "2ii needs Isabelle/HOL"
+  reading is corrected by §8.3.
 
-| G-1 `wrap-unwrap-𝟙`, `wrap-unwrap-id`
-| Definitional or premise-restating
-| `wrap-unwrap-𝟙` is `refl`, because both steps are annotated `fin 0`.
-  `wrap-unwrap-id` returns the record's own `cancels` premise. Their content
-  is the premise, which is TESTED as `execute_then_undo_is_identity`.
+| PROOF-POLICY
+| §8.4 rules
+| A grade is derived from receipts, never asserted; no percentage, only a
+  census with its denominator; every counted witness lists its axioms (for
+  Agda: `--safe`, a comment-aware postulate scan of the import cone, and the
+  recorded cone); a receipt no longer current carries `state: superseded` or
+  `state: regressed`, never deleted.
 
-| T-1 `rollback-restores`
-| Substantive (induction over executed lists)
-| Undoing a fully executed list in reverse restores the start state, given
-  each step's undo law (T-6, ASSUMED). `ForwardRollback.agda` pins that
-  execution-order undo is refused.
+| `hyperpolymath/standards`,
+  `3-practice/PROOF-POLICY.adoc`
+| §1 mapping
+| Theory is proved in **Agda** and rechecked in Rocq and Lean; the behaviour of
+  first-party Rust is **Creusot** with **Pearlite** contracts, and **Verus**
+  (§1.2, owner ruling 2026-11-07), on that code; API, ABI and wire-format
+  contracts are **Idris2**. The earlier "Rust always means Rust/SPARK" note is
+  withdrawn (owner ruling 2026-04-10): Rust is Creusot.
 
-| T-2 `lifecycle-preserves-good`, T-3 `at-most-one-active`
-| Substantive (case analysis and list lemmas)
-| The four transitions keep `Good`, rewrite only the Active transaction, and
-  leave at most one Active. The model matches the Rust by transcription (T-11,
-  ASSUMED). The premise `Good` is now checked when a log is loaded (T-10,
-  TESTED). Before 2026-11-09 a hand-edited or foreign log could start the
-  Rust outside the invariant, and the unused `TransactionManager::active_mut`
-  could change a transaction outside the four transitions. That method has
-  been removed.
+| PROOF-POLICY
+| §2.1 invocation
+| `agda --safe --without-K --cubical-compatible <module.agda>`; pin and record
+  the Agda version and the library set per commit; a missing tool is an open
+  obligation, never a silent skip.
 
-| E-1m `adversary-ignorant`, `obliterate-ignorance`
-| Witness-specific
-| Proved for two particular worlds whose stores differ and whose adversary
-  observations are both empty. The general form is
-  `different-store-unknown`, which needs such a pair as its hypothesis. These
-  statements show that ignorance is expressible and true in the model. They
-  do not show that the adversary is ignorant in every januskey state.
-
-| E-1m `obliterate-cuts-recovery`
-| Substantive (small)
-| After obliterating `h`, the model store holds nothing at `h`.
-
-| E-1m `rotate-forgets-old`
-| Definitional
-| Holds because the model's `rotate` sets the old key unusable for every
-  agent. `OldKeyStillUsable.agda` pins that the opposite is refused, but no
-  link exists to the Rust key subsystem.
+| PROOF-POLICY
+| §2.3 execution
+| The policy text records policy; CI receipts establish the executions. §2.2's
+  statuses (`AGDA-PENDING`, `AGDA-VERIFIED`, `COQ-CHECKED`, `LEAN-CHECKED`,
+  `BRIDGE-PENDING`, `RECONCILED`, `COUNTEREXAMPLE`, `QUARANTINED`) name what
+  happened to one proposition.
 |===
 
-No row was found false. The two corrections that follow from this review are
-made in this change: rows T-10 and T-11 now exist, and the narrower reading
-of E-1m above is recorded. They do not change any grade.
+januskey's own five-status ledger vocabulary (`PROVEN`, `TESTED`, `ASSUMED`,
+`DESIGNED`, `OPEN`) is the estate's claim vocabulary and is unchanged by any of
+this. A grade is a second axis laid over it, not a replacement: a row is
+`PROVEN` *because* a named artefact checks it, and separately has (or has not) a
+Proof Witness Grade.
 
-== Not graded, and why
+== The PWG-3 receipt
 
-=== Idris2 ABI rows (engineering)
+The theory artefacts are three Agda modules:
 
-A-1, A-2 and C-1 to C-5 are `PROVEN` Idris2 theorems, checked by
-`idris2 --typecheck src/abi/januskey-abi.ipkg` (in `idris-abi.yml` and
-`dashboard-check`). §8.1 does not grade engineering proofs. G-2 (Idris2
-`IsCNO`/`ReversibleOp` against Agda `ReversiblePair`) is `ASSUMED`, by
-transcription.
+* `verification/proofs/agda/Reversibility.agda` — the Loss grade algebra:
+  lossless traces have only lossless steps, obliteration absorbs, and a
+  wrap/unwrap pair with a cancellation premise is a grade-𝟙 two-step trace.
+* `verification/proofs/agda/TransactionAtomicity.agda` — rollback restores the
+  state the transaction began in; the `TransactionManager` lifecycle keeps its
+  log invariant under begin, add_operation, commit and mark_rolled_back, and at
+  most one transaction is Active.
+* `verification/proofs/agda/Epistemic.agda` — the model-level half of E-1
+  (row E-1m, §The epistemic rewrite below).
 
-=== Rust obligations (Creusot, Pearlite and Verus)
+All three are checked by `scripts/check-agda.sh` (`just test-agda`), which is
+also the ledger's recorded checker for rows G-1, T-1, T-2, T-3 and E-1m.
 
-PROOF-POLICY §1.2 asks for the implementation entrypoint, the verifier, the
-specification, the assumptions and the result of each obligation. Both
-verifiers are planned by default.
+The gate changed in hyperpolymath/januskey#170: it now derives the import cone
+from Agda and scans it for postulates. A changed checker has to re-earn its
+receipt (§8.4), so the receipt below is the **last receipt for the three
+modules**, not yet a receipt for this gate. The first green `agda-proofs.yml` run
+on `main` after #170 is the receipt for the gate, and replaces this row, which
+then becomes `state: superseded`. Until then the grade is `PWG-3`, receipt
+pending re-run.
 
-[cols="1,2,1,1,2",options="header"]
+[cols="1,3",options="header"]
 |===
-| Row | Entrypoint | Creusot / Pearlite | Verus | Today
+| Field | Value
 
-| T-4 | `cmd_rollback` (`crates/januskey-cli/src/main.rs`) | `OPEN` | `OPEN` | TESTED
-| T-5, T-10 | `TransactionManager::{new, begin, add_operation, commit, mark_rolled_back}`, `write_atomic` (`crates/reversible-core/src/transaction.rs`) | `OPEN` | `OPEN` | TESTED
-| T-8 | `MetadataStore::{append, mark_undone, prune, purge_path_entries}` (`crates/reversible-core/src/metadata.rs`) | `OPEN` | `OPEN` | TESTED
-| S-1, S-2 | `ContentStore::{hash_path, store}` (`crates/reversible-core/src/content_store.rs`) | `OPEN` | `OPEN` | TESTED
+| Workflow, run | `agda-proofs.yml`, run
+  https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251],
+  branch `main`, conclusion **success**; last receipt for the modules, before
+  the gate change above
+| Commit | `23bc8c38160a25c37917bce69cf05d91899b07e5` (started 2026-11-05T17:40:46Z)
+| Prover | `agda-bin=2.6.4.3-1+b2` on Debian trixie-slim
+  (`@sha256:a29215f6…`), asserted by a passing step:
+  `test "$(agda --version)" = 'Agda version 2.6.4.3'`
+| Library pin | none: `--no-libraries`; the only import outside this tree is the
+  sibling below
+| Flags | `--safe --without-K --cubical-compatible --no-libraries
+  --ignore-interfaces --double-check`: the §2.1 canonical invocation, plus two
+  stricter options
+| Import cone | the module set Agda reports with `--dependency-graph` for the
+  roots `Reversibility`, `TransactionAtomicity` and `Epistemic`: 14 modules.
+  First-party (6): the three roots and `ResourceAlgebra.Prelude`,
+  `ResourceAlgebra.Core` and `ResourceAlgebra.Instances.Loss` from
+  `resource-algebra` at `cf9235c532712a783a404c359a1055f40134794a`, fetched by
+  `scripts/fetch-siblings.sh` and re-checked from source under the same flags
+  (`--ignore-interfaces`). Supplied with the prover (8): `Agda.Primitive` and
+  `Agda.Builtin.{Bool,Equality,List,Maybe,Nat,Sigma,Unit}`
+| Axioms | none in the development. `--safe` refuses `postulate`, and the
+  comment-aware scan (`scripts/scan-postulates.sh`) finds 0 postulates in the
+  six first-party modules. The prover-supplied `Agda.Primitive` declares the
+  universe-level primitives (`Level`, `lzero`, `lsuc`, `_⊔_`) by two `postulate`
+  blocks, each bound by a `BUILTIN` pragma: they are the prover's trusted base,
+  not axioms of this development. The gate checks that those blocks declare
+  exactly those four names and that each has its `BUILTIN` binding, and fails on
+  any other prover-supplied postulate, so a prover pin that adds one does not
+  pass. The scan is new in #170, so its first receipt on `main` is the run that
+  replaces this row. The same figures came from the #170 branch in CI under
+  Agda 2.6.4.3 (run
+  https://github.com/hyperpolymath/januskey/actions/runs/42624327510[42624327510]
+  at `77fcedb`; branch evidence, not a receipt)
+| Result | The three modules type-check; the fixtures under
+  `tests/reject-agda/` are refused *with the message each fixture names*, so a
+  fixture that starts passing, or starts failing for the wrong reason, fails the
+  gate. Agda reports `UnsupportedIndexedMatch` warnings (§The §2.1 invocation
+  below): they concern computation under cubical transports, not the
+  propositions, and are kept visible
 |===
 
-Every `OPEN` here has the same reason. No Creusot or Verus toolchain is set up
-in this repository or its CI, and the agent sandboxes that wrote these rows
-could not install one (`docs/estate/environment-toolchains.md`). Next action:
-pick the smallest obligation, T-10's invariant check, write it as a Pearlite
-contract and a Verus specification, and add a pinned CI job for each. File I/O
-(T-5, T-8, S-2) sits at the edge of what either verifier models, so a
-contract there covers the in-memory logic, with the filesystem as an
-`ASSUMED` boundary.
+*The comment edits of hyperpolymath/januskey#171 (2026-11-09) are covered by
+the same re-run.* #171 edits the explanatory comments of `Reversibility.agda`
+and `TransactionAtomicity.agda`: the "What is NOT claimed" block named failure
+modes since fixed by T-4, T-5 and T-8, and a G-1 comment implied that the grade
+was derived from the cancellation law. No statement or proof term changed, but
+the bytes did, so the receipt above does not cover them either. #171 also adds a fourth root, `SingleActiveLog.agda` (the T-2/T-3 split), so
+the cone the next receipt records has seven first-party modules, not six. The first green
+`agda-proofs.yml` run on `main` after both pull requests is the receipt for the
+new gate and the new bytes together. On the branch the same gate passed on each
+revision of the comments (for example run
+https://github.com/hyperpolymath/januskey/actions/runs/42623188471[42623188471]
+at `a71dc76`; branch evidence, not a receipt).
 
-=== Other rows
+Earlier receipts, kept with their lineage (§8.4):
 
-T-6, T-7, T-11, X-1 and G-2 are `ASSUMED`. G-3, E-1, T-9, L-1, L-2 and O-1 are
-`OPEN`. V-1 to V-3 are `DESIGNED`. Each row names its own gap in
-`PROOF-NEEDS.adoc`, and none may borrow the grade of a neighbouring row: "a
-row is only as strong as its weakest step" (README-EXPLAINME).
+[cols="1,1,3",options="header"]
+|===
+| Run, commit | State | Why
+
+| https://github.com/hyperpolymath/januskey/actions/runs/41687715055[41687715055], `fc188c4`
+| `superseded`
+| Canonical flags and all three modules; replaced by the run above at a later commit
+| https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509], `4afb710`
+| `superseded`
+| Before `--cubical-compatible` and before `Epistemic.agda`; it never covered E-1m
+|===
+
+Those are the `PWG-3` facts: the propositions type-check in Agda under the
+§2.1 invocation, in CI, at a named commit, with the prover version pinned and
+the import cone recorded; the receipt is re-earned by the first run of the
+changed gate, as above. For G-1, T-2, T-3 and E-1m no Rocq or Lean leg exists, so
+no recheck leg counts and their grade is `PWG-3`. T-1 has both legs and is
+`PWG-2ii` (§T-1 below). No witness in another foundation exists, so
+`foundation_diverse` is false throughout.
+
+=== Why four rows stop at PWG-3
+
+PWG-2i and above require an Agda → Dedukti → Rocq/Lean transport or a
+re-proof, with the outcome recorded as `transported`, `re-proved` or
+`unavailable` (PROOF-POLICY §2). For T-1 that work is done (§T-1 below, now
+`PWG-2ii`); for G-1, T-2, T-3 and E-1m it has not been done and is not
+claimed. A recheck would not change what these modules prove: §2.2 is explicit that compiling
+in a second prover does not establish the same proposition unless the
+correspondence is checked too.
+
+== The §2.1 invocation: adopted, and measured (2026-11-01)
+
+PROOF-POLICY §2.1's canonical form is
+`agda --safe --without-K --cubical-compatible <module.agda>`. Until this branch
+the gate ran `--safe --without-K --no-libraries --ignore-interfaces
+--double-check` without the cubical flag, and an earlier revision of this page
+predicted that adding it would fail, because the flag is *infectious* (direct
+imports must use it too) and every module of the pinned sibling opens with
+`{-# OPTIONS --safe --without-K #-}`.
+
+**That prediction was wrong and is withdrawn.** With Agda 2.6.4.3 installed in
+the sandbox (PyPI wheel `agda==2.6.4.3.post1`, reporting
+`Agda version 2.6.4.3-56f5f56`, the same version CI pins), the canonical
+invocation type-checks both modules:
+
+[source,text]
+----
+$ agda --safe --without-K --cubical-compatible --no-libraries \
+       --ignore-interfaces --double-check \
+       -i verification/proofs/agda -i _build/dependencies/resource-algebra/src \
+       verification/proofs/agda/Reversibility.agda
+   → exit 0, 14 × warning: -W[no]UnsupportedIndexedMatch
+
+$ … verification/proofs/agda/TransactionAtomicity.agda
+   → exit 0, 16 × warning: -W[no]UnsupportedIndexedMatch
+
+$ AGDA=/tmp/tc/bin/agda bash scripts/check-agda.sh
+   → [PASS] refused as expected: tests/reject-agda/{CommitWhenIdle,ForwardRollback,HiddenLoss,ReviveAfterObliterate}
+   → [check-agda] OK
+----
+
+Agda warns where the earlier reading expected it to refuse: a `--without-K`
+import is accepted, and what it reports is that particular clauses — the
+sibling's `≤-trans`, and `obliterate-absorbs` here — will not compute when
+applied to cubical transports. That is a statement about computation under
+transport, not about the propositions these modules prove, so the gate keeps the
+warnings visible rather than silencing them with `-WnoUnsupportedIndexedMatch`.
+
+`scripts/check-agda.sh` now runs the canonical invocation, so januskey matches
+§2.1 exactly and is still stricter in two other respects (`--ignore-interfaces`
+re-checks the sibling from source instead of trusting compiled interfaces;
+`--double-check` re-verifies the type-checker's own work).
+
+=== Receipt bookkeeping for that change
+
+The local run above is recorded as **reproduction** only: same prover version,
+PyPI provenance instead of Debian, and no CI provenance (PROOF-POLICY §2.3:
+receipts of execution come from CI). The CI receipt it was waiting for now
+exists: the table in §The PWG-3 receipt cites run 42076969251, which ran the
+canonical invocation on all three modules, and the receipts from before the
+flag changed are marked `superseded` there.
+
+Until 2026-11-09 the Agda version was pinned twice in CI: `agda-proofs.yml`
+installed 2.6.4.3 (the receipt above), while `dashboard-check.yml` installed
+Ubuntu's 2.6.3 on the Idris2 image so it could run the PROVEN rows' checkers.
+Resolved by owner decision on 2026-11-09. The dashboard job now runs Agda from
+the image `agda-proofs.yml` pins: the same `debian:trixie-slim` digest and
+`agda-bin=2.6.4.3-1+b2`. It runs Idris2 from the image `idris-abi.yml` pins,
+and asserts the version string exactly as the proof job does. One version, one
+receipt.
+
+=== Upgrade path, measured
+
+`agda==2.7.0.1` runs in the sandbox once its wheel's missing `data/lib` is
+supplied (bare install dies with "The lib directory … does not exist"), and
+under 2.7.0.1 **both modules also type-check, exit 0**. The latest upstream
+release is 2.8.0.2 (2026-09-13), which has not been tried. None of this is a
+recommendation to move: the CI pin is Debian trixie's 2.6.4.3, and an upgrade
+means a new container, a new pin and a new receipt.
+
+The sandbox's installable set, and the exact hosts that block Rust, Creusot and
+Idris2, are recorded in `docs/estate/environment-toolchains.md`.
+
+== Grades, ledger row by ledger row
+
+The ledger rows fall into three classes under PROOF-POLICY §1. `PROOF-NEEDS.adoc`
+is the only place the rows are counted: an earlier revision of this page
+repeated the counts, and the two copies drifted apart.
+
+=== PWG-3 — theory, proved in Agda
+
+[cols="1,3,2",options="header"]
+|===
+| Row | Proposition | Theorem
+
+| G-1 | A lossless trace has only lossless steps; an obliterating step absorbs;
+  a wrap/unwrap pair carries its cancellation law. The pair's grade 𝟙 is
+  *assigned* by `wrapStep`/`unwrapStep`, not derived from that law:
+  `wrap-unwrap-𝟙` holds by definition and does not use `cancels` |
+  `Reversibility.agda::lossless-trace-all`, `obliterate-absorbs`,
+  `wrap-unwrap-id`
+| T-1 | Undoing a fully executed transaction in reverse order restores the state
+  it began in, given each step's undo restores its execute |
+  `TransactionAtomicity.agda::rollback-restores`
+| T-2 | In any single-active log, opening a fresh active record, a key- and
+  phase-preserving edit, and a settling transition each preserve the invariant
+  and rewrite only the active record |
+  `SingleActiveLog.agda::begin-good`, `modify-good`, `finish-good`,
+  `update-active` (januskey's instance: `TransactionAtomicity.agda::lifecycle-preserves-good`)
+| T-3 | In any single-active log satisfying the invariant, at most one record is
+  active, and exactly one when the pointer is set |
+  `SingleActiveLog.agda::at-most-one-active`
+| E-1m | In a world model, an agent whose observation excludes the store does not
+  know what the store holds; obliteration leaves nothing to recover; rotation
+  to a different key (premise `old ≠ new`) leaves no agent — the system included
+  — able to use the old one (true by the definition of `rotate` in the model).
+  `adversary-ignorant` and `obliterate-ignorance` are proved for two particular
+  worlds whose stores differ and whose adversary observations are both empty;
+  the general form is `different-store-unknown`, which takes such a pair as its
+  hypothesis, so these show ignorance is expressible and true in the model, not
+  that the adversary is ignorant in every januskey state |
+  `Epistemic.agda::adversary-ignorant`, `obliterate-cuts-recovery`,
+  `obliterate-ignorance`, `rotate-forgets-old`
+|===
+
+==== Leg records (PROOF-POLICY §8.5)
+
+The same record holds for each of G-1, T-2, T-3 and E-1m, so it is given once.
+`pwg: 3`, `foundation_diverse: false`. T-1 has its own record below
+(§T-1: the first recheck legs).
+
+[cols="1,1,1,1,3",options="header"]
+|===
+| Leg | Route | §5 token | §2.2 state | Receipts
+
+| Agda (source)
+| source of truth
+| `PROVEN`
+| `AGDA-VERIFIED`
+| §The PWG-3 receipt above, with its lineage
+
+| Rocq
+| none: not attempted
+| `OPEN`
+| none: no target statement exists to compare
+| none
+
+| Lean
+| none: not attempted
+| `OPEN`
+| none: no target statement exists to compare
+| none
+|===
+
+§8.5's route values (`transported`, `re-proved`, `waived`, `unavailable`) each
+describe a leg that was tried, excused or found impossible. None applies to a
+leg nobody has started, so the route field says that instead of borrowing one.
+When a leg is started, its row gets the route, the target statement, the
+comparison with the Agda statement and its receipts, and the PWG is recomputed.
+
+==== T-1: the first recheck legs (2026-11-09)
+
+T-1 is the pilot for PROOF-POLICY §2, chosen because its statement is small and
+abstract. Its Agda module imports `ResourceAlgebra.Prelude` from the pinned
+sibling, but the `Rollback` part uses only three things from it: `_≡_` (Agda's
+builtin equality, re-exported) and the elementary `trans` and `cong`. Those are
+accounted for in the comparison below. `pwg: 2ii`, `foundation_diverse:
+false`.
+
+[cols="1,1,1,1,3",options="header"]
+|===
+| Leg | Route | §5 token | §2.2 state | Receipts
+
+| Agda (source)
+| source of truth
+| `PROVEN`
+| `AGDA-VERIFIED`
+| §The PWG-3 receipt above
+
+| Rocq
+| `re-proved`
+| `PROVEN`
+| `RECONCILED`
+| `agda-proofs.yml` job "Rocq and Lean recheck legs", on this change and then
+  on `main`
+
+| Lean
+| `re-proved`
+| `PROVEN`
+| `RECONCILED`
+| the same job
+|===
+
+*Why re-proved.* §2 asks for transport first. The Agda → Dedukti translator
+(`Deducteam/Agda2Dedukti`, last changed 2022-01-24 at `c7c7d67`) builds against
+a forked Agda branch of that period and its documentation pins Lambdapi 2.1.0.
+It cannot read modules checked by the pinned Agda 2.6.4.3, so no transport
+route exists for this toolchain. For Lean, §2 already says to re-prove until a
+released Lambdapi has a Lean exporter. Both legs are therefore re-proved by
+hand, in each prover's core library: no Mathlib, no imports in the Lean file,
+only the prelude in the Rocq file.
+
+*The statements, side by side.*
+
+[cols="1,3",options="header"]
+|===
+| Prover | Proposition
+
+| Agda (`TransactionAtomicity.agda`, module `Rollback (S : Set)`)
+| `rollback-restores : ∀ {os x z} → Executed os x z → rollback os z ≡ x`
+
+| Rocq (`verification/proofs/rocq/Rollback.v`)
+| `rollback_restores : forall (S : Type) (os : list (Op S)) (x z : S),
+  Executed os x z -> rollback os z = x`
+
+| Lean (`verification/proofs/lean/Rollback.lean`)
+| `rollback_restores {S : Type} {os : List (Op S)} {x z : S} :
+  Executed os x z → rollback os z = x`
+|===
+
+*How the comparison was made.* By reading, definition by definition. It was not
+done by a round trip, since no translator exists.
+
+* `Op`: a record of `execute : S → Maybe S`, `undo : S → S` and
+  `undoes : execute x ≡ just y → undo y ≡ x`. The targets have the same three
+  fields over `option`/`Option`. Agda binds `x` and `y` implicitly and Rocq
+  explicitly, which is the same proposition.
+* `Executed`: an inductive family in `Set` with constructors `done` and `next`.
+  The targets put it in `Type`, the same universe level, with the same two
+  constructors and the same indices.
+* `rollback`: the same structural recursion on the list, undoing the head after
+  the tail.
+* The source type `S` is a parameter in `Set` in all three (`Type` at level 0).
+* Builtins: Agda's `List`/`Maybe` and the targets' `list`/`option` and
+  `List`/`Option` are the same free inductive types.
+* The sibling's prelude: `_≡_` is `Agda.Builtin.Equality` re-exported, and
+  `trans` and `cong` are the usual one-clause definitions by pattern matching on
+  `refl`. Rocq's `eq` with `eq_trans`/`f_equal`, and Lean's `Eq` with
+  `Eq.trans`/`congrArg`, are the same inductive equality and the same
+  eliminations. The re-proofs use `rewrite` instead, which needs nothing beyond
+  the equality type. No other sibling definition reaches T-1's statement or
+  proof.
+
+*Residual differences, listed rather than hidden.* The logics differ in
+what they add to equality. Axiom-free Rocq has neither K nor uniqueness of
+identity proofs, like Agda under `--without-K`, and `Print Assumptions` confirms
+that this leg adds no axiom that would supply them. Lean is stronger: its `Eq`
+lives in a proof-irrelevant `Prop`, so it has uniqueness of identity proofs
+definitionally. Neither proof uses these: each is the same
+induction on `Executed`, a rewrite with the induction hypothesis and one use of
+`undoes`. Proving the statement in a stronger logic adds no assumption to the
+Agda source.
+
+*Axioms.* Rocq `Print Assumptions rollback_restores` reports "Closed under the
+global context". Lean `#print axioms` reports that it "does not depend on any
+axioms". The gate (`scripts/check-recheck.sh`) fails if either line is missing:
+a mutant with `Admitted` in Rocq and one with `sorry` in Lean were each caught.
+
+*Non-vacuity.* `tests/reject-rocq/ForwardRollback.v` and
+`tests/reject-lean/ForwardRollback.lean` are twins of
+`tests/reject-agda/ForwardRollback.agda`. They build real double and increment
+operations against the leg's own definitions and claim that undoing them in
+execution order restores the start. Rocq refuses with `Unable to unify "1" with
+"0"`, and Lean with "`decide` proved that the proposition … is false". The gate
+checks each refusal message.
+
+*Pins and inputs.*
+
+[cols="1,3",options="header"]
+|===
+| Field | Value
+
+| Rocq | The Coq Proof Assistant 8.18.0, Ubuntu `coq=8.18.0+dfsg-1build2` on the
+  `ubuntu-24.04` runner, asserted by version string. `coqc -q -Q . JanusKey`.
+| Lean | Lean 4.35.0 (commit `eb6cafb7290e8bd5f2937522d8d804f58f02bafc`), the
+  release tarball `lean-4.35.0-linux.tar.zst`, SHA-256
+  `7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d`, checked
+  before unpacking. `lean -o <module>.olean <file>`.
+| Inputs (SHA-256) | `Rollback.v`
+  `662d51bf0b642ac28f816853c7d2c6a851583487a15e9f79c3b8184a53ff28e2`,
+  `Rollback.lean`
+  `808c32585ad582fced7497b93607668f92d9140b36ae4bd90b14f6b26bcd36c6`, the Rocq
+  fixture `4b2c01d4f70d1b60080babdf64aeaf873ec4db98c4682a6694e1981127160410`,
+  the Lean fixture
+  `813cae57494bee9c6457a63553489d83ad47c2ac538c18a0de8e86956cc477ee`,
+  `check-recheck.sh`
+  `5171d9d27a888e79dc9544f7b84d2a3557428c918a25194f9a88bcb2944f8483`
+| Observed | Locally, with the same two versions: both legs check with no
+  axioms, both fixtures refused as named, `[check-recheck] OK`. The CI job on
+  this change is the receipt.
+|===
+
+The pilot answers the question the pilot was for. The transport route is not
+available for any of the five theorems, for the reason above. A hand re-proof
+in core Rocq and core Lean costs about forty lines per statement. The remaining
+four take the same route. G-1 needs the Loss grade algebra restated, since the
+targets cannot import `resource-algebra`. T-2 and T-3 are now stated over the abstract
+log in `SingleActiveLog.agda`, built from builtins only, so their legs can
+restate it directly.
+
+These five are the only rows in this repository with a Proof Witness Grade (PWG). Each
+rests on a premise it names rather than assumes silently — the per-step
+cancellation law (`undoes`, TESTED as `execute_then_undo_is_identity`), the
+freshness of the transaction id (T-7, `ASSUMED`, probabilistic), the absence of
+I/O, and, for E-1m, that the modelled channels are the only ones an attacker
+has (X-1). §6 asks for the axioms to be tracked; they are, in the modules'
+own "What is NOT claimed" blocks and in the ledger's T-6, T-7, G-2, X-1 rows.
+
+=== Engineering contracts — no Proof Witness Grade applies
+
+Seven `PROVEN` rows are Idris2 theorems about this ABI: A-1, A-2, C-1, C-2,
+C-3, C-4, C-5, checked by
+`idris2 --typecheck src/abi/januskey-abi.ipkg`. Under PROOF-POLICY §1 these
+are interface and wire-format contracts, so the theory ladder does not grade
+them — they are `PROVEN` in the ledger's own vocabulary and that is the whole
+of the claim. The `Rust/SPARK` shorthand is withdrawn; the mapping that
+replaces it is Rust → **Creusot** with **Pearlite** contracts, and **Verus**
+(§1.2), Ada → SPARK, API/ABI → Idris2, theory → Agda.
+
+The same heading covers every `TESTED` row: a test proves behaviour was
+observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) is
+`ASSUMED` by transcription and would have to become mechanical before any
+"every operation is reversible" theorem could cite both halves.
+
+=== Not graded, and what would grade them
+
+[cols="1,2,3",options="header"]
+|===
+| Rows | Today | What moves them
+
+| E-1 (`OPEN`) — the cryptographic claim that an attacker cannot recover
+  obliterated content or use a revoked key
+| Its model-level shadow is proved as E-1m, and the row stays OPEN because a
+  model of channels is not a statement about cryptography.
+| Nothing in Agda: recovering from ciphertext is the assumption X-1. Only a
+  different kind of evidence (a cryptanalysis, or a reduction) would move it, and
+  this repository would record that as an external assumption with its source.
+
+| `TESTED` rows describing Rust behaviour (T-4, T-5, the property tests)
+| Claimed, tested. No Creusot/Pearlite contract or Verus proof exists, and
+  neither verifier is installed in the session that wrote this file.
+| Contracts and proofs on the Rust functions, run in CI: PROOF-POLICY §1.2
+  plans first-party Rust for both Creusot (with Pearlite) and Verus, whose
+  scopes may differ; a property proved by one need not be duplicated in the
+  other, and where both cover it the correspondence is recorded. Not Idris2 and
+  not Agda.
+
+| T-6, T-7, X-1, G-2, E-1, G-3 (`ASSUMED` / `OPEN`; G-3 is engineering under §1)
+| Premises, external assumptions, or filed obligations.
+| Each names its own gap in `PROOF-NEEDS.adoc`; none may be counted as proved
+  by the grade of a neighbouring row (README-EXPLAINME: "a row is only as
+  strong as its weakest step").
+
+| V-1, V-2, V-3 (`DESIGNED`)
+| Downstream consumption designed, never exercised.
+| A dependency edge in the consumer's manifest and a green test there.
+
+| T-9 and T-11 (`OPEN`)
+| Two different windows. T-9: `execute_*` changes the filesystem and then
+  appends, so a crash between them leaves a change with no record. T-11:
+  `undo` records the inverse as its own operation and then marks the original,
+  so a failed mark leaves the original unmarked and a retry re-applies the
+  inverse. (T-8, the metadata log's own saves, is TESTED since #168.)
+| T-9: a write-ahead intent record, which is a design decision. T-11: an
+  idempotent undo that finds the existing inverse record before re-applying.
+  Each then needs a test that injects the failure between its two steps.
+|===
 
 == The epistemic rewrite: E-1 becomes E-1m
 
-januskey's Idris2 ABI carries `Knows : Agent → Type → Type` (`Types.idr`,
-§Level 12). It could not state the security claims the ledger attributed to it:
-`Knows Adversary a` is uninhabited *by construction*, and "the system forgets
-the old key" was unstateable, because `Knows` has no negative form.
-`verification/proofs/agda/Epistemic.agda` replaces it with knowledge as
-indiscriminability over an observation, so that ignorance is a provable
-proposition (`¬ Knows`). Its theorems, and what they do not establish, are in
-the design review above. E-1 stays `OPEN`. The Idris module is unchanged,
-because the theory belongs in Agda (§1) and the ABI in Idris2.
+The one claim with an inheritance, rather than an invention, behind it. januskey's
+Idris2 ABI carries `Knows : Agent → Type → Type` (`Types.idr` §Level 12), a
+discrete epistemic modality inherited from the estate's epistemic-types work. It
+could not state the security claims the ledger attributed to it:
+
+* `Knows Adversary a` is uninhabited **by construction** — there is no Adversary
+  constructor — so "an attacker cannot recover …" (E-1) was a property of a
+  datatype. The repository's own comment says as much: "a property of this
+  model, not a security proof".
+* "The system forgets the old key" was **unstateable**, because `Knows` has no
+  negative form. The lemma was deleted rather than repaired, and the ledger
+  records the deletion.
+
+`verification/proofs/agda/Epistemic.agda` replaces the modality with one whose
+ignorance is a proposition. Knowledge is indiscriminability over an observation
+— an agent knows φ in *x* when φ holds in every world it cannot tell apart from
+*x* — so:
+
+* ignorance is `¬ Knows`, proved by exhibiting a world that looks the same and is
+  not (`adversary-ignorant`, over two worlds that differ only in the store);
+* obliteration is a change to the store channel, and recovery is a `Σ` that
+  becomes empty (`obliterate-cuts-recovery`), with the adversary's ignorance
+  surviving the operation because its observation did not change
+  (`obliterate-ignorance`);
+* rotation is an update to a `usable` predicate, so "no agent can use the old
+  key" is a theorem with a Bool on the right (`rotate-forgets-old`), and the
+  deleted Idris lemma now has a proved counterpart. It follows from the
+  definition of `rotate`; its content is that the statement is now
+  *expressible*, which the Idris modality could not manage, not that it is deep.
+
+Two fixtures pin the refusals: `AdversaryKnows.agda` (asserting the two stores
+are identical — refused, `2 != 1`) and `OldKeyStillUsable.agda` (asserting the
+old key survives rotation — refused, `!= true`).
+
+What this does **not** do is move E-1. A model of channels is not a model of
+cryptography: that the store channel is the only one an attacker has, and that a
+key which is not `usable` cannot decrypt, are assumptions (X-1), and E-1 stays
+`OPEN`. The Idris module is unchanged — its typecheck status, its deleted lemma
+and its comments now pointing here — because the theory belongs in Agda under
+PROOF-POLICY §1 and the ABI belongs in Idris2.
 
 == Reporting rules this repository follows
 
-* No percentage for a proof claim, ever. The TOPOLOGY bars are project-plan
-  measures, not proof measures.
-* Every grade is derived from a named receipt, and a receipt names its commit,
-  checker version, flags, library set, sibling pin, import cone, axiom scan
-  and inputs.
-* A change to a graded artefact, its checker or its pin makes the next run the
-  receipt. Older receipts are kept with their lineage state and never deleted.
-* Always write the `PWG-` prefix. A bare grade number collides with CRG, TRG,
-  ARG and FRG, and with ECHIDNA's `TrustLevel`, which counts the other way.
+* No percentage, ever. Where a "completion" figure exists elsewhere in the
+  tree it is a project-plan measure, not a proof measure, and it is not a grade.
+* Every grade names its receipt: commit, prover, prover version, flags,
+  sibling pin. The receipt above is the only one of its kind here.
+* A receipt is invalidated by a change to a graded artefact, to its checker or
+  to its pin, and is then re-earned by the next run, not carried forward.
+* A receipt that is no longer current carries `state: superseded` (a newer
+  receipt replaced it) or `state: regressed` (the source no longer checks), with
+  the reason (PROOF-POLICY §8.4). These are receipt states, not status tokens,
+  and neither receipt is deleted from the history.
+* `AGDA-PENDING` is the correct correspondence state for a module committed but
+  not yet checked. No row in this repository is in that state today: the five
+  graded rows are `AGDA-VERIFIED` at the commit above. Except for T-1, whose
+  legs are re-proved and reconciled, their Rocq and Lean legs have not been
+  attempted, so each is `OPEN` with no route and no §2.2 record,
+  and the grade is `PWG-3`. They are not `unavailable`: under §2 that route
+  means a leg that cannot be built, and a hand re-proof is always available as
+  the fallback, so the legs are owed, not excused (§8.4.1).
+* Grade counts appear only as the census at the top of this page: a count per
+  rung, with the denominator and the `ungraded` rung in the same line.

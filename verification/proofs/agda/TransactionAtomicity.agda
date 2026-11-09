@@ -25,23 +25,22 @@
 --
 -- What is NOT claimed (the model is hand-transcribed from the Rust, like
 -- G-2, and these are deliberate limits):
---   * No I/O. Saving is not modelled. The Rust's save behaviour is tested,
---     not proved: a failed save leaves the in-memory log unchanged and the
---     log is replaced by write, sync and rename (ledger row T-5). `Good` is a
---     premise of Part B; a log read from disk is checked against it at load
---     (TransactionManager::new, row T-10, tested), so the premise holds for
---     a loaded log as well as for one this code wrote.
+--   * No I/O. Saving is not modelled. Some of the Rust's failed-save
+--     behaviour is TESTED, not proved (ledger rows T-5 and T-8): a
+--     transaction-log mutation, or a metadata-log edit, whose save fails is
+--     not applied in memory, while a metadata append whose save fails keeps
+--     its record for the next save; both logs are replaced by write, sync and
+--     rename. A failure after the temporary file exists is not injected. A
+--     file change whose log record fails to persist is OPEN (T-9).
 --   * A failed execute is assumed to leave the state unchanged. Part A only
 --     speaks about operations that executed; nothing here proves the Rust
---     executor is a no-op on failure.
---   * Rollback is assumed to succeed on every step. cmd_rollback stops at
---     the first undo error and leaves the transaction Active with the later
---     operations already undone; the retry skips those and finishes (ledger
---     row T-4, tested). Part A does not model the partial case.
+--     executor is a no-op on failure (ASSUMED, T-6).
+--   * Rollback is assumed to succeed on every step. In the Rust a rollback
+--     that fails part-way stops, and a retry skips the operations already
+--     undone (TESTED, T-4); Part A does not model the failure or the retry.
 --   * Transaction ids are assumed fresh (Fresh below). The Rust draws a
 --     UUID v4; a collision would break Good, and nothing here rules it out
---     (row T-7, assumed; a log broken that way is refused at its next load,
---     row T-10).
+--     (ASSUMED, T-7).
 --   * Obliterating operations have no undo, so they have no `Op` here
 --     (cf. C-3); a transaction containing one is outside this theorem.
 --   * Concurrency: one process, no locking, is the whole model.
@@ -135,9 +134,18 @@ module Rollback (S : Set) where
 
 ----------------------------------------------------------------------
 -- Part B. The TransactionManager lifecycle
+--
+-- The invariant and its theorems are theory, proved once for every
+-- single-active log in SingleActiveLog.agda (ledger rows T-2 and T-3). This
+-- module is januskey's instance: a transaction is a record keyed by its id,
+-- Active or settled by its state, and the four TransactionManager
+-- transitions are the abstract ones at that record type. That the Rust
+-- matches this instance is engineering (ledger row T-10), not proved here.
 ----------------------------------------------------------------------
 
 module Lifecycle where
+
+  import SingleActiveLog as SAL
 
   data TState : Set where
     Active Committed RolledBack : TState
@@ -158,53 +166,41 @@ module Lifecycle where
 
   open Tx public
 
-  -- The log and the pointer to the active transaction.
-  record Log : Set where
-    constructor log
-    field
-      txs      : List Tx
-      activeId : Maybe Nat
-
-  open Log public
-
-  Settled : Tx → Set
-  Settled t = txState t ≢ Active
-
   addOpTx : Nat → Tx → Tx
   addOpTx o t = tx (txId t) (txState t) (txOps t ++ o ∷ [])
 
   settle : TState → Tx → Tx
   settle s t = tx (txId t) s (txOps t)
 
+  phaseOf : TState → SAL.Phase
+  phaseOf Active     = SAL.active
+  phaseOf Committed  = SAL.settled
+  phaseOf RolledBack = SAL.settled
+
+  _≟ₛ_ : (m n : Nat) → (m ≡ n) SAL.⊎ (m SAL.≢ n)
+  m ≟ₛ n with m ≟ n
+  ... | inl p = SAL.inl p
+  ... | inr q = SAL.inr (λ e → ⊥-elim (q e))
+
   -- `iter_mut().find(|t| t.id == i)` then rewrite: only the FIRST transaction
-  -- with that id changes. nothing = no such transaction.
-  update : Nat → (Tx → Tx) → List Tx → Maybe (List Tx)
-  update i f []       = nothing
-  update i f (t ∷ ts) with txId t ≟ i
-  ... | inl _ = just (f t ∷ ts)
-  ... | inr _ with update i f ts
-  ...   | nothing = nothing
-  ...   | just us = just (t ∷ us)
+  -- with that id changes (SAL.Log.update).
+  open SAL.Log Tx Nat _≟ₛ_ txId (λ t → phaseOf (txState t)) public
+    hiding (begin-refused-while-active; finish-refused-when-idle)
+    renaming (begin to openRecord; finish to settleActive;
+              begin-good to openRecord-good; finish-good to settleActive-good)
 
   -- TransactionManager::begin(name), with the fresh id as an argument.
   begin : Nat → Log → Maybe Log
-  begin i (log ts (just _)) = nothing
-  begin i (log ts nothing)  = just (log (ts ++ tx i Active [] ∷ []) (just i))
+  begin i = openRecord (tx i Active [])
 
   -- TransactionManager::add_operation.
   addOp : Nat → Log → Maybe Log
-  addOp o (log ts nothing)  = nothing
-  addOp o (log ts (just i)) with update i (addOpTx o) ts
-  ... | nothing = nothing
-  ... | just us = just (log us (just i))
+  addOp o = modify (addOpTx o)
 
   -- TransactionManager::commit (s = Committed) and ::mark_rolled_back
   -- (s = RolledBack).
   finish : TState → Log → Maybe Log
-  finish s (log ts nothing)  = nothing
-  finish s (log ts (just i)) with update i (settle s) ts
-  ... | nothing = nothing
-  ... | just us = just (log us nothing)
+  finish s = settleActive (settle s)
 
   commit : Log → Maybe Log
   commit = finish Committed
@@ -213,92 +209,31 @@ module Lifecycle where
   markRolledBack = finish RolledBack
 
   ----------------------------------------------------------------------
-  -- The invariant
-  ----------------------------------------------------------------------
-
-  data Good : Log → Set where
-    -- No pointer: nothing is Active.
-    idle : ∀ {ts} → All Settled ts → Good (log ts nothing)
-    -- Pointer to t: t is the first with its id, it is the one Active
-    -- transaction, and everything else is Committed or RolledBack.
-    busy : ∀ {pre t post}
-         → All (λ u → txId u ≢ txId t) pre
-         → All Settled pre
-         → txState t ≡ Active
-         → All Settled post
-         → Good (log (pre ++ t ∷ post) (just (txId t)))
-
-  Fresh : Nat → List Tx → Set
-  Fresh i = All (λ u → txId u ≢ i)
-
-  good-empty : Good (log [] nothing)
-  good-empty = idle []
-
-  ----------------------------------------------------------------------
-  -- Only the Active transaction is rewritten (completed ones are frozen)
-  ----------------------------------------------------------------------
-
-  update-active : ∀ f pre t post
-                → All (λ u → txId u ≢ txId t) pre
-                → update (txId t) f (pre ++ t ∷ post) ≡ just (pre ++ f t ∷ post)
-  update-active f []        t post []       with txId t ≟ txId t
-  ... | inl _ = refl
-  ... | inr n = ⊥-elim (n refl)
-  update-active f (u ∷ pre) t post (n ∷ ns) with txId u ≟ txId t
-  ... | inl e = ⊥-elim (n e)
-  ... | inr _ with update (txId t) f (pre ++ t ∷ post) | update-active f pre t post ns
-  ...   | .(just (pre ++ f t ∷ post)) | refl = refl
-
-  ----------------------------------------------------------------------
-  -- Settled transactions append and concatenate without becoming Active
-  ----------------------------------------------------------------------
-
-  all-++ : ∀ {A : Set} {P : A → Set} {xs ys}
-         → All P xs → All P ys → All P (xs ++ ys)
-  all-++ []       qs = qs
-  all-++ (p ∷ ps) qs = p ∷ all-++ ps qs
-
-  ----------------------------------------------------------------------
-  -- Theorem B-1: begin preserves Good (given a fresh id), and is refused
-  -- while a transaction is active.
+  -- Theorems B-1 to B-4, as instances of SingleActiveLog
   ----------------------------------------------------------------------
 
   begin-refused-while-active : ∀ i ts j → begin i (log ts (just j)) ≡ nothing
   begin-refused-while-active i ts j = refl
 
   begin-good : ∀ {i L L'} → Good L → Fresh i (txs L) → begin i L ≡ just L' → Good L'
-  begin-good (busy _ _ _ _) _ ()
-  begin-good {i} (idle {ts} ss) fr refl =
-    busy {pre = ts} {t = tx i Active []} {post = []} fr ss refl []
-
-  ----------------------------------------------------------------------
-  -- Theorem B-2: add_operation preserves Good, and is refused when idle.
-  ----------------------------------------------------------------------
+  begin-good g fr eq = openRecord-good refl g fr eq
 
   addOp-refused-when-idle : ∀ o ts → addOp o (log ts nothing) ≡ nothing
   addOp-refused-when-idle o ts = refl
 
   addOp-good : ∀ {o L L'} → Good L → addOp o L ≡ just L' → Good L'
-  addOp-good (idle _) ()
-  addOp-good {o} (busy {pre} {t} {post} np sp act sq) eq
-    with update (txId t) (addOpTx o) (pre ++ t ∷ post) | update-active (addOpTx o) pre t post np
-  ... | .(just (pre ++ addOpTx o t ∷ post)) | refl with eq
-  ... | refl = busy {pre = pre} {t = addOpTx o t} {post = post} np sp act sq
-
-  ----------------------------------------------------------------------
-  -- Theorem B-3: commit and mark_rolled_back preserve Good, land idle,
-  -- and are refused when idle.
-  ----------------------------------------------------------------------
+  addOp-good = modify-good (λ _ → refl) (λ _ → refl)
 
   finish-refused-when-idle : ∀ s ts → finish s (log ts nothing) ≡ nothing
   finish-refused-when-idle s ts = refl
 
+  settled-phase : ∀ {s} → s ≢ Active → phaseOf s ≡ SAL.settled
+  settled-phase {Active}     sn = ⊥-elim (sn refl)
+  settled-phase {Committed}  _  = refl
+  settled-phase {RolledBack} _  = refl
+
   finish-good : ∀ {s L L'} → s ≢ Active → Good L → finish s L ≡ just L' → Good L'
-  finish-good _ (idle _) ()
-  finish-good {s} sn (busy {pre} {t} {post} np sp act sq) eq
-    with update (txId t) (settle s) (pre ++ t ∷ post) | update-active (settle s) pre t post np
-  ... | .(just (pre ++ settle s t ∷ post)) | refl with eq
-  ... | refl = idle (all-++ sp ((λ e → sn e) ∷ sq))
+  finish-good sn = settleActive-good (λ _ → settled-phase sn)
 
   commit-good : ∀ {L L'} → Good L → commit L ≡ just L' → Good L'
   commit-good = finish-good (λ e → Active≢Committed (sym e))
@@ -306,40 +241,7 @@ module Lifecycle where
   markRolledBack-good : ∀ {L L'} → Good L → markRolledBack L ≡ just L' → Good L'
   markRolledBack-good = finish-good (λ e → Active≢RolledBack (sym e))
 
-  ----------------------------------------------------------------------
-  -- Theorem B-4: at most one transaction is Active, and exactly when the
-  -- pointer is set.
-  ----------------------------------------------------------------------
-
-  countActive : List Tx → Nat
-  countActive []       = 0
-  countActive (t ∷ ts) with txState t
-  ... | Active     = suc (countActive ts)
-  ... | Committed  = countActive ts
-  ... | RolledBack = countActive ts
-
-  expected : Maybe Nat → Nat
-  expected nothing  = 0
-  expected (just _) = 1
-
-  settled-count : ∀ {ts} → All Settled ts → countActive ts ≡ 0
-  settled-count []                  = refl
-  settled-count {t ∷ ts} (s ∷ ss) with txState t | s
-  ... | Active     | s' = ⊥-elim (s' refl)
-  ... | Committed  | _  = settled-count ss
-  ... | RolledBack | _  = settled-count ss
-
-  count-++ : ∀ xs ys → countActive (xs ++ ys) ≡ countActive xs + countActive ys
-  count-++ []       ys = refl
-  count-++ (x ∷ xs) ys with txState x
-  ... | Active     = cong suc (count-++ xs ys)
-  ... | Committed  = count-++ xs ys
-  ... | RolledBack = count-++ xs ys
-
-  at-most-one-active : ∀ {L} → Good L → countActive (txs L) ≡ expected (activeId L)
-  at-most-one-active (idle ss) = settled-count ss
-  at-most-one-active (busy {pre} {t} {post} _ sp act sq)
-    rewrite count-++ pre (t ∷ post) | settled-count sp | act | settled-count sq = refl
+  -- Theorem B-4 (at-most-one-active) is SingleActiveLog's, at this instance.
 
   ----------------------------------------------------------------------
   -- Theorem B-5 (lifecycle-preserves-good): the four transitions together.
@@ -355,8 +257,8 @@ module Lifecycle where
       onCommit     : ∀ {L L'} → Good L → commit L ≡ just L' → Good L'
       onRollback   : ∀ {L L'} → Good L → markRolledBack L ≡ just L' → Good L'
       onlyActive   : ∀ f pre t post
-                   → All (λ u → txId u ≢ txId t) pre
-                   → update (txId t) f (pre ++ t ∷ post) ≡ just (pre ++ f t ∷ post)
+                   → SAL.All (λ u → txId u SAL.≢ txId t) pre
+                   → update (txId t) f (pre SAL.++ t ∷ post) ≡ just (pre SAL.++ f t ∷ post)
 
   lifecycle-preserves-good : Preserves
   lifecycle-preserves-good = record

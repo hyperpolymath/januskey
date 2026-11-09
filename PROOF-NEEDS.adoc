@@ -62,22 +62,24 @@ tables must agree.
 | C-3 | A transaction containing an obliteration is not all-reversible | PROVEN | `+Layout.obliterateNotReversible+`
 | C-4 | Replacing a chain entry by one with a different hash breaks the link | PROVEN | `+Proofs.tamperBreaksLink+`
 | C-5 | Struct sizes 32/16/112 and 8-byte alignment as divisibility (statements about the literals) | PROVEN | `+Layout.{contentHashSize,keyIdSize,oblitProofSize,hashAligned,keyIdAligned,oblitAligned}+`
-| G-1 | Reversibility as a Loss grade: lossless traces have only lossless steps; obliteration absorbs; wrap/unwrap is grade 𝟙 given cancellation | PROVEN | `+verification/proofs/agda/Reversibility.agda+` (Agda kernel, resource-algebra pinned at `+cf9235c+`); `+tests/reject-agda/*+` refused; the cancellation premise is the TESTED row `+execute_then_undo_is_identity+`
+| G-1 | Reversibility as a Loss grade: lossless traces have only lossless steps; obliteration absorbs; a wrap/unwrap pair carries its cancellation law (its grade 𝟙 is assigned, not derived from that law) | PROVEN | `+verification/proofs/agda/Reversibility.agda+` (Agda kernel, resource-algebra pinned at `+cf9235c+`); `+tests/reject-agda/*+` refused; the cancellation premise is the TESTED row `+execute_then_undo_is_identity+`
 | G-2 | The Idris2 `+IsCNO+`/`+ReversibleOp+` pair corresponds to Agda `+ReversiblePair+` (by transcription) | ASSUMED | no mechanical link claimed
 | G-3 | The FFI bridge preserves grade 𝟙 (homomorphism) | OPEN | resource-algebra lists homomorphisms OPEN; to file from JNK-01
 | E-1 | An attacker cannot recover obliterated content or use a revoked key | OPEN | `+Types.adversaryCannotKnow+` holds only because `+Knows+` has no Adversary constructor; the *model-level* half is now proved in Agda as row E-1m (#145 item 3)
+| E-1m | In a world model, an adversary whose observation excludes the store does not know what it holds; obliteration leaves nothing to recover; rotation to a different key leaves no agent able to use the old one (premise `+old ≠ new+`; true by the definition of `+rotate+` in the model; that an unusable key cannot decrypt is X-1) | PROVEN | `+verification/proofs/agda/Epistemic.agda+`; `+tests/reject-agda/{AdversaryKnows,OldKeyStillUsable}.agda+` refused
 | X-1 | Hash one-wayness; physical erasure (cryptographic and physical assumptions, external to this repository) | ASSUMED | not theorems of this repo
-| T-1 | Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute (the sequential Theorem 3.4) | PROVEN | `+TransactionAtomicity.rollback-restores+`; `+tests/reject-agda/ForwardRollback.agda+` refused
-| T-2 | begin, add_operation, commit and mark_rolled_back each preserve the log invariant (given a fresh id for begin) and rewrite only the Active transaction, so a completed one is never modified | PROVEN | `+TransactionAtomicity.lifecycle-preserves-good+`; `+tests/reject-agda/CommitWhenIdle.agda+` refused
-| T-3 | At most one transaction is Active, and exactly one when the active pointer is set | PROVEN | `+TransactionAtomicity.at-most-one-active+`
+| T-1 | Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute (the sequential Theorem 3.4) | PROVEN | `+TransactionAtomicity.rollback-restores+`; rechecked in Rocq and Lean (`+verification/proofs/{rocq,lean}/Rollback+`, `+PWG-2ii+`); `+tests/reject-agda/ForwardRollback.agda+` refused
+| T-2 | In any single-active log (records with a decidable key and an active or settled phase), opening a fresh active record, a key- and phase-preserving edit, and a settling transition each preserve the invariant and rewrite only the active record, so a settled one is never modified | PROVEN | `+SingleActiveLog.{begin-good,modify-good,finish-good,update-active}+`; `+tests/reject-agda/SettleWithoutSettling.agda+` refused; januskey's instance is `+TransactionAtomicity.lifecycle-preserves-good+`; `+tests/reject-agda/CommitWhenIdle.agda+` refused
+| T-3 | In any single-active log satisfying the invariant, at most one record is active, and exactly one when the pointer is set | PROVEN | `+SingleActiveLog.at-most-one-active+` (januskey's transactions are an instance)
 | T-4 | A rollback that fails part-way can be retried to completion | TESTED | `+rollback_resume_test+` drives the real `+jk+`: after one undo error and a repair, `+jk rollback+` skips the already undone operation and finishes (before the fix the retry stopped at it every time, reproduced 2026-10-26); fixed in `+cmd_rollback+`
-| T-5 | The transaction log is never left disagreeing with memory by a failed save, and is replaced by write, fsync and rename (a randomly named temporary file opened with the old file's mode, removed only if this save created it) rather than overwritten in place | TESTED | `+transaction::tests::failed_save_*+`: a save that fails at the final step leaves begin, add_operation, commit and rollback unapplied in memory; mutants (memory first, plain `+fs::write+`, no temp cleanup, shared temp name, truncating open, no permission copy) each fail a test. Not claimed: crash-safety of the rename itself is by construction, not crash-injected; the directory fsync is best effort (owner decision 2026-11-09), because failing the save after the rename would leave disk new and memory old; concurrent writers are out of scope (each save's content is intact, the last rename wins)
+| T-5 | The transaction log is never left disagreeing with memory by a failed save, and is replaced by rename rather than overwritten in place, with an fsync before the rename by construction (no test observes the fsync) (a randomly named temporary file opened with the old file's mode, removed only if this save created it) rather than overwritten in place | TESTED | `+transaction::tests::failed_save_*+`: a save that fails at the final step leaves begin, add_operation, commit and rollback unapplied in memory; mutants (memory first, plain `+fs::write+`, no temp cleanup, shared temp name, truncating open, no permission copy) each fail a test. Not claimed: crash-safety of the rename itself is by construction, not crash-injected; the directory fsync is best effort (owner decision 2026-11-09), because failing the save after the rename would leave disk new and memory old; concurrent writers are out of scope (each save's content is intact, the last rename wins)
 | T-6 | A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1; single steps are TESTED by `+execute_then_undo_is_identity+`) | ASSUMED | not checked for the failure path
 | T-7 | Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) | ASSUMED | probabilistic, not checked
-| T-8 | The operation metadata log is saved atomically; a save that fails leaves mark_undone, prune and purge unapplied in memory, and keeps an append pending for the next save (its file change already happened) | TESTED | `+metadata::tests::save_replaces_rather_than_overwrites_the_log+` (rename, not an in-place write, through `+crate::transaction::write_atomic+`; a plain `+fs::write+` mutant fails it) and `+save_replaces_the_log_atomically+` (no temporary file left) and `+metadata::tests::failed_save_leaves_every_mutation_unapplied+` and `+a_failed_append_keeps_its_record_for_the_next_save+` (memory), and `+transaction::tests::a_failed_save_leaves_the_existing_log_intact+` (disk: the old log survives a save that fails before its temporary file exists); a mutant that updates memory first, and one that removes the log before saving, each fail a test
-| T-9 | A file operation or undo whose log record fails to persist can be recovered or retried | OPEN | by inspection: every `+execute_*+` changes the filesystem and then appends its record, and `+undo+` runs the inverse and then calls `+mark_undone+`. A crash or failed save between the two leaves a change the log does not know about (on undo: the file restored but the operation still marked not undone, so the retry tries the inverse again). Save ordering cannot close this. Owner decision 2026-11-09: close it with a write-ahead intent log (an intent record written before the file change, completed or undone at startup); not built yet
-| T-10 | A transaction log read from disk satisfies the invariant `+Good+` that T-2 and T-3 preserve, so their premise holds for a loaded log too; a log that breaks it is refused as corrupted, not loaded | TESTED | `+transaction::tests::a_loaded_log_that_breaks_the_invariant_is_refused+` (five ways of breaking `+Good+`: pointer to a missing or a settled transaction, an Active one with no pointer, two Active, a pointer whose first transaction with that id is settled) and the positive control `+a_log_the_manager_wrote_loads_back+`; mutants (no check at load, last-with-id instead of first, no stray-Active scan) each fail the first test. Before this row the premise was unchecked at load, and the unused `+active_mut+`, which could change a transaction outside the four transitions, has been removed
-| T-11 | The Agda lifecycle model (`+TransactionAtomicity.Lifecycle+`) corresponds to `+TransactionManager+` (by transcription, like G-2) | ASSUMED | no mechanical link; PROOF-POLICY §2.1: a translated model does not prove runtime refinement. The Rust is tested against the same transitions (T-5, T-10)
+| T-8 | The operation metadata log is replaced by rename, never overwritten in place (the sync before the rename is there by construction; no test observes it); a log edit (`+mark_undone+`, `+prune+`, `+purge_path_entries+`) whose save fails is not applied in memory and applies exactly once on retry; an append whose save fails keeps its record for the next save | TESTED | `+metadata::tests::{failed_save_leaves_every_mutation_unapplied,a_failed_append_keeps_its_record_for_the_next_save,save_replaces_the_log_atomically,save_replaces_rather_than_overwrites_the_log}+` and `+transaction::tests::a_failed_save_leaves_the_existing_log_intact+`, each checked against a mutant in #168. Not claimed: a failure after the temporary file exists (during the write, sync or rename) is not injected; the rename's atomicity is the filesystem's guarantee
+| T-9 | A forward file change is never left without a log record: `+execute_*+` changes the filesystem and then appends, so a crash or failed save between the two leaves a change the log does not know about | OPEN | needs a write-ahead intent record: owner decision 2026-11-09 to close it with a write-ahead intent log (an intent record written before the file change, completed or undone at startup), not built yet; split out of T-8 in #168
+| T-11 | An undo whose `+mark_undone+` fails to persist can be retried safely: `+undo+` records the inverse as its own operation (each helper calls `+execute+`), then marks the original, so a failed mark leaves the original unmarked and a retry re-applies the inverse or fails against the changed filesystem | OPEN | the inverse is recorded, unlike T-9; the fix is an idempotent undo (find the existing inverse record before re-applying), not write-ahead intent
+| T-10 | januskey's TransactionManager is an instance of the single-active log: the Rust begin, add_operation, commit and mark_rolled_back refine the abstract open, edit and settle transitions, as the hand-written instance in `+TransactionAtomicity.agda+` Part B assumes | OPEN | engineering (PROOF-POLICY §1): Creusot/Pearlite or Verus contracts on `+crates/reversible-core/src/transaction.rs+`; the instance itself is a transcription, like G-2
+| T-12 | A transaction log read from disk satisfies the invariant `+Good+` that T-2 and T-3 preserve, so their premise holds for a loaded log as well as for one this code wrote; a log that breaks it is refused as corrupted, not loaded | TESTED | `+transaction::tests::a_loaded_log_that_breaks_the_invariant_is_refused+` (five ways of breaking `+Good+`: a pointer to a missing or a settled transaction, an Active one with no pointer, two Active, a pointer whose first transaction with that id is settled) and the positive control `+a_log_the_manager_wrote_loads_back+`; mutants (no check at load, last-with-id instead of first, no stray-Active scan) each fail the first test. The unused `+active_mut+`, which could change a transaction outside the four transitions, is removed. Evidence towards T-10 at the load boundary, not the refinement itself
 | S-1 | A content hash that is not `+sha256:+` plus 64 lowercase hex digits never resolves to a path outside the store root | TESTED | `+content_store::tests::malformed_hash_never_leaves_the_store_root+`; fixed in #163 after audit probe P5 showed `+delete+` removing a file outside the store (`+docs/reports/audit/proof-statement-audit-2026-10-27.adoc+`)
 | S-2 | `+store+` repairs a blob a crash left damaged instead of deduplicating against it, and a successful store leaves no temporary file behind | TESTED | not claimed: cleanup after a failed write or rename, whose removal error `+store+` ignores, so a temporary file can remain; not claimed: that the write itself is atomic. `+store+` writes by temporary file, sync and rename, but by construction only; no test injects a failure mid-write. `+content_store::tests::store_repairs_a_blob_truncated_by_a_crash+`, `+store_leaves_no_temp_files_and_count_ignores_strays+`; fixed in #163 (probe P4)
 | L-1 | Editing any field of any audit-log entry makes `+verify_integrity+` fail | OPEN | false today, probes P1 and P2: algorithm, purpose, old_state, new_state, rotated_to and rotated_from are in neither the MAC nor the chain hash, and key_id, fingerprint and reason are chain-hashed only, so on the last entry nothing protects them. The fix is a MAC over every field (a scheme version bump)
@@ -115,54 +117,55 @@ The dashboards (README, TOPOLOGY, READINESS) carry the proof count that
 
 === Proof Witness Grades (PROOF-POLICY §8)
 
-The five statuses above are this repository's claim vocabulary (the
-README-EXPLAINME ledger; DESIGNED aside, they are the §5 tokens of the
-estate's `+metadatastician/standards+` `+3-practice/PROOF-POLICY.adoc+`,
-read at `+9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5+`, 2026-11-08). A *Proof Witness
-Grade* is a separate field, defined by that policy's §8 (owner ruling
-2026-11-04). It says how many independent machine-checked witnesses a
-*theory* theorem has: `+PWG-3+` (the Agda proof checks under §2.1), then
-`+PWG-2i+` and `+PWG-2ii+` (one or both Rocq and Lean recheck legs counted),
-then `+PWG-1+` (per-commit receipts for every witness). Lower is stronger.
-Grades are derived from receipts, never asserted. The Mathesis brief's
-grade ladder, whose wording this file used until 2026-11-09, is superseded by
-§8 and is not used here.
+The five statuses above are this repository's claim vocabulary — the estate's
+README-EXPLAINME ledger, as used across it. A *Proof Witness Grade* is a second,
+orthogonal axis, governed by `+hyperpolymath/standards+`
+`+3-practice/PROOF-POLICY.adoc+` §8 (owner ruling 2026-11-04). The mathesis
+brief (`+estate-mathematical-architecture+` §5 and §6) first proposed the ladder
+and is kept for provenance only. Neither uses a confidence percentage and this
+repository does not publish one.
 
-*Census of theory theorems (by ledger row): `+PWG-3+` 5 (G-1, T-1, T-2,
-T-3, E-1m), `+PWG-2i+` 0, `+PWG-2ii+` 0, `+PWG-1+` 0, `+ungraded+` 3 (G-3,
-E-1 and the reversibility theorem "every operation is reversible", all
-`+OPEN+`), of 8.* None of the five rests on an axiom: each is `+PROVEN+`,
-not `+PROVEN-WITH-AXIOMS+`. A `+PWG-3+` grade is not a discharge. Each of the
-five still owes its Rocq and Lean legs (§2, §8.4 rule 1).
+Of the 12 PROVEN rows, five are the theory rows — **G-1, T-1, T-2, T-3, E-1m** — and
+their artefact is Agda (`+verification/proofs/agda/+`). They are **`+PWG-3+`,
+receipt pending re-run** (PROOF-POLICY §8, owner ruling 2026-11-04, which
+governs over the mathesis brief):
+each is `+PROVEN+` under the §2.1 invocation and no Rocq or Lean leg exists. The
+last receipt for the modules is a green `+agda-proofs.yml+` run
+(https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251])
+at commit `+23bc8c3+`, Agda 2.6.4.3, with `+resource-algebra+` pinned at
+`+cf9235c+`, running `+Reversibility+`, `+TransactionAtomicity+` and
+`+Epistemic+` under `+--safe --without-K --cubical-compatible+`. The gate gained
+an import-cone postulate scan after it, so the first green run of the changed
+gate on `+main+` is the receipt that replaces it. The cone, the axioms (none in
+the development; the prover's four universe-level primitives are checked by
+name and reported) and the superseded receipts (runs 41687715055 at
+`+fc188c4+` and 40867211509 at
+`+4afb710+`) are recorded in
+link:docs/theory/PROOF-GRADES.adoc[`+docs/theory/PROOF-GRADES.adoc+`].
+Correspondence state for them: `+AGDA-VERIFIED+`.
 
-The §8.5 record for each graded row:
+*PWG census, theory theorems of this repository (denominator 5):* `+PWG-3+` 4
+(G-1, T-2, T-3, E-1m) · `+PWG-2i+` 0 · `+PWG-2ii+` 1 (T-1) · `+PWG-1+` 0 ·
+`+ungraded+` 0. G-3 names this repository's FFI bridge, so PROOF-POLICY §1
+classes it as engineering and it is outside the ladder. T-1's Rocq and Lean legs are re-proved and reconciled
+(`+docs/theory/PROOF-GRADES.adoc+`, §T-1); the other four have not been
+attempted, and each still owes both (§8.4: a grade is not a discharge).
 
-[cols="1,1,1,2,2,2",options="header"]
-|===
-| Row | `+pwg+` | `+foundation_diverse+` | Agda leg | Rocq leg | Lean leg
+The other seven PROVEN rows — A-1, A-2, C-1 to C-5 — are Idris2 theorems. Under
+PROOF-POLICY §1 those are interface and ABI contracts, so the theory ladder does
+not grade them: they are PROVEN in the vocabulary above and nothing more. The
+same holds for the TESTED rows, which record observed behaviour and never
+grading. First-party Rust behaviour belongs to **Creusot** with **Pearlite**
+contracts, and **Verus** (PROOF-POLICY §1.2, owner ruling 2026-11-07; not SPARK,
+and not Idris2); neither verifier has a contract or proof in this tree yet,
+which is why no Rust row is proved.
 
-| G-1 | 3 | false .5+| `+PROVEN+`; correspondence `+AGDA-VERIFIED+`; receipt: the
-`+agda-proofs.yml+` run on the source commit, `+current+` (see
-`+docs/theory/PROOF-GRADES.adoc+` for the fields and the lineage)
-.5+| `+OPEN+`: not attempted, so no route is chosen yet and no
-correspondence state applies (§2: Dedukti transport first, re-proof as the
-fallback)
-.5+| `+OPEN+`: not attempted, as for Rocq (§2: no released Lambdapi Lean
-exporter is pinned, so this leg is expected to be re-proved)
-| T-1 | 3 | false
-| T-2 | 3 | false
-| T-3 | 3 | false
-| E-1m | 3 | false
-|===
-
-The other seven PROVEN rows (A-1, A-2, C-1 to C-5) are Idris2 theorems about
-the ABI. The 35 TESTED rows record observed behaviour. §8.1 grades neither:
-engineering proofs carry the §5 tokens only. First-party Rust behaviour belongs
-to *Creusot*, with contracts in *Pearlite*, and to *Verus*, by default
-(PROOF-POLICY §1.2). No Creusot, Pearlite or Verus artefact exists in this tree,
-so every Rust obligation stays at its tested status. The obligations, their
-entrypoints and why neither verifier has been run are listed in
-`+docs/theory/PROOF-GRADES.adoc+` §Rust obligations.
+Only T-1 is above `+PWG-3+`: it is `+PWG-2ii+`, with Rocq and Lean legs re-proved
+and reconciled. No row is `+PWG-2i+` or `+PWG-1+`, and none is claimed to be. The row-by-row mapping and the receipt in full are in
+`+docs/theory/PROOF-GRADES.adoc+`. Since 2026-11-01 the gate runs
+PROOF-POLICY §2.1's canonical invocation
+(`+--safe --without-K --cubical-compatible …+`); the CI receipt for that flag
+set is run 42076969251 above.
 
 === Current State
 
@@ -203,7 +206,7 @@ attestations undermine trust
 |Content store integrity |Content-addressed storage never returns wrong
 content (paths confined to the store and damaged blobs repaired: S-1 and S-2 are TESTED; the write is atomic by construction, not by test; reads verify the hash) |Hash collisions or bugs corrupt stored data
 
-|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed; a loaded log is checked against the proved invariant, T-10, and the model's match to the Rust is assumed, T-11; the metadata log is tested for atomic and failed saves, T-8; a file change whose log record fails to persist is OPEN, T-9)
+|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed; the metadata log is tested for atomic and failed saves, T-8; a forward file change whose log record fails to persist is OPEN, T-9, and so is an undo whose mark fails to persist, T-11)
 |Partial transactions corrupt state
 
 |reversible-core |Undo/redo preserves data integrity |Core crate used by
@@ -247,8 +250,8 @@ the status table above.
 |C-5: The 32-, 16- and 112-byte ABI structs are 8-byte aligned (divisibility at the literals) |PROVEN |`src/abi/JanusKey/ABI/Layout.idr::oblitAligned` |`idris2 --typecheck src/abi/januskey-abi.ipkg`
 |G-1: Reversibility as a Loss grade: a trace is lossless only if every step is, and an obliterating step absorbs |PROVEN |`verification/proofs/agda/Reversibility.agda::lossless-trace-all` |`bash scripts/check-agda.sh`
 |T-1: Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute |PROVEN |`verification/proofs/agda/TransactionAtomicity.agda::rollback-restores` |`bash scripts/check-agda.sh`
-|T-2: begin, add_operation, commit and mark_rolled_back each preserve the log invariant (given a fresh id for begin) and rewrite only the Active transaction |PROVEN |`verification/proofs/agda/TransactionAtomicity.agda::lifecycle-preserves-good` |`bash scripts/check-agda.sh`
-|T-3: At most one transaction is Active, and exactly one when the active pointer is set |PROVEN |`verification/proofs/agda/TransactionAtomicity.agda::at-most-one-active` |`bash scripts/check-agda.sh`
+|T-2: In any single-active log, opening a fresh active record, a key- and phase-preserving edit, and a settling transition each preserve the invariant and rewrite only the active record |PROVEN |`verification/proofs/agda/SingleActiveLog.agda::finish-good` |`bash scripts/check-agda.sh`
+|T-3: In any single-active log satisfying the invariant, at most one record is active, and exactly one when the pointer is set |PROVEN |`verification/proofs/agda/SingleActiveLog.agda::at-most-one-active` |`bash scripts/check-agda.sh`
 |A-3: Idris2 struct sizes, status codes, enums and exported symbols agree with januskey.h and ffi/zig |TESTED |`scripts/check-abi-layout.sh::check-abi-layout` |`bash scripts/check-abi-layout.sh`
 |A-4: A linearly held library handle cannot be closed twice |TESTED |`tests/reject-idris/DoubleClose.idr::DoubleClose` |`bash scripts/check-idris-reject.sh DoubleClose`
 |A-4: A linearly held library handle cannot be forgotten |TESTED |`tests/reject-idris/ForgottenClose.idr::ForgottenClose` |`bash scripts/check-idris-reject.sh ForgottenClose`
@@ -266,6 +269,11 @@ the status table above.
 |T-5: A save whose temporary file already exists (another writer's) fails without deleting that file or writing the log |TESTED |`crates/reversible-core/src/transaction.rs::a_save_never_removes_a_temporary_file_it_did_not_create` |`cargo test --locked -p reversible-core --lib a_save_never_removes_a_temporary_file_it_did_not_create`
 |T-5: The temporary file has the log's permissions from creation, before any content is written |TESTED |`crates/reversible-core/src/transaction.rs::the_temporary_file_is_restricted_before_any_content_is_written` |`cargo test --locked -p reversible-core --lib the_temporary_file_is_restricted_before_any_content_is_written`
 |T-5: The temporary file is opened with the log's mode, so it is never more readable than the log at any instant, not only after a later chmod (checked where the umask leaves owner read-write, the usual 022) |TESTED |`crates/reversible-core/src/transaction.rs::the_temporary_file_is_opened_with_the_logs_mode` |`cargo test --locked -p reversible-core --lib the_temporary_file_is_opened_with_the_logs_mode`
+|T-8: A metadata-log edit (mark_undone, prune, purge) whose save fails is not applied in memory, and each retry applies it exactly once |TESTED |`crates/reversible-core/src/metadata.rs::failed_save_leaves_every_mutation_unapplied` |`cargo test --locked -p reversible-core --lib failed_save_leaves_every_mutation_unapplied`
+|T-8: An append whose save fails keeps its record in memory, and the next successful save persists it exactly once |TESTED |`crates/reversible-core/src/metadata.rs::a_failed_append_keeps_its_record_for_the_next_save` |`cargo test --locked -p reversible-core --lib a_failed_append_keeps_its_record_for_the_next_save`
+|T-8: A metadata-log save replaces the log by rename, leaves no temporary file, and ignores a stale temporary file from an earlier crash |TESTED |`crates/reversible-core/src/metadata.rs::save_replaces_the_log_atomically` |`cargo test --locked -p reversible-core --lib save_replaces_the_log_atomically`
+|T-8: A metadata-log save replaces the log rather than overwriting it in place (a hard link to the old log keeps the old bytes) |TESTED |`crates/reversible-core/src/metadata.rs::save_replaces_rather_than_overwrites_the_log` |`cargo test --locked -p reversible-core --lib metadata::tests::save_replaces_rather_than_overwrites_the_log`
+|T-8: A save that fails before its temporary file exists leaves the old log's bytes intact |TESTED |`crates/reversible-core/src/transaction.rs::a_failed_save_leaves_the_existing_log_intact` |`cargo test --locked -p reversible-core --lib a_failed_save_leaves_the_existing_log_intact`
 |S-1: A malformed content hash never resolves to a path outside the store root |TESTED |`crates/reversible-core/src/content_store.rs::malformed_hash_never_leaves_the_store_root` |`cargo test --locked -p reversible-core --lib malformed_hash_never_leaves_the_store_root`
 |S-1: A well-formed content hash keeps the existing two-level blob layout |TESTED |`crates/reversible-core/src/content_store.rs::well_formed_hash_keeps_the_existing_layout` |`cargo test --locked -p reversible-core --lib well_formed_hash_keeps_the_existing_layout`
 |S-2: Storing content again repairs a blob a crash left truncated |TESTED |`crates/reversible-core/src/content_store.rs::store_repairs_a_blob_truncated_by_a_crash` |`cargo test --locked -p reversible-core --lib store_repairs_a_blob_truncated_by_a_crash`
@@ -274,20 +282,16 @@ the status table above.
 |X-1: Hash one-wayness and physical erasure (cryptographic and physical assumptions) |ASSUMED |`src/abi/JanusKey/ABI/Proofs.idr` |-
 |G-3: The FFI bridge preserves grade 𝟙 (a homomorphism; resource-algebra lists homomorphisms as OPEN) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
 |E-1: An attacker cannot recover obliterated content or use a revoked key (adversaryCannotKnow holds only by construction of the model) |OPEN |`src/abi/JanusKey/ABI/Types.idr` |-
-|E-1m: In a world model, an adversary whose observation excludes the store does not know what it holds (adversary-ignorant), obliteration leaves nothing to recover (obliterate-cuts-recovery, obliterate-ignorance), and rotation leaves no agent — the system included — able to use the old key (rotate-forgets-old); the fixtures AdversaryKnows and OldKeyStillUsable are refused |PROVEN |`verification/proofs/agda/Epistemic.agda::adversary-ignorant` |`bash scripts/check-agda.sh`
+|E-1m: In a world model, an adversary whose observation excludes the store does not know what it holds (adversary-ignorant), obliteration leaves nothing to recover (obliterate-cuts-recovery, obliterate-ignorance), and rotation to a different key leaves no agent — the system included — able to use the old one (rotate-forgets-old, premise old ≠ new); the fixtures AdversaryKnows and OldKeyStillUsable are refused |PROVEN |`verification/proofs/agda/Epistemic.agda::adversary-ignorant` |`bash scripts/check-agda.sh`
 |The six security obligations under "What Needs Proving" (obliteration, key derivation, attestation chain, content store, transaction atomicity, reversible-core) are proved |OPEN |`PROOF-NEEDS.adoc` |-
 |L-1: Editing any field of any audit-log entry makes verify_integrity fail (false today: audit probes P1, P2) |OPEN |`crates/januskey-cli/src/attestation.rs` |-
 |L-2: Removing trailing audit-log entries makes verify_integrity fail (false today: audit probe P3; needs an external anchor) |OPEN |`crates/januskey-cli/src/attestation.rs` |-
 |O-1: An ObliterationProof attests that the content it names was erased (false today: storage_cleared is hard-coded, audit probe P6) |OPEN |`crates/januskey-cli/src/obliteration.rs` |-
-|T-8: A metadata save leaves no temporary file behind and ignores a stale one from an earlier crash |TESTED |`crates/reversible-core/src/metadata.rs::save_replaces_the_log_atomically` |`cargo test --locked -p reversible-core --lib save_replaces_the_log_atomically`
-|T-8: A metadata save replaces the log rather than overwriting it in place (a hard link to the old log keeps the old bytes; a regression to plain `fs::write` fails) |TESTED |`crates/reversible-core/src/metadata.rs::save_replaces_rather_than_overwrites_the_log` |`cargo test --locked -p reversible-core --lib metadata::tests::save_replaces_rather_than_overwrites_the_log`
-|T-8: A metadata save that fails leaves mark_undone, prune and purge unapplied in memory, and each retried mutator then applies once with memory and the reloaded log agreeing |TESTED |`crates/reversible-core/src/metadata.rs::failed_save_leaves_every_mutation_unapplied` |`cargo test --locked -p reversible-core --lib failed_save_leaves_every_mutation_unapplied`
-|T-8: An append whose save fails keeps its record pending, and the next successful save persists it once (so `jk delete` continuing after one failed record does not lose it) |TESTED |`crates/reversible-core/src/metadata.rs::a_failed_append_keeps_its_record_for_the_next_save` |`cargo test --locked -p reversible-core --lib a_failed_append_keeps_its_record_for_the_next_save`
-|T-8: A save that fails before creating its temporary file leaves the existing log's bytes intact on disk (failure injected without touching the log; shared by the transaction and metadata logs; a failure after the temporary file exists is not covered) |TESTED |`crates/reversible-core/src/transaction.rs::a_failed_save_leaves_the_existing_log_intact` |`cargo test --locked -p reversible-core --lib a_failed_save_leaves_the_existing_log_intact`
-|T-9: A file operation or undo whose log record fails to persist can be recovered or retried (by inspection: the filesystem changes before the record is saved; needs a write-ahead intent record, the design chosen 2026-11-09; not built) |OPEN |`crates/januskey-cli/src/operations.rs` |-
-|T-10: A transaction log read from disk that breaks the lifecycle invariant (pointer to a missing or settled transaction, an Active one with no pointer, two Active, or a settled first transaction with the active id) is refused as corrupted |TESTED |`crates/reversible-core/src/transaction.rs::a_loaded_log_that_breaks_the_invariant_is_refused` |`cargo test --locked -p reversible-core --lib a_loaded_log_that_breaks_the_invariant_is_refused`
-|T-10: Logs the manager writes, idle and busy, satisfy the invariant and load back (the positive control) |TESTED |`crates/reversible-core/src/transaction.rs::a_log_the_manager_wrote_loads_back` |`cargo test --locked -p reversible-core --lib a_log_the_manager_wrote_loads_back`
-|T-11: The Agda lifecycle model corresponds to TransactionManager (by transcription) |ASSUMED |`verification/proofs/agda/TransactionAtomicity.agda` |-
+|T-9: A forward file change is never left without a log record (execute changes the filesystem, then appends; needs a write-ahead intent record) |OPEN |`crates/januskey-cli/src/operations.rs` |-
+|T-11: An undo whose mark_undone fails to persist can be retried safely (the inverse is recorded as its own operation before the mark; needs an idempotent undo) |OPEN |`crates/januskey-cli/src/operations.rs` |-
+|T-10: januskey's TransactionManager refines the single-active log (Rust begin, add_operation, commit, mark_rolled_back against the abstract transitions; engineering, for Creusot or Verus) |OPEN |`crates/reversible-core/src/transaction.rs` |-
+|T-12: A transaction log read from disk that breaks the lifecycle invariant (pointer to a missing or settled transaction, an Active one with no pointer, two Active, or a settled first transaction with the active id) is refused as corrupted |TESTED |`crates/reversible-core/src/transaction.rs::a_loaded_log_that_breaks_the_invariant_is_refused` |`cargo test --locked -p reversible-core --lib a_loaded_log_that_breaks_the_invariant_is_refused`
+|T-12: Logs the manager writes, idle and busy, satisfy the invariant and load back (the positive control) |TESTED |`crates/reversible-core/src/transaction.rs::a_log_the_manager_wrote_loads_back` |`cargo test --locked -p reversible-core --lib a_log_the_manager_wrote_loads_back`
 |T-6: A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1) |ASSUMED |`crates/januskey-cli/src/operations.rs` |-
 |T-7: Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) |ASSUMED |`crates/reversible-core/src/transaction.rs` |-
 |Every operation is reversible (MPR), as a theorem linked to the Rust (needs G-2 made mechanical, and G-3) |OPEN |`verification/proofs/agda/Reversibility.agda` |-
@@ -311,7 +315,7 @@ be systematically replaced with proven error handling.
 
 *HIGH* — reversibility is the product, and its exceptions are destructive:
 obliteration destroys data on purpose, and the operation log is the only thing
-that makes undo possible (row T-9 is open). Any correctness bug in either is a
+that makes undo possible (rows T-9 and T-11 are open). Any correctness bug in either is a
 critical vulnerability. The ABI layer now typechecks, but none of the security
 obligations above is proved.
 

@@ -19,14 +19,10 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 * feat(transactions): a transaction log read from disk is checked against the
 lifecycle invariant the Agda theorems preserve, and refused if it breaks it
-(T-10, TESTED); the unused `TransactionManager::active_mut` is removed; the
-model's match to the Rust is recorded as T-11 (ASSUMED)
-* feat(proofs): proof grades restated as Proof Witness Grades (PROOF-POLICY
-§8): five `PWG-3` rows, census of 8 theory rows; the Agda gate now prints the
-import cone, input digests and a self-tested comment-aware escape-hatch scan
-into its receipt; Rust obligations name Creusot, Pearlite and Verus (§1.2)
-* fix(ledger): restore the T-8 TESTED and T-9 OPEN rows that the #167 merge
-into #168 dropped
+(T-12, TESTED, evidence towards T-10 at the load boundary); the unused
+`TransactionManager::active_mut` is removed
+* ci(dashboard): the dashboard job runs Agda 2.6.4.3 from the proof job's
+pinned image (one Agda version across CI, owner decision 2026-11-09)
 * feat(proofs): `Epistemic.agda` replaces the vacuous Idris `Knows` modality with
 knowledge as indiscriminability: ignorance, obliteration and rotation-forgetting
 become propositions, with two expected-rejection fixtures; new ledger row E-1m

@@ -16,11 +16,10 @@
 -- a TESTED row of the claims ledger in PROOF-NEEDS.adoc.
 --
 -- Pinned sibling: hyperpolymath/resource-algebra, see scripts/fetch-siblings.sh.
--- Kernel: Agda, checked by scripts/check-agda.sh under PROOF-POLICY §2.1
--- (--safe --without-K --cubical-compatible); the Idris2 ABI
--- (src/abi/JanusKey/ABI) is the runtime layer. The Idris2 IsCNO /
--- ReversibleOp pair corresponds to ReversiblePair below by transcription
--- (ASSUMED; no mechanical link is claimed).
+-- Kernel ruling (2026-10-12): Agda --safe --without-K is the proof kernel;
+-- the Idris2 ABI (src/abi/JanusKey/ABI) is the runtime layer. The Idris2
+-- IsCNO / ReversibleOp pair corresponds to ReversiblePair below by
+-- transcription (ASSUMED; no mechanical link is claimed).
 
 module Reversibility where
 
@@ -129,8 +128,12 @@ module Steps (S : Set) where
 
   ----------------------------------------------------------------------
   -- The reversible pair: wrap then unwrap. The cancellation law is the
-  -- operational premise (execute_then_undo_is_identity, cited above);
-  -- given it, both steps are graded 𝟙 and the two-step trace is lossless.
+  -- operational premise (execute_then_undo_is_identity, cited above).
+  -- Both steps are *assigned* grade 𝟙: wrap-unwrap-𝟙 holds by definition
+  -- and does not use `cancels`. The kernel-checked link between the pair
+  -- and its grade is only that a pair carries its cancellation law
+  -- (wrap-unwrap-id); that the law is why 𝟙 is the right annotation is
+  -- the informal reading, not a theorem here.
   ----------------------------------------------------------------------
 
   record ReversiblePair : Set where
@@ -151,8 +154,8 @@ module Steps (S : Set) where
   wrap-unwrap-𝟙 : ∀ p → traceGrade (wrapStep p ∷ unwrapStep p ∷ []) ≡ fin 0
   wrap-unwrap-𝟙 p = refl
 
-  -- Running the pair really is the identity: the grade annotation above is
-  -- justified by this, not the other way round.
+  -- Running the pair really is the identity. This is what the 𝟙
+  -- annotation above is meant to record; the kernel does not tie the two.
   wrap-unwrap-id : ∀ p x → run (unwrapStep p) (run (wrapStep p) x) ≡ x
   wrap-unwrap-id p x = cancels p x
 

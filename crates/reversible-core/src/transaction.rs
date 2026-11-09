@@ -107,13 +107,15 @@ impl TransactionLog {
 }
 
 /// Check the lifecycle invariant `Good` of
-/// `verification/proofs/agda/TransactionAtomicity.agda` on a log read from disk.
+/// `verification/proofs/agda/SingleActiveLog.agda` (januskey's instance in
+/// `TransactionAtomicity.agda` Part B) on a log read from disk.
 ///
 /// The Agda theorems (ledger rows T-2 and T-3) prove that begin, add_operation,
 /// commit and mark_rolled_back preserve `Good`, so a log this code wrote
 /// satisfies it. A log read from disk is not guaranteed to — it may have been
 /// edited, or written by another version — and without this check the proved
-/// invariant would rest on an unchecked premise at load (row T-10).
+/// invariant would rest on an unchecked premise at load (row T-12; the
+/// refinement itself is T-10, OPEN).
 ///
 /// `Good` holds when either the active pointer is unset and no transaction is
 /// Active, or the pointer names an id whose *first* transaction is Active and
@@ -892,7 +894,7 @@ mod tests {
         }
     }
 
-    /// T-10: a log read from disk must satisfy the invariant `Good` that the
+    /// T-12: a log read from disk must satisfy the invariant `Good` that the
     /// Agda lifecycle theorems (T-2, T-3) preserve; each way of breaking it is
     /// refused as corrupted rather than loaded.
     #[test]
@@ -929,7 +931,7 @@ mod tests {
         }
     }
 
-    /// T-10, the positive control: logs the manager writes satisfy the
+    /// T-12, the positive control: logs the manager writes satisfy the
     /// invariant, idle and busy, and load back unchanged.
     #[test]
     fn a_log_the_manager_wrote_loads_back() {
