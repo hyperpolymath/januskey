@@ -12,32 +12,42 @@ repository, and none is introduced here.
 
 == What governs the grades
 
-Two owner documents, both read at HEAD on 2026-11-01:
+Since the owner ruling of 2026-11-04, `PROOF-POLICY.adoc` §8 is normative for
+grades, and they are written with their prefix: `PWG-3`, `PWG-2i`, `PWG-2ii`,
+`PWG-1`, or `ungraded`. The mathesis brief that first proposed the ladder is
+kept for provenance only; where the two differ, §8 governs. This page was first
+written against the brief (2026-11-01) and was brought in line with §8 on
+2026-11-09.
 
 [cols="1,2,3",options="header"]
 |===
 | Source | Section | Rule taken from it
 
-| `hyperpolymath/mathesis`,
-  file `estate-mathematical-architecture`
-| §5 grades
-| **Grade 3** — "a proof is Grade 3 if it type-checks locally in Agda but has
-  not been translated to an independent foundational system". Grade 2i adds one
-  translation, Grade 2ii two *foundationally distinct* ones (Agda, Rocq and
-  Lean are all dependent type theory, so 2ii needs Isabelle/HOL), Grade 1 is a
-  check served to headless CI tooling (AXLE, isabelle server, coq-lsp REST).
+| `hyperpolymath/standards`,
+  `3-practice/PROOF-POLICY.adoc`
+| §8 Proof Witness Grades
+| `PWG-3`: the Agda proof is `PROVEN` under the §2.1 invocation, with the
+  receipt recording the Agda version, library pin, flags and import cone.
+  `PWG-2i`: plus one counted Rocq or Lean leg (`RECONCILED`). `PWG-2ii`: plus
+  both. `PWG-1`: plus current receipts per commit for every counted witness. A
+  witness in a different foundation (Isabelle/HOL and the like) is the tag
+  `+foundation-diverse`, never a grade: the brief's "2ii needs Isabelle/HOL"
+  reading is corrected by §8.3.
 
-| mathesis, same file
-| §6 reporting
-| No percentage; every axiom the development relies on is tracked; a grade
-  receipt records the **commit hash** it was produced at; a grade that stops
-  applying is marked `Superseded` or `Regressed`, never quietly deleted.
+| PROOF-POLICY
+| §8.4 rules
+| A grade is derived from receipts, never asserted; no percentage, only a
+  census with its denominator; every counted witness lists its axioms (for
+  Agda: `--safe`, a comment-aware postulate scan of the import cone, and the
+  recorded cone); a receipt no longer current carries `state: superseded` or
+  `state: regressed`, never deleted.
 
 | `hyperpolymath/standards`,
   `3-practice/PROOF-POLICY.adoc`
 | §1 mapping
 | Theory is proved in **Agda** and rechecked in Rocq and Lean; the behaviour of
-  first-party Rust is **Creusot** on that code; API, ABI and wire-format
+  first-party Rust is **Creusot** with **Pearlite** contracts, and **Verus**
+  (§1.2, owner ruling 2026-11-07), on that code; API, ABI and wire-format
   contracts are **Idris2**. The earlier "Rust always means Rust/SPARK" note is
   withdrawn (owner ruling 2026-04-10): Rust is Creusot.
 
@@ -59,11 +69,11 @@ januskey's own five-status ledger vocabulary (`PROVEN`, `TESTED`, `ASSUMED`,
 `DESIGNED`, `OPEN`) is the estate's claim vocabulary and is unchanged by any of
 this. A grade is a second axis laid over it, not a replacement: a row is
 `PROVEN` *because* a named artefact checks it, and separately has (or has not) a
-mathesis grade.
+Proof Witness Grade.
 
-== The Grade 3 receipt
+== The PWG-3 receipt
 
-The theory artefacts are two Agda modules:
+The theory artefacts are three Agda modules:
 
 * `verification/proofs/agda/Reversibility.agda` — the Loss grade algebra:
   lossless traces have only lossless steps, obliteration absorbs, and a
@@ -72,51 +82,70 @@ The theory artefacts are two Agda modules:
   state the transaction began in; the `TransactionManager` lifecycle keeps its
   log invariant under begin, add_operation, commit and mark_rolled_back, and at
   most one transaction is Active.
+* `verification/proofs/agda/Epistemic.agda` — the model-level half of E-1
+  (row E-1m, §The epistemic rewrite below).
 
-Both are checked by `scripts/check-agda.sh` (`just test-agda`), which is also
-the ledger's recorded checker for rows G-1, T-1, T-2 and T-3. The receipt:
+All three are checked by `scripts/check-agda.sh` (`just test-agda`), which is
+also the ledger's recorded checker for rows G-1, T-1, T-2, T-3 and E-1m. The
+current receipt (PROOF-POLICY §8.2, `PWG-3`):
 
 [cols="1,3",options="header"]
 |===
 | Field | Value
 
 | Workflow, run | `agda-proofs.yml`, run
-  https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509],
-  branch `main`, conclusion **success**
-| Commit | `4afb710e86646658f667f10bd6274ee47416bfc7` (started 2026-10-29T11:40:36Z)
+  https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251],
+  branch `main`, conclusion **success**, `state: current`
+| Commit | `23bc8c38160a25c37917bce69cf05d91899b07e5` (started 2026-11-05T17:40:46Z)
 | Prover | `agda-bin=2.6.4.3-1+b2` on Debian trixie-slim
   (`@sha256:a29215f6…`), asserted by a passing step:
   `test "$(agda --version)" = 'Agda version 2.6.4.3'`
-| Flags | `--safe --without-K --no-libraries --ignore-interfaces --double-check`
-  at the receipt commit; the gate now runs PROOF-POLICY §2.1's canonical form
-  with `--cubical-compatible` added (see §The §2.1 invocation below)
-| Sibling | `resource-algebra` at
+| Library pin | none: `--no-libraries`; the only import outside this tree is the
+  sibling below
+| Flags | `--safe --without-K --cubical-compatible --no-libraries
+  --ignore-interfaces --double-check`: the §2.1 canonical invocation, plus two
+  stricter options
+| Import cone | roots `Reversibility`, `TransactionAtomicity`, `Epistemic`; the
+  cone is those modules and `resource-algebra` at
   `cf9235c532712a783a404c359a1055f40134794a`, fetched by
-  `scripts/fetch-siblings.sh`; consumed by pin, not re-declared here
-| Result | The two modules in this receipt type-check; the fixtures under
+  `scripts/fetch-siblings.sh` and re-checked from source under the same flags
+  (`--ignore-interfaces`); consumed by pin, not re-declared here
+| Axioms | none. `--safe` refuses `postulate`; postulate count 0. The
+  comment-aware scan of the cone (`scripts/scan-postulates.sh`, wired into the
+  gate with a positive and a negative control on every run) was added after this
+  run, so its first CI receipt is the next `agda-proofs.yml` run on `main`;
+  a local run at this receipt's sources reported 10 files, 0 postulates
+| Result | The three modules type-check; the fixtures under
   `tests/reject-agda/` are refused *with the message each fixture names*, so a
   fixture that starts passing, or starts failing for the wrong reason, fails the
-  gate
-| Transfer | `Reversibility.agda`, `TransactionAtomicity.agda`,
-  `scripts/fetch-siblings.sh` and `agda-proofs.yml` are byte-identical at that
-  commit and at this branch's HEAD (blobs `0d30206…`, `38c9b06…`, `9b66a48…`,
-  `7c7e653…`), so the receipt covers those two rows as they stand. It does
-  **not** cover `Epistemic.agda` (new) or the changed `check-agda.sh`: their
-  first CI evidence is the run on this branch's pull request
+  gate. Agda reports `UnsupportedIndexedMatch` warnings (§The §2.1 invocation
+  below): they concern computation under cubical transports, not the
+  propositions, and are kept visible
 |===
 
-That is a Grade 3 receipt in mathesis terms: the propositions type-check in
-Agda, in CI, at a named commit, with the prover version pinned and recorded.
-mathesis §5 illustrates "strict solver flags" with `--safe --erasure`;
-januskey's strictness is `--safe --without-K` plus `--double-check`, which is
-the same family and stricter than bare `--safe` (no K, no trusted compiled
-interfaces, a second checking pass).
-Nothing here has been translated to Rocq, Lean or Isabelle, so it is not
-Grade 2i, and no headless proof service is involved, so it is not Grade 1.
+Earlier receipts, kept with their lineage (§8.4):
 
-=== Why it stops at Grade 3
+[cols="1,1,3",options="header"]
+|===
+| Run, commit | State | Why
 
-Grade 2i and above would require an Agda → Dedukti → Rocq/Lean transport or a
+| https://github.com/hyperpolymath/januskey/actions/runs/41687715055[41687715055], `fc188c4`
+| `superseded`
+| Canonical flags and all three modules; replaced by the run above at a later commit
+| https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509], `4afb710`
+| `superseded`
+| Before `--cubical-compatible` and before `Epistemic.agda`; it never covered E-1m
+|===
+
+That is a `PWG-3` receipt: the propositions type-check in Agda under the §2.1
+invocation, in CI, at a named commit, with the prover version pinned and the
+import cone recorded. Nothing here has been translated to Rocq or Lean, so no
+recheck leg counts and the grade is not `PWG-2i`; no witness in another
+foundation exists, so `foundation_diverse` is false.
+
+=== Why it stops at PWG-3
+
+PWG-2i and above would require an Agda → Dedukti → Rocq/Lean transport or a
 re-proof, with the outcome recorded as `transported`, `re-proved` or
 `unavailable` (PROOF-POLICY §2). That work has not been done, is not claimed,
 and would not change what these modules prove: §2.2 is explicit that compiling
@@ -168,16 +197,12 @@ re-checks the sibling from source instead of trusting compiled interfaces;
 
 === Receipt bookkeeping for that change
 
-The CI receipt in the table above was produced **before** the flag changed.
-Changing a graded artefact's checker invalidates its receipt's exactness, so:
-
-* the local run above is recorded as **reproduction** — same prover version,
-  PyPI provenance instead of Debian, and no CI provenance at all (PROOF-POLICY
-  §2.3: receipts of execution come from CI);
-* the next `agda-proofs.yml` run on `main` is the new receipt, and this page
-  must cite it in place of the local run once it exists. Until then the rows
-  stay `AGDA-VERIFIED` on the strength of the four artefacts being unchanged
-  plus a matching local run, and that is the strongest claim available.
+The local run above is recorded as **reproduction** only: same prover version,
+PyPI provenance instead of Debian, and no CI provenance (PROOF-POLICY §2.3:
+receipts of execution come from CI). The CI receipt it was waiting for now
+exists: the table in §The PWG-3 receipt cites run 42076969251, which ran the
+canonical invocation on all three modules, and the receipts from before the
+flag changed are marked `superseded` there.
 
 One related inconsistency is an open obligation, not a claim: the Agda version
 is pinned twice in CI and the two pins differ — `agda-proofs.yml` installs
@@ -200,11 +225,11 @@ Idris2, are recorded in `docs/estate/environment-toolchains.md`.
 
 == Grades, ledger row by ledger row
 
-The 47 ledger rows fall into three classes under PROOF-POLICY §1. Counts are
-from `PROOF-NEEDS.adoc` at this commit and are `PROVEN` 12, `TESTED` 23,
-`ASSUMED` 4, `DESIGNED` 3, `OPEN` 5.
+The ledger rows fall into three classes under PROOF-POLICY §1. `PROOF-NEEDS.adoc`
+is the only place the rows are counted: an earlier revision of this page
+repeated the counts, and the two copies drifted apart.
 
-=== Grade 3 — theory, proved in Agda
+=== PWG-3 — theory, proved in Agda
 
 [cols="1,3,2",options="header"]
 |===
@@ -227,7 +252,7 @@ from `PROOF-NEEDS.adoc` at this commit and are `PROVEN` 12, `TESTED` 23,
   `obliterate-ignorance`, `rotate-forgets-old`
 |===
 
-These five are the only rows in this repository with a mathesis grade. Each
+These five are the only rows in this repository with a Proof Witness Grade (PWG). Each
 rests on a premise it names rather than assumes silently — the per-step
 cancellation law (`undoes`, TESTED as `execute_then_undo_is_identity`), the
 freshness of the transaction id (T-7, `ASSUMED`, probabilistic), the absence of
@@ -235,7 +260,7 @@ I/O, and, for E-1m, that the modelled channels are the only ones an attacker
 has (X-1). §6 asks for the axioms to be tracked; they are, in the modules'
 own "What is NOT claimed" blocks and in the ledger's T-6, T-7, G-2, X-1 rows.
 
-=== Engineering contracts — no mathesis grade applies
+=== Engineering contracts — no Proof Witness Grade applies
 
 Seven `PROVEN` rows are Idris2 theorems about this ABI: A-1, A-2, C-1, C-2,
 C-3, C-4, C-5, checked by
@@ -336,12 +361,12 @@ PROOF-POLICY §1 and the ABI belongs in Idris2.
 * Every grade names its receipt: commit, prover, prover version, flags,
   sibling pin. The receipt above is the only one of its kind here.
 * A receipt is invalidated by a change to a graded artefact, to its checker or
-  to its pin, and is then re-earned by the next run, not carried forward. The
-  blob comparison in §The Grade 3 receipt exists precisely to show which
-  changes do and do not invalidate it.
-* When a graded artefact is replaced, the grade is marked `Superseded`; when a
-  green receipt goes red and is not immediately fixed, `Regressed`. Neither is
-  deleted from the history.
-* `AGDA-PENDING` is the correct status for a module committed but not yet
-  checked. No row in this repository is in that state today: the four graded
-  rows are `AGDA-VERIFIED` at the commit above.
+  to its pin, and is then re-earned by the next run, not carried forward.
+* A receipt that is no longer current carries `state: superseded` (a newer
+  receipt replaced it) or `state: regressed` (the source no longer checks), with
+  the reason (PROOF-POLICY §8.4). These are receipt states, not status tokens,
+  and neither receipt is deleted from the history.
+* `AGDA-PENDING` is the correct correspondence state for a module committed but
+  not yet checked. No row in this repository is in that state today: the five
+  graded rows are `AGDA-VERIFIED` at the commit above, and their Rocq and Lean
+  legs are `unavailable`, so the grade is `PWG-3`.

@@ -20,6 +20,25 @@ bash scripts/fetch-siblings.sh
 # them visible rather than silencing them with -WnoUnsupportedIndexedMatch.
 flags=(--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check
        -i verification/proofs/agda -i _build/dependencies/resource-algebra/src)
+# PROOF-POLICY §8.4: a comment-aware postulate scan of the import cone (the
+# proofs and the pinned sibling), proved to work both ways on every run.
+bash scripts/scan-postulates.sh verification/proofs/agda _build/dependencies/resource-algebra/src
+# The controls are written at run time, so no file in the tree carries a real
+# postulate for another scanner to count.
+controls="$(mktemp -d)"
+trap 'rm -rf -- "$controls"' EXIT
+mkdir -p "$controls/comments-only" "$controls/planted"
+printf '%s\n' 'module CommentsOnly where' '-- postulate in a line comment' \
+  '{- postulate {- nested postulate -} postulate -}' 'x-postulate : Set₁' \
+  'x-postulate = Set' > "$controls/comments-only/CommentsOnly.agda"
+printf '%s\n' 'module Planted where' '{- c -} postulate X : Set' \
+  > "$controls/planted/Planted.agda"
+bash scripts/scan-postulates.sh "$controls/comments-only" >/dev/null \
+  || { echo "ERROR: postulate scan reported a postulate that is only in comments" >&2; exit 1; }
+if bash scripts/scan-postulates.sh "$controls/planted" >/dev/null; then
+  echo "ERROR: postulate scan missed the planted postulate" >&2; exit 1
+fi
+echo "[PASS] postulate scan: cone clean, both controls behave"
 for module in Reversibility TransactionAtomicity Epistemic; do
   "$prover" "${flags[@]}" "verification/proofs/agda/$module.agda"
 done
