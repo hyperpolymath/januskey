@@ -24,19 +24,49 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # PROVEN rows of the PROOF-NEEDS claims ledger run their checker, so this
-    # job needs Idris2 (the same pinned image as idris-abi.yml) and Agda.
-    container:
-      image: ghcr.io/stefan-hoeck/idris2-pack@sha256:f0758996a931fb35d9ecb1de273c4d59dabe2a09b433afc7e357f65a08b7e1ff
+    # job needs Idris2 and Agda. Each runs from the image its own proof job
+    # pins, so a green dashboard re-runs the same prover version as the
+    # receipt: Idris2 from idris-abi.yml's image, Agda 2.6.4.3 from
+    # agda-proofs.yml's Debian image (before 2026-11-09 this job installed
+    # Ubuntu's Agda 2.6.3, a second, different pin). `agda` and `idris2` on
+    # PATH are wrappers that run those images over the checkout.
+    env:
+      IDRIS2_IMAGE: ghcr.io/stefan-hoeck/idris2-pack@sha256:f0758996a931fb35d9ecb1de273c4d59dabe2a09b433afc7e357f65a08b7e1ff
+      AGDA_BASE: debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
     steps:
-      - name: Install Agda, and curl for rustup
-        run: |
-          apt-get update
-          apt-get install --no-install-recommends -y ca-certificates curl agda-bin=2.6.3-1build1
-          agda --version
-          idris2 --version
-
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
+
+      - name: Provers from the pinned images (Agda 2.6.4.3, Idris2)
+        run: |
+          printf 'FROM %s\nRUN apt-get update && apt-get install --no-install-recommends -y agda-bin=2.6.4.3-1+b2 && rm -rf /var/lib/apt/lists/*\n' \
+            "$AGDA_BASE" | docker build -t januskey-agda:2.6.4.3 -
+          docker pull -q "$IDRIS2_IMAGE"
+          mkdir -p "$RUNNER_TEMP/provers"
+          # Agda runs as the runner user. The Idris2 image keeps its toolchain
+          # under /root, so idris2 runs as root, and the wrapper then hands any
+          # root-owned file it left in the working tree back to the runner: a
+          # checker that cannot clean up its scratch copy would fail its row.
+          cat > "$RUNNER_TEMP/provers/agda" <<'WRAP'
+          #!/usr/bin/env bash
+          exec docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e LC_ALL=C.UTF-8 \
+            -v "$PWD:$PWD" -w "$PWD" --entrypoint agda januskey-agda:2.6.4.3 "$@"
+          WRAP
+          cat > "$RUNNER_TEMP/provers/idris2" <<'WRAP'
+          #!/usr/bin/env bash
+          docker run --rm -e LC_ALL=C.UTF-8 -v "$PWD:$PWD" -w "$PWD" --entrypoint "" "$IDRIS2_IMAGE" idris2 "$@"
+          rc=$?
+          docker run --rm -v "$PWD:$PWD" --entrypoint "" "$IDRIS2_IMAGE" \
+            find "$PWD" -xdev -uid 0 -exec chown -h "$(id -u):$(id -g)" {} +
+          exit "$rc"
+          WRAP
+          chmod +x "$RUNNER_TEMP"/provers/*
+          echo "$RUNNER_TEMP/provers" >> "$GITHUB_PATH"
+
+      - name: Verify the prover versions
+        run: |
+          test "$(agda --version)" = 'Agda version 2.6.4.3'
+          idris2 --version
 
       - uses: dtolnay/rust-toolchain@v1
         with:

@@ -153,13 +153,15 @@ are kept as evidence rather than cited as complete receipts. A red run on
 `main` makes that receipt `regressed`, and the five rows fall to `ungraded`
 until it is fixed (§8.4 rule 4).
 
-=== One checker, two pins: an open obligation
+=== One checker, one pin (resolved 2026-11-09)
 
-`agda-proofs.yml` pins Agda 2.6.4.3, the receipt above. `dashboard-check.yml`
-installs Agda 2.6.3 on the Idris2 image so that it can run the PROVEN rows'
-checkers. Both are green, but a green dashboard is not a receipt at 2.6.4.3.
-Pinning the dashboard's Agda to the same version means choosing a base
-image, which is an owner decision.
+Until 2026-11-09 `dashboard-check.yml` installed Ubuntu's Agda 2.6.3 on the
+Idris2 image, a second pin that differed from the receipt's 2.6.4.3. By owner
+decision the dashboard now runs Agda from the image `agda-proofs.yml` pins:
+the same `debian:trixie-slim` digest and `agda-bin=2.6.4.3-1+b2`. It runs
+Idris2 from the image `idris-abi.yml` pins, and checks the version string as
+the proof job does. A green dashboard therefore re-runs the PROVEN rows with
+the prover version of the receipt.
 
 == Design review of the graded theorems (2026-11-09)
 
