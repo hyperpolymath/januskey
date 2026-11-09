@@ -92,6 +92,10 @@ test-contracts:
 test-agda:
     bash scripts/check-agda.sh
 
+# Rocq and Lean recheck legs of the Agda theorems (PROOF-POLICY §2), no axioms, expected rejections.
+test-recheck:
+    bash scripts/check-recheck.sh
+
 # Idris2 ABI <-> januskey.h <-> ffi/zig agreement (sizes, status codes, enums, symbols); no compiler needed.
 abi-layout-check:
     bash scripts/check-abi-layout.sh
