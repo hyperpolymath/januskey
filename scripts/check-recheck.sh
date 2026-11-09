@@ -71,8 +71,12 @@ reject() {
     printf '%s\n' "$log"; echo "ERROR: $file was refused, but not with '$want'" >&2; exit 1; }
   echo "[PASS] refused as expected: $file ($want)"
 }
+# Fixtures are compiled from a copy in the work directory, so no build output
+# (.glob, .aux) lands in the tree.
+mkdir -p "$work/reject-rocq"
 for f in "${rocq_rej[@]}"; do
-  reject "$f" "$rocq" -q -Q "$work/rocq" JanusKey "$f"
+  cp -- "$f" "$work/reject-rocq/"
+  reject "$f" "$rocq" -q -Q "$work/rocq" JanusKey "$work/reject-rocq/$(basename -- "$f")"
 done
 for f in "${lean_rej[@]}"; do
   reject "$f" env LEAN_PATH="$work/lean" "$lean" "$f"

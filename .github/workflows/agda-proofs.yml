@@ -45,7 +45,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y coq=8.18.0+dfsg-1build2 zstd
-          curl -sSfL -o lean.tar.zst \
+          curl --proto '=https' --tlsv1.2 -sSfL -o lean.tar.zst \
             "https://github.com/leanprover/lean4/releases/download/v${LEAN_VERSION}/lean-${LEAN_VERSION}-linux.tar.zst"
           echo "${LEAN_SHA256}  lean.tar.zst" | sha256sum -c -
           mkdir -p "$RUNNER_TEMP/lean"
