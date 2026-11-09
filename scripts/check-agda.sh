@@ -91,16 +91,22 @@ printf '%s\n' 'module CommentsOnly where' '-- postulate in a line comment' \
   '{- postulate {- nested postulate -} postulate -}' \
   'x--postulate : Set₁' 'x--postulate = Set' \
   's : String' 's = "a postulate in a string \" still the string"' \
+  '{-# FOREIGN GHC postulate = () #-}' \
   > "$work/CommentsOnly.agda"
-# Line 2: a postulate after a block comment. Line 3: one bounded by NO-BREAK
-# SPACE (U+00A0) on both sides, which Agda reads as whitespace.
+# One planted postulate per line, 2 to 5: after a block comment; bounded by
+# NO-BREAK SPACE (U+00A0), which Agda reads as whitespace; separated from its
+# name by a block comment; after a pragma whose payload holds `{- {-`, which Agda
+# does not read as a comment there.
 printf '%s\n' 'module Planted where' '{- c -} postulate X : Set' \
-  $'\302\240postulate\302\240Y : Set' > "$work/Planted.agda"
+  $'\302\240postulate\302\240Y : Set' 'postulate{- c -}Z : Set' \
+  '{-# FOREIGN GHC {- {- #-} postulate W : Set' > "$work/Planted.agda"
 status=0; bash scripts/scan-postulates.sh "$work/CommentsOnly.agda" >"$work/neg.log" 2>&1 || status=$?
 [ "$status" -eq 0 ] || { cat "$work/neg.log"; echo "ERROR: the comments-only control did not exit 0 (got $status)" >&2; exit 1; }
 status=0; bash scripts/scan-postulates.sh "$work/Planted.agda" >"$work/pos.log" 2>&1 || status=$?
-if [ "$status" -ne 1 ] || ! grep -qF -- "Planted.agda:2:" "$work/pos.log" || ! grep -qF -- "Planted.agda:3:" "$work/pos.log"; then
-  cat "$work/pos.log"; echo "ERROR: the planted control did not exit 1 naming Planted.agda:2 and :3 (got $status)" >&2; exit 1
+missed=""
+for line in 2 3 4 5; do grep -qF -- "Planted.agda:$line:" "$work/pos.log" || missed="$missed $line"; done
+if [ "$status" -ne 1 ] || [ -n "$missed" ]; then
+  cat "$work/pos.log"; echo "ERROR: the planted control did not exit 1 naming lines 2-5 (got $status; missed:${missed:- none})" >&2; exit 1
 fi
 echo "[PASS] postulate scan: cone clean, both controls behave"
 mkdir -p _build/check-logs

@@ -9,8 +9,14 @@
 #
 # Lexing follows Agda closely enough for one keyword: text inside nested
 # {- -} comments, after a `--` that starts a token (with or without a space
-# after it), and inside string or character literals is ignored; pragmas
-# ({-# … #-}) are code. A `--` inside a name such as `x--y` is part of the name.
+# after it), and inside string or character literals is ignored. A `--` inside
+# a name such as `x--y` is part of the name. A comment separates tokens, as it
+# does for Agda, so `postulate{- c -}X` is a postulate.
+# A pragma ({-# … #-}) is skipped to the first `#-}`: its contents are pragma
+# tokens or, for FOREIGN and COMPILE, another language's text, never an Agda
+# declaration, and Agda does not nest comments inside it (Lexer.x). Agda closes
+# a pragma at a `#-}` token, never before the first `#-}` in the text, so this
+# rule can end a pragma early (an extra report) but never late (a missed one).
 # Whitespace is Agda's: its lexer reads every character Haskell's isSpace accepts,
 # other than tab and newline, as a space (Agda.Syntax.Parser.Alex, toASCII), so
 # CR, FF, VT, NO-BREAK SPACE and the Unicode space separators (category Zs) are
@@ -30,17 +36,21 @@ ws="$(printf '\302\240|\341\232\200|\342\200[\200-\212]|\342\200\257|\342\201\23
 hits="$(LC_ALL=C awk -v ws="$ws" '
   # Agda name characters are everything except whitespace and .;{}()@"
   function namechar(c) { return c != "" && c !~ /[ \t.;{}()@"]/ }
-  FNR == 1 { depth = 0 }
+  FNR == 1 { depth = 0; pragma = 0 }
   {
     line = $0; gsub(/[\r\f\v]/, " ", line); gsub(ws, " ", line)
     code = ""; i = 1; n = length(line)
     while (i <= n) {
       c = substr(line, i, 1); two = substr(line, i, 2)
       prev = (i > 1) ? substr(line, i - 1, 1) : ""
-      if (depth == 0 && two == "{-" && substr(line, i + 2, 1) == "#") {
-        code = code "{-#"; i += 3; continue
+      if (pragma) {                        # inside {-# … #-}: skip to the first #-}
+        if (substr(line, i, 3) == "#-}") { pragma = 0; i += 3; code = code " " } else i++
+        continue
       }
-      if (two == "{-") { depth++; i += 2; continue }
+      if (depth == 0 && two == "{-" && substr(line, i + 2, 1) == "#") {
+        pragma = 1; i += 3; code = code " "; continue
+      }
+      if (two == "{-") { if (depth == 0) code = code " "; depth++; i += 2; continue }
       if (depth > 0 && two == "-}") { depth--; i += 2; continue }
       if (depth > 0) { i++; continue }
       if (c == "\"") {                     # string literal: skip to the closing quote
