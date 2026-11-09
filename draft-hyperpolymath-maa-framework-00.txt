@@ -4,6 +4,20 @@ Intended status: Informational                                   [October 13, 20
 Expires: April 13, 2026
 
                                    Mutually Assured Accountability (MAA) Framework
+
+STATUS OF THIS COPY (repository note, 2026-11-09)
+
+  EXPIRED DRAFT. This is the -00 draft dated October 13, 2025. It
+  expired on April 13, 2026 and has not been renewed: no -01 exists.
+  Nothing in this repository records that it was submitted to the
+  IETF, adopted by a working group, or ratified by anyone, so it has
+  no standing as an IETF document. Read it as a design note.
+
+  The text below was corrected in place on 2026-11-09. The changes are
+  listed under "Revision note" at the end, and the original -00 text
+  is in git history (commit 2361441). The claims ledger in
+  PROOF-NEEDS.adoc is the authority for every status word used here.
+
                                                             Abstract
 
 The widespread reliance on unverifiable, best-effort transactional
@@ -11,94 +25,158 @@ integrity and data deletion mechanisms in decentralized systems
 constitutes a systemic trust deficit. This deficit leads to chronic
 compliance failures (e.g., GDPR Article 17) and unrecoverable state
 corruption in Edge and IoT deployments. This document introduces the
-Mutually Assured Accountability (MAA) Framework, a novel ethical
-and engineering paradigm. MAA operationalises the **Maximal
-Principle Reduction (MPR)** axiom by defining a set of formally
-verifiable, dual primitives (RMR and RMO) that structurally enforce
-a balance between auditability and user autonomy. The MAA Framework
-proposes achieving system dependability through mathematically
-certain state reversibility and data obliteration, thereby replacing
-operational logging reliance with structural, formal assurance.
+Mutually Assured Accountability (MAA) Framework, an ethical and
+engineering paradigm. MAA operationalises the **Maximal Principle
+Reduction (MPR)** axiom by proposing a pair of dual primitives (RMR
+and RMO) intended to balance auditability and user autonomy. Each
+property claimed for them below is stated with its current evidence
+status, and none of them is proved in full: reversibility is proved
+only for a model and tested for single steps, and unrecoverability
+after erasure is not proved.
 
                                    1. Introduction
 
 The principles governing data management in high-assurance,
 decentralized systems remain fundamentally reliant on operational
 accountability methods (logging, monitoring, eventual consistency).
-These methods fail to provide **epistemological certainty**—the
+These methods do not provide **epistemological certainty**, the
 mathematical guarantee that a system state is correct, or that a
 deleted record no longer exists. This gap leads to structural trust
 deficits.
 
-The MAA Framework addresses this by establishing two symmetrical,
-formally verifiable primitives derived from the MPR axiom. These
-primitives are structurally guaranteed by the **Oblíbený** language's
-constraint-driven compilation model:
+The MAA Framework addresses this by proposing two symmetrical
+primitives derived from the MPR axiom. They are implemented in Rust
+in this repository (crates/reversible-core, crates/januskey-cli).
+No other language or toolchain enforces them: nothing here is
+compiled by, constrained by, or depends on the Oblíbený toolchain
+that the -00 text named.
 
 * **RMR (Reversible Transaction):** A primitive for state transitions
-  that guarantees instant, mathematically certain rollback to a
-  prior safe state via Algorithmic Reversibility. This maximizes
-  system auditability and dependability.
+  that records, before each change, what is needed to undo it. Its
+  reversibility claim is relative to a stated equality on states and
+  has two directions (Section 3). It supports auditability and
+  dependability.
 
 * **RMO (Obliterative Wipe):** A primitive for data erasure that
-  achieves Formal Obliteration, proving the non-existence of
-  specified data traces, thereby providing verifiable individual
-  autonomy.
+  overwrites and removes the data and leaves a tamper-evident record
+  that it did so. It does not prove that the data no longer exists
+  (Section 4).
 
 The MAA dynamic dictates that the deployment of RMR (Accountability)
-must be coupled with RMO (Control), stabilizing the system through
-a mutually enforced set of formal constraints.
+must be coupled with RMO (Control).
 
                                    2. Terminology
 
 The key terms defined within this document are:
 
 * **MAA (Mutually Assured Accountability):** The ethical and
-  engineering paradigm that structurally balances adversarial
-  system requirements using formal verification.
+  engineering paradigm that balances adversarial system requirements
+  by pairing a reversible primitive with an erasing one.
 
 * **MPR (Maximal Principle Reduction):** The core axiom used to
-  constrain system complexity to a minimal, verifiable subset.
+  constrain system complexity to a minimal, checkable subset. It is a
+  design philosophy; no tool in this repository enforces it.
 
-* **Oblíbený:** The specialized language and compiler toolchain that
-  enforces the MPR axiom via a Turing-Incomplete Deployment Subset.
+* **RMR (Reversible Transaction):** A data primitive that records, for
+  each state change F, the information that determines an inverse
+  F^-1. Section 3 states exactly what is claimed about F^-1.
 
-* **RMR (Reversible Transaction):** A data primitive, implemented
-  via the **Oblíbený** toolchain (targeting Rust/WASM), that guarantees
-  the existence of a mathematically sound inverse function for every
-  state change.
-
-* **RMO (Obliterative Wipe):** A data primitive that guarantees,
-  via formal proof, the non-existence (unrecoverability) of specific
-  data after invocation, satisfying the Right to Erasure.
+* **RMO (Obliterative Wipe):** A data primitive that overwrites and
+  removes specified data and records the fact. Whether the data is
+  unrecoverable afterwards is not established (Section 4).
 
                                 3. MAA and Formal Integrity
-  
+
 Current distributed transaction models (e.g., Two-Phase Commit, Saga)
 are complex and can enter blocking or inconsistent states. RMR
-proposes replacement with a simple, formally verified mechanism
-where the guarantee of integrity is based on the proven symmetry of
-the underlying function: $F^{-1}(\text{F}(\text{State})) = \text{State}$. The
-formal proof scripts for RMR demonstrate that the primitive is
-structurally incapable of leaving the state corrupted.
+proposes a simpler mechanism: each operation records the information
+that determines its inverse before it changes anything.
+
+3.1. The equality the claim is relative to
+
+Every reversibility statement in this section is an equality up to an
+equivalence ~ on states, and it says nothing about any finer equality.
+Two equivalences are in use:
+
+  ~tree   Two states are ~tree-equal when the regular files under the
+          working tree have the same relative paths and the same byte
+          content. Permission bits, owner and group, timestamps,
+          symlink identity, inode identity and empty directories are
+          not compared. This is what the property test
+          execute_then_undo_is_identity checks. The implementation
+          also restores permission bits on undo, but no test compares
+          them, so they are not part of ~tree. Owner, group, mtime
+          and symlink identity are recorded but not restored.
+
+  ~model  Propositional equality on the abstract state type of
+          verification/proofs/agda/TransactionAtomicity.agda. Nothing
+          links that type to the filesystem mechanically.
+
+3.2. The claim, in both directions
+
+Let F be an operation, D_F the states on which its precondition holds,
+and F^-1 the inverse determined by the metadata F recorded.
+
+  RMR-L (left inverse):  for every s in D_F,       F^-1(F(s)) ~ s
+  RMR-R (right inverse): for every t in F(D_F),    F(F^-1(t)) ~ t
+
+Together they say that F, restricted to D_F, is a bijection onto its
+image up to ~. RMR-R ranges over the image F(D_F) only, not over every
+state on which F^-1 is defined: Copy^-1 is Delete of the destination,
+and copying again does not restore arbitrary destination content.
+RMR-R follows from RMR-L when F respects ~ (s ~ s' implies
+F(s) ~ F(s')), and that congruence is not stated or tested either.
+
+3.3. What is established today
+
+  RMR-L, one step, ~tree    TESTED for Delete, Modify, Move, Copy and
+                            Create (property test above). Chmod is
+                            not in that test; Chown undo is not
+                            implemented. A failed execute leaving the
+                            state unchanged is ASSUMED (ledger T-6).
+  RMR-L, sequences, ~model  PROVEN as ledger T-1
+                            (TransactionAtomicity.rollback-restores),
+                            given that each step's undo restores its
+                            execute (T-6, ASSUMED).
+  RMR-R                     No ledger row. Not proved, not tested:
+                            OPEN.
+  "Every operation is       OPEN.
+   reversible"
+  Obliteration              Excluded by construction: a transaction
+                            containing one is not all-reversible
+                            (ledger C-3, PROVEN in the model).
+
+The guarantee is therefore not that the primitive "is structurally
+incapable of leaving the state corrupted". It is the conditional
+statements above, at the strength the ledger gives them.
 
                                    4. MAA and User Autonomy
 
 RMO addresses the chronic failure of data persistence to honour user
-deletion requests. The primitive ensures that the integrity of the
-data record is broken and its digital reminiscence is eliminated. This
-capability is crucial for compliance with privacy frameworks,
-providing a verifiable technical mechanism for the individual's
-right to control their digital history.
+deletion requests. The primitive overwrites the data in place, removes
+it, scrubs the unshared content-store blobs and log entries for it, and
+records a timestamped commitment to what was destroyed. That record is
+tamper-evident; it is not a certificate that the data is gone.
+
+That an attacker cannot recover obliterated content is OPEN (ledger
+E-1); only a model-level shadow of it is proved (E-1m). Hash
+one-wayness and physical erasure on the storage media are ASSUMED,
+external to this repository (ledger X-1). Overwrite in place does not
+guarantee physical erasure on SSD, copy-on-write or journaling
+filesystems. RMO is a mechanism relevant to the right to erasure; it
+is not a compliance determination.
 
                                    5. Security Considerations
 
 The MAA framework shifts the security focus from patch management
-to structural design. Security is assured by forcing the smallest
-possible Trusted Computing Base (TCB) at the protocol/primitive
-layer. The integrity of the MAA framework itself relies on the rigor
-of the formal verification proofs (e.g., using Isabelle/HOL and Z3)
-which must be auditable and maintained openly (e.g., as FOSS).
+to structural design, by keeping the Trusted Computing Base (TCB) at
+the protocol/primitive layer as small as possible. The framework is
+only as strong as its proofs, which must be auditable and maintained
+openly (e.g., as FOSS). The proofs in this repository are Agda
+(--safe --without-K, verification/proofs/agda) and an Idris2 ABI
+(src/abi). They cover the models named in Sections 3 and 4, not the
+Rust implementation. This repository contains no Isabelle/HOL theory
+and no Z3 script, and none of its claims rests on either.
 
                                    6. IANA Considerations
 
@@ -114,7 +192,27 @@ epistemological dilemmas (Wittgenstein and Russell) and by the
 critical necessity to clearly articulate verifiable security concepts
 in response to challenges raised by Joshua Jewell.
 
-                                   Author's Address
+                                   Revision note (2026-11-09)
+
+Corrected in place. The draft was not renewed, and no new revision
+number was assigned.
+
+* Status: marked expired and unratified (top of document).
+* Oblíbený: the -00 text said the primitives are "structurally
+  guaranteed" by, and RMR "implemented via", the Oblíbený toolchain.
+  This repository contains no Oblíbený source, configuration or
+  dependency, so those attributions and the Oblíbený glossary entry
+  were removed.
+* Isabelle/HOL and Z3: the -00 text named them as the verification
+  tools. This repository has neither, so Section 5 now names the
+  provers it actually uses.
+* RMR: -00 stated F^-1(F(State)) = State as proved and unconditional.
+  Section 3 now states it in both directions, relative to a named
+  equality on states, with the evidence status of each part.
+* RMO: -00 said it proves the non-existence of the data. Section 4
+  now carries the ledger status (E-1 OPEN, X-1 ASSUMED).
+
+Author's Address
 
 Jonathan D.A. Jewell
 The Open University

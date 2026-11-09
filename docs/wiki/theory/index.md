@@ -56,9 +56,14 @@ The **Mutually Assured Accountability (MAA) Framework** balances two opposing re
 
 These are implemented through dual primitives:
 
-- **RMR (Reversible Transaction)**: Guarantees perfect state reversal
+- **RMR (Reversible Transaction)**: Records each change's inverse; undo restores
+  the prior state up to a stated equality, tested for single steps and proved
+  for a transaction model; the right-inverse direction and "every operation is
+  reversible" are OPEN (see [MAA Property 1](maa-framework.md))
 
-- **RMO (Obliterative Wipe)**: Guarantees permanent, verifiable data erasure
+- **RMO (Obliterative Wipe)**: Best-effort overwrite and removal with a
+  tamper-evident record; unrecoverability is OPEN (E-1) and physical erasure is
+  ASSUMED (X-1)
 
 <!-- -->
 

@@ -511,6 +511,40 @@ mod tests {
         );
     }
 
+    /// A second undo of the same operation id is refused, in the same process
+    /// and after the log is reloaded from disk, and it leaves the file alone.
+    /// This is the runtime guard that `undo(&str)` has today; it is not a
+    /// typed, use-once undo token (see docs/adr/0003-undo-token-design-note.adoc).
+    #[test]
+    fn second_undo_of_the_same_operation_is_refused() {
+        let (tmp, content_store, mut metadata_store) = setup();
+        let file = tmp.path().join("f.txt");
+        fs::write(&file, "one").unwrap();
+
+        let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
+        let modify = executor
+            .execute(FileOperation::Modify {
+                path: file.clone(),
+                new_content: b"two".to_vec(),
+            })
+            .unwrap();
+        executor.undo(&modify.id).unwrap();
+        assert_eq!(fs::read(&file).unwrap(), b"one");
+
+        // A later edit that a second undo would clobber.
+        fs::write(&file, "three").unwrap();
+
+        let mut executor = OperationExecutor::new(&content_store, &mut metadata_store);
+        assert!(executor.undo(&modify.id).is_err());
+        assert_eq!(fs::read(&file).unwrap(), b"three");
+
+        // The refusal survives a reload: the undone flag is persisted.
+        let mut reloaded = MetadataStore::new(tmp.path().join("metadata.json")).unwrap();
+        let mut executor = OperationExecutor::new(&content_store, &mut reloaded);
+        assert!(executor.undo(&modify.id).is_err());
+        assert_eq!(fs::read(&file).unwrap(), b"three");
+    }
+
     #[test]
     fn test_modify_and_undo() {
         let (tmp, content_store, mut metadata_store) = setup();

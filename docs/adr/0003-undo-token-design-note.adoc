@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= ADR-0003 — A use-once undo token (design note)
+:toc: left
+
+* *Status:* design note. Not proposed for acceptance, not decided, and nothing is built. §5 lists the questions the owner has to answer first.
+* *Date:* 2026-11-09
+* *Origin:* the ephapax v2 survey (2026-11-04) lists "Linear-token undo API (T-8)" as a januskey action, citing "`undo(&str)` allows double-undo" and sizing it S–M.
+* *Related:* `PROOF-NEEDS.adoc` rows T-1, T-6 and T-8; ADR-0001 (identity and scope).
+
+== 1. The survey item, checked against the tree
+
+* *The label is wrong.* T-8 in this repository's ledger is "the operation metadata log is saved atomically, and an undo whose `mark_undone` fails to persist can be retried". No roadmap, task list or ledger row here describes an undo-token API. This note keeps the survey's request and drops the label.
+* *The premise is partly wrong.* `OperationExecutor::undo(&str)` in `crates/januskey-cli/src/operations.rs` refuses an id whose `undone` flag is set, and `MetadataStore::mark_undone` persists that flag. A second undo of the same id is refused in the same process and after the log is reloaded. The test `operations::tests::second_undo_of_the_same_operation_is_refused` pins this. With the guard disabled the test fails, so it does exercise the guard.
+* *There is a real double-undo window, and it is T-8's second half.* `undo` changes the file first and then calls `mark_undone`. If that save fails, the file is undone but the log still says it is not, and a retry undoes it again. A typed token does not close this window, because the token lives in memory and the hazard is the order of persistence.
+
+== 2. What a token would and would not add
+
+A token would turn "undo this operation at most once" from a runtime check into a compile-time one, for Rust callers that hold the value `execute` returned:
+
+[source,rust]
+----
+#[must_use = "an UndoToken is the only way to undo this operation"]
+pub struct UndoToken { id: String }          // not Clone, not Copy
+
+impl OperationExecutor<'_> {
+    pub fn execute_with_token(&mut self, op: FileOperation)
+        -> Result<(OperationMetadata, UndoToken)>;
+    pub fn undo_token(&mut self, token: UndoToken) -> Result<OperationMetadata>;
+}
+----
+
+Because `undo_token` takes the token by value, a second call with the same token fails to compile. A `compile_fail` doctest can pin that without new dependencies. A trybuild test is an alternative, but it adds a dev-dependency.
+
+What it would not add:
+
+* *Linearity.* Rust move semantics are affine: a token can be dropped without being used. `#[must_use]` only warns. "Consumed exactly once" cannot be stated in Rust, so the honest name is "use at most once".
+* *Cross-process safety.* `jk undo <id>` takes the id from the command line, and tokens do not survive a process. The CLI, the transaction rollback in `cmd_rollback` and any persisted log entry would still go through the string path and its runtime `undone` check.
+* *Protection on a failed `mark_undone` save* (§1, third point).
+
+== 3. Options
+
+[cols="1,3,3",options="header"]
+|===
+| Option | What it is | Cost
+
+| A. Leave the API, keep the test
+| The runtime `undone` check plus the new regression test.
+| Nothing new. Callers can still pass a stale id and get an error, not a compile failure.
+
+| B. Add a token API next to `undo(&str)`
+| §2's sketch. It is additive, and the CLI keeps the string path.
+| Two undo entry points. The guarantee covers in-process library callers only.
+
+| C. Put tokens on the `ReversibleExecutor` trait
+| `type Token; fn undo(&mut self, t: Self::Token)`.
+| Breaking. The trait has no implementor in this workspace today, and it is described as the intended mirror of ochrance's `VerifiedSubsystem`, so its shape is a cross-repository decision.
+
+| D. Close T-8's retry half first
+| Persist an "undo in progress" intent before changing the file, then reconcile it on the next start. This makes a retried undo idempotent.
+| A log-format change and a recovery path. It addresses the real double-undo window that B and C do not.
+|===
+
+== 4. Recommendation
+
+D is the most correct long-term option, because it removes the double-undo that can actually happen. B is cheap and makes library misuse visible at compile time, but it does not touch that path. B on its own would let a reader believe double-undo is ruled out when it is not. If B is built, its docs must say that it covers in-process callers only and that T-8 remains open.
+
+== 5. Open questions for the owner
+
+. Is the survey's item about library callers (B or C), or about the double-undo window (D)? They are different work.
+. If B or C: is "use at most once" (affine) acceptable, given that Rust cannot express "exactly once"?
+. If C: does ochrance's `VerifiedSubsystem` constrain the trait's undo signature?
+. Should the survey's "(T-8)" reference be corrected upstream in the ephapax report, since T-8 here names a different obligation?

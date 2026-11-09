@@ -18,7 +18,10 @@
 operation `F` it applies to state `S`, it records enough to apply an inverse
 `F⁻¹` with `F⁻¹(F(S)) = S`.
 
-Whether that holds in general is **open**. What holds today, concretely:
+Whether that holds in general is **open**. That sentence is one-sided and leaves
+the equality on states implicit; the precise statement — both directions
+(RMR-L, RMR-R), each relative to a named equality on states — is
+[MAA Property 1](maa-framework.md). What holds today, concretely:
 
 - each operation type has a named inverse (`OperationType::inverse`:
   `Delete↔Create`, `Modify↔Modify`, `Move↔Move`, `Copy→Delete`, `Chmod`,

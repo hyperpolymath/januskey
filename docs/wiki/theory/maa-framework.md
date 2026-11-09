@@ -66,7 +66,8 @@ This pushes toward: *complete, verifiable deletion capability*.
 
 ## The MAA Solution
 
-MAA introduces two formally verified primitives that satisfy both requirements:
+MAA proposes two primitives, one for each requirement. Neither is formally
+verified in full; the status of each part is stated below and in the ledger.
 
 ### RMR (Reversible Transaction)
 
@@ -141,21 +142,48 @@ The key insight of MAA is that RMR and RMO are not alternatives—they are compl
 
 ## Formal Properties
 
-### Property 1: Complete Reversibility (RMR)
+These are target properties. Each is stated with its status in the claims ledger
+(`PROOF-NEEDS.adoc`), and none is a theorem about the Rust as a whole.
 
-For any sequence of operations $O_1, O_2, \ldots, O_n$:
+### Property 1: Reversibility (RMR), two-sided and relative to an equality
 
-$$O_n^{-1}(O_{n-1}^{-1}(\ldots O_1^{-1}(O_1(O_2(\ldots O_n(S)))))) = S$$
+A reversibility claim is an equality *up to* an equivalence $\sim$ on states, and
+says nothing about any finer equality. Two are in use:
 
-The system can always return to any previous state.
+- $\sim_{tree}$: same relative paths and same bytes for the regular files under
+  the working tree. Permissions, owner/group, mtime, symlink identity, inode
+  identity and empty directories are not compared. This is what
+  `property_tests::execute_then_undo_is_identity` checks. Undo also restores
+  permission bits, but no test compares them; owner, group, mtime and symlink
+  identity are recorded and not restored ([RMR §2](rmr-primitive.md)).
+- $\sim_{model}$: propositional equality on the abstract state of
+  `verification/proofs/agda/TransactionAtomicity.agda`, with no mechanical link
+  to the filesystem.
 
-### Property 2: Formal Obliteration (RMO)
+For an operation $F$ with precondition domain $D_F$ and recorded inverse $F^{-1}$:
 
-After $\text{RMO}(d)$ for data $d$:
+$$\text{RMR-L:}\quad \forall s \in D_F.\; F^{-1}(F(s)) \sim s \qquad\qquad \text{RMR-R:}\quad \forall t \in F(D_F).\; F(F^{-1}(t)) \sim t$$
 
-$$\nexists \text{ algorithm } A: A(\text{system\_state}) \to d$$
+Together they make $F$ a bijection from $D_F$ onto its image, up to $\sim$.
+RMR-R is over the image only: $\text{Copy}^{-1}$ is a delete of the
+destination, and copying again does not restore arbitrary destination content.
+RMR-R follows from RMR-L when $F$ respects $\sim$; that congruence is not stated
+or tested.
 
-No algorithm can recover the obliterated data from system state.
+| Part | Status |
+|---|---|
+| RMR-L, one step, $\sim_{tree}$ | **TESTED** for Delete, Modify, Move, Copy, Create; Chmod is not in the test; Chown undo is unimplemented; the failure path is ASSUMED (T-6) |
+| RMR-L, a transaction undone in reverse order, $\sim_{model}$ | **PROVEN** in the model (T-1), given T-6 |
+| RMR-R | **OPEN** — no ledger row; neither proved nor tested |
+| "Every operation is reversible" | **OPEN** |
+
+### Property 2: Obliteration (RMO) — target, not established
+
+The target: after $\text{RMO}(d)$, no algorithm recovers $d$ from the system
+state. That an attacker cannot recover obliterated content is **OPEN** (ledger
+E-1; only its model-level shadow E-1m is proved). Hash one-wayness and physical
+erasure are **ASSUMED**, external to this repository (X-1). See
+[RMO Primitive Specification](rmo-primitive.md).
 
 ### Property 3: Accountability Preservation
 
@@ -165,7 +193,10 @@ The fact of deletion is logged, maintaining accountability without content prese
 
 ## Implementation in JanusKey
 
-JanusKey currently implements RMR fully. RMO support is planned.
+JanusKey implements RMR at the strength stated under Property 1, and RMO as
+`jk obliterate` (`crates/januskey-cli/src/obliteration.rs`). The "Planned RMO
+Implementation" sketch below predates that module; its step 4 ("non-existence
+proof") was never implemented and is not claimed (E-1, X-1).
 
 ### Current RMR Implementation
 
