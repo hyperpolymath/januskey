@@ -160,19 +160,17 @@ pending re-run.
   propositions, and are kept visible
 |===
 
-*Re-earned on the change that edits the proof comments (2026-11-09).* That
-change edits the explanatory comments of `Reversibility.agda` and
-`TransactionAtomicity.agda`. The "What is NOT claimed" block named failure modes
-since fixed by T-4, T-5 and T-8, and a G-1 comment implied that the grade was
-derived from the cancellation law. No statement or proof term changed, but the
-bytes did, so the receipt above does not cover them. The receipt of record for
-the merged bytes is the `agda-proofs.yml` run on `main` after merge; run
-42076969251 then becomes `state: superseded`. On the pull request the same
-gate passed on each revision of the comments, for example run
+*The comment edits of hyperpolymath/januskey#171 (2026-11-09) are covered by
+the same re-run.* #171 edits the explanatory comments of `Reversibility.agda`
+and `TransactionAtomicity.agda`: the "What is NOT claimed" block named failure
+modes since fixed by T-4, T-5 and T-8, and a G-1 comment implied that the grade
+was derived from the cancellation law. No statement or proof term changed, but
+the bytes did, so the receipt above does not cover them either. The first green
+`agda-proofs.yml` run on `main` after both pull requests is the receipt for the
+new gate and the new bytes together. On the branch the same gate passed on each
+revision of the comments (for example run
 https://github.com/hyperpolymath/januskey/actions/runs/42623188471[42623188471]
-at `a71dc76` (same container, prover and flags, postulate scan included). A
-later review round reworded one comment again, so that run does not cover the
-final bytes either; the run on the pull request's final head does.
+at `a71dc76`; branch evidence, not a receipt).
 
 Earlier receipts, kept with their lineage (§8.4):
 
