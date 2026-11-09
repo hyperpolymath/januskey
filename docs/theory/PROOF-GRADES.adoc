@@ -192,9 +192,10 @@ Earlier receipts, kept with their lineage (§8.4):
 Those are the `PWG-3` facts: the propositions type-check in Agda under the
 §2.1 invocation, in CI, at a named commit, with the prover version pinned and
 the import cone recorded; the receipt is re-earned by the first run of the
-changed gate, as above. Nothing here has been translated to Rocq or Lean, so no
-recheck leg counts and the grade is not `PWG-2i`; no witness in another
-foundation exists, so `foundation_diverse` is false.
+changed gate, as above. For G-1, T-2, T-3 and E-1m no Rocq or Lean leg exists, so
+no recheck leg counts and their grade is `PWG-3`. T-1 has both legs and is
+`PWG-2ii` (§T-1 below). No witness in another foundation exists, so
+`foundation_diverse` is false throughout.
 
 === Why four rows stop at PWG-3
 
@@ -432,10 +433,12 @@ done by a round trip, since no translator exists.
   the equality type. No other sibling definition reaches T-1's statement or
   proof.
 
-*Residual differences, listed rather than hidden.* The targets' logics are
-stronger than the source's. Rocq and Lean both have uniqueness of identity
-proofs for their equality, which `--without-K` withholds from Agda, and Lean
-has definitional proof irrelevance. Neither proof uses these: each is the same
+*Residual differences, listed rather than hidden.* The logics differ in
+what they add to equality. Axiom-free Rocq has neither K nor uniqueness of
+identity proofs, like Agda under `--without-K`, and `Print Assumptions` confirms
+that this leg adds no axiom that would supply them. Lean is stronger: its `Eq`
+lives in a proof-irrelevant `Prop`, so it has uniqueness of identity proofs
+definitionally. Neither proof uses these: each is the same
 induction on `Executed`, a rewrite with the induction hypothesis and one use of
 `undoes`. Proving the statement in a stronger logic adds no assumption to the
 Agda source.
@@ -544,12 +547,15 @@ observed, never that it always holds. G-2 (the Idris2 ↔ Agda correspondence) i
 | Downstream consumption designed, never exercised.
 | A dependency edge in the consumer's manifest and a green test there.
 
-| T-9 (`OPEN`)
-| A file change whose log record fails to persist: `execute_*` changes the
-  filesystem and then appends, and `undo` runs the inverse and then marks it.
-  (T-8, the metadata log's own saves, is TESTED since #168.)
-| A write-ahead intent record, which is a design decision, then a test that
-  injects the failure between the two steps.
+| T-9 and T-11 (`OPEN`)
+| Two different windows. T-9: `execute_*` changes the filesystem and then
+  appends, so a crash between them leaves a change with no record. T-11:
+  `undo` records the inverse as its own operation and then marks the original,
+  so a failed mark leaves the original unmarked and a retry re-applies the
+  inverse. (T-8, the metadata log's own saves, is TESTED since #168.)
+| T-9: a write-ahead intent record, which is a design decision. T-11: an
+  idempotent undo that finds the existing inverse record before re-applying.
+  Each then needs a test that injects the failure between its two steps.
 |===
 
 == The epistemic rewrite: E-1 becomes E-1m

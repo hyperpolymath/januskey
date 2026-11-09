@@ -76,7 +76,8 @@ tables must agree.
 | T-6 | A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1; single steps are TESTED by `+execute_then_undo_is_identity+`) | ASSUMED | not checked for the failure path
 | T-7 | Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) | ASSUMED | probabilistic, not checked
 | T-8 | The operation metadata log is replaced by rename, never overwritten in place (the sync before the rename is there by construction; no test observes it); a log edit (`+mark_undone+`, `+prune+`, `+purge_path_entries+`) whose save fails is not applied in memory and applies exactly once on retry; an append whose save fails keeps its record for the next save | TESTED | `+metadata::tests::{failed_save_leaves_every_mutation_unapplied,a_failed_append_keeps_its_record_for_the_next_save,save_replaces_the_log_atomically,save_replaces_rather_than_overwrites_the_log}+` and `+transaction::tests::a_failed_save_leaves_the_existing_log_intact+`, each checked against a mutant in #168. Not claimed: a failure after the temporary file exists (during the write, sync or rename) is not injected; the rename's atomicity is the filesystem's guarantee
-| T-9 | A file change whose log record fails to persist is either recorded or reverted: `+execute_*+` changes the filesystem and then appends, and `+undo+` runs the inverse and then marks it, so a crash or failed save between the two leaves a change the log does not know about | OPEN | needs a write-ahead intent record (a design decision); split out of T-8 in #168
+| T-9 | A forward file change is never left without a log record: `+execute_*+` changes the filesystem and then appends, so a crash or failed save between the two leaves a change the log does not know about | OPEN | needs a write-ahead intent record (a design decision); split out of T-8 in #168
+| T-11 | An undo whose `+mark_undone+` fails to persist can be retried safely: `+undo+` records the inverse as its own operation (each helper calls `+execute+`), then marks the original, so a failed mark leaves the original unmarked and a retry re-applies the inverse or fails against the changed filesystem | OPEN | the inverse is recorded, unlike T-9; the fix is an idempotent undo (find the existing inverse record before re-applying), not write-ahead intent
 | T-10 | januskey's TransactionManager is an instance of the single-active log: the Rust begin, add_operation, commit and mark_rolled_back refine the abstract open, edit and settle transitions, as the hand-written instance in `+TransactionAtomicity.agda+` Part B assumes | OPEN | engineering (PROOF-POLICY §1): Creusot/Pearlite or Verus contracts on `+crates/reversible-core/src/transaction.rs+`; the instance itself is a transcription, like G-2
 | S-1 | A content hash that is not `+sha256:+` plus 64 lowercase hex digits never resolves to a path outside the store root | TESTED | `+content_store::tests::malformed_hash_never_leaves_the_store_root+`; fixed in #163 after audit probe P5 showed `+delete+` removing a file outside the store (`+docs/reports/audit/proof-statement-audit-2026-10-27.adoc+`)
 | S-2 | `+store+` repairs a blob a crash left damaged instead of deduplicating against it, and a successful store leaves no temporary file behind | TESTED | not claimed: cleanup after a failed write or rename, whose removal error `+store+` ignores, so a temporary file can remain; not claimed: that the write itself is atomic. `+store+` writes by temporary file, sync and rename, but by construction only; no test injects a failure mid-write. `+content_store::tests::store_repairs_a_blob_truncated_by_a_crash+`, `+store_leaves_no_temp_files_and_count_ignores_strays+`; fixed in #163 (probe P4)
@@ -158,8 +159,8 @@ contracts, and **Verus** (PROOF-POLICY §1.2, owner ruling 2026-11-07; not SPARK
 and not Idris2); neither verifier has a contract or proof in this tree yet,
 which is why no Rust row is proved.
 
-No row of this ledger is `+PWG-2i+`, `+PWG-2ii+` or `+PWG-1+`, and none is claimed to
-be. The row-by-row mapping and the receipt in full are in
+Only T-1 is above `+PWG-3+`: it is `+PWG-2ii+`, with Rocq and Lean legs re-proved
+and reconciled. No row is `+PWG-2i+` or `+PWG-1+`, and none is claimed to be. The row-by-row mapping and the receipt in full are in
 `+docs/theory/PROOF-GRADES.adoc+`. Since 2026-11-01 the gate runs
 PROOF-POLICY §2.1's canonical invocation
 (`+--safe --without-K --cubical-compatible …+`); the CI receipt for that flag
@@ -204,7 +205,7 @@ attestations undermine trust
 |Content store integrity |Content-addressed storage never returns wrong
 content (paths confined to the store and damaged blobs repaired: S-1 and S-2 are TESTED; the write is atomic by construction, not by test; reads verify the hash) |Hash collisions or bugs corrupt stored data
 
-|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed; the metadata log is tested for atomic and failed saves, T-8; a file change whose log record fails to persist is OPEN, T-9)
+|Transaction atomicity |Delta application is atomic and reversible (the model is proved, T-1 to T-3; the Rust is tested for partial-rollback retry, T-4, and failed saves, T-5; the premises T-6 and T-7 are assumed; the metadata log is tested for atomic and failed saves, T-8; a forward file change whose log record fails to persist is OPEN, T-9, and so is an undo whose mark fails to persist, T-11)
 |Partial transactions corrupt state
 
 |reversible-core |Undo/redo preserves data integrity |Core crate used by
@@ -285,7 +286,8 @@ the status table above.
 |L-1: Editing any field of any audit-log entry makes verify_integrity fail (false today: audit probes P1, P2) |OPEN |`crates/januskey-cli/src/attestation.rs` |-
 |L-2: Removing trailing audit-log entries makes verify_integrity fail (false today: audit probe P3; needs an external anchor) |OPEN |`crates/januskey-cli/src/attestation.rs` |-
 |O-1: An ObliterationProof attests that the content it names was erased (false today: storage_cleared is hard-coded, audit probe P6) |OPEN |`crates/januskey-cli/src/obliteration.rs` |-
-|T-9: A file change whose log record fails to persist is either recorded or reverted (execute changes the filesystem then appends; undo runs the inverse then marks it; needs a write-ahead intent record) |OPEN |`crates/januskey-cli/src/operations.rs` |-
+|T-9: A forward file change is never left without a log record (execute changes the filesystem, then appends; needs a write-ahead intent record) |OPEN |`crates/januskey-cli/src/operations.rs` |-
+|T-11: An undo whose mark_undone fails to persist can be retried safely (the inverse is recorded as its own operation before the mark; needs an idempotent undo) |OPEN |`crates/januskey-cli/src/operations.rs` |-
 |T-10: januskey's TransactionManager refines the single-active log (Rust begin, add_operation, commit, mark_rolled_back against the abstract transitions; engineering, for Creusot or Verus) |OPEN |`crates/reversible-core/src/transaction.rs` |-
 |T-6: A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1) |ASSUMED |`crates/januskey-cli/src/operations.rs` |-
 |T-7: Transaction ids (UUID v4) never collide within one log (the freshness premise of T-2) |ASSUMED |`crates/reversible-core/src/transaction.rs` |-
@@ -310,7 +312,7 @@ be systematically replaced with proven error handling.
 
 *HIGH* — reversibility is the product, and its exceptions are destructive:
 obliteration destroys data on purpose, and the operation log is the only thing
-that makes undo possible (row T-9 is open). Any correctness bug in either is a
+that makes undo possible (rows T-9 and T-11 are open). Any correctness bug in either is a
 critical vulnerability. The ABI layer now typechecks, but none of the security
 obligations above is proved.
 

@@ -79,7 +79,7 @@ statement about bytes on a device.
 | Commit/rollback settle a group of operations | yes — `TransactionManager`, states `Active`/`Committed`/`RolledBack`; at most one active (T-3, PROVEN) |
 | A rollback that fails part-way can be retried | yes (T-4, TESTED — `rollback_resume_test`, driving the real `jk`) |
 | A failed save leaves memory and disk agreeing | yes for the transaction log (T-5, TESTED: replaced by rename, never overwritten in place, with permission preservation; the fsync before the rename is by construction, not tested) |
-| The **operation metadata** log has the same guarantee | yes for the log itself (T-8, TESTED): an edit whose save fails is not applied and applies exactly once on retry, and an append whose save fails keeps its record for the next save. **Not** for the file change it records: `execute_*` changes the filesystem before appending, and `undo` runs the inverse before `mark_undone`, so a crash or failed save between the two leaves a change the log does not know about (T-9, **OPEN**) |
+| The **operation metadata** log has the same guarantee | yes for the log itself (T-8, TESTED): an edit whose save fails is not applied and applies exactly once on retry, and an append whose save fails keeps its record for the next save. **Not** for the file change it records: `execute_*` changes the filesystem before appending, so a crash between the two leaves a change the log does not know about (T-9, **OPEN**). An undo is recorded as its own operation before `mark_undone`, so a failed mark leaves the original unmarked and a retry re-applies the inverse (T-11, **OPEN**) |
 | A failed execute leaves the filesystem unchanged | assumed, not checked (T-6) |
 | Intermediate states are invisible to other processes | **false** — operations are applied to the filesystem one at a time as they are executed. A transaction gives you a recorded, resumable rollback, not isolation. Nothing in this tool locks, stages, or hides the working tree |
 
@@ -155,7 +155,7 @@ fn undo(operation_id: &str) -> Result<()> {
     let content = content_store.retrieve(&metadata.content_hash)?;
     let inverse = construct_inverse(&metadata, content);
     inverse.perform()?;
-    metadata_store.mark_undone(operation_id)?;   // T-9: runs after the inverse (OPEN)
+    metadata_store.mark_undone(operation_id)?;   // T-11: after the inverse is recorded (OPEN)
     Ok(())
 }
 ```
@@ -196,7 +196,8 @@ present one until it exists. What exists, by ledger row:
 | T-6 | A failed execute leaves the filesystem unchanged; each undo restores its execute's pre-state | **ASSUMED** |
 | T-7 | Transaction ids never collide | **ASSUMED** |
 | T-8 | The operation metadata log is replaced by rename; a failed edit is unapplied and retries once; a failed append keeps its record | **TESTED** |
-| T-9 | A file change whose log record fails to persist is recorded or reverted | **OPEN** — needs a write-ahead intent record |
+| T-9 | A forward file change is never left without a log record | **OPEN** — needs a write-ahead intent record |
+| T-11 | An undo whose mark fails to persist can be retried safely | **OPEN** — needs an idempotent undo |
 | T-10 | The Rust `TransactionManager` refines the abstract single-active log | **OPEN** — engineering, for Creusot or Verus |
 | — | "Every operation is reversible" as a theorem linked to the Rust | **OPEN** |
 | G-2 | The Idris2 and Agda presentations correspond | **ASSUMED** — "by transcription, no mechanical link claimed" |
@@ -272,7 +273,8 @@ their results are unbaselined (`READINESS.adoc` §Benchmark Classification).
 2. **Metadata consistency is weaker than it looks.** The log itself saves
    safely (T-8, TESTED), but a file change and its log record are not written
    together: a crash between them leaves a change the log does not know about
-   (T-9, OPEN).
+   (T-9, OPEN), and an undo whose mark fails can be re-applied on retry (T-11,
+   OPEN).
 3. **Not everything captured is restored** — ownership, mtime and symlink
    identity are recorded but not applied (§2).
 4. **No isolation.** Operations touch the live filesystem as they execute.
@@ -284,5 +286,5 @@ their results are unbaselined (`READINESS.adoc` §Benchmark Classification).
 
 - [RMO: Obliterative Wipe Primitive](rmo-primitive.md)
 - [Formal Model of File System State](formal-model.md)
-- `../../../PROOF-NEEDS.adoc` — the claims ledger, rows T-1..T-10
+- `../../../PROOF-NEEDS.adoc` — the claims ledger, rows T-1..T-11
 - [Architecture](../architecture/index.md)
