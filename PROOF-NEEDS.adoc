@@ -62,15 +62,15 @@ tables must agree.
 | C-3 | A transaction containing an obliteration is not all-reversible | PROVEN | `+Layout.obliterateNotReversible+`
 | C-4 | Replacing a chain entry by one with a different hash breaks the link | PROVEN | `+Proofs.tamperBreaksLink+`
 | C-5 | Struct sizes 32/16/112 and 8-byte alignment as divisibility (statements about the literals) | PROVEN | `+Layout.{contentHashSize,keyIdSize,oblitProofSize,hashAligned,keyIdAligned,oblitAligned}+`
-| G-1 | Reversibility as a Loss grade: lossless traces have only lossless steps; obliteration absorbs; a wrap/unwrap pair carries its cancellation law (its grade 𝟙 is assigned, not derived from that law) | PROVEN | `+verification/proofs/agda/Reversibility.agda+` (Agda kernel, resource-algebra pinned at `+cf9235c+`); `+tests/reject-agda/*+` refused; the cancellation premise is the TESTED row `+execute_then_undo_is_identity+`
+| G-1 | Reversibility as a Loss grade: lossless traces have only lossless steps; obliteration absorbs; a wrap/unwrap pair carries its cancellation law (its grade 𝟙 is assigned, not derived from that law) | PROVEN | `+verification/proofs/agda/Reversibility.agda+` (Agda kernel, resource-algebra pinned at `+cf9235c+`); `+tests/reject-agda/*+` refused; rechecked in Rocq and Lean (`+verification/proofs/{rocq,lean}/Reversibility+`, the Loss grade restated, `+PWG-2ii+`); the cancellation premise is the TESTED row `+execute_then_undo_is_identity+`
 | G-2 | The Idris2 `+IsCNO+`/`+ReversibleOp+` pair corresponds to Agda `+ReversiblePair+` (by transcription) | ASSUMED | no mechanical link claimed
 | G-3 | The FFI bridge preserves grade 𝟙 (homomorphism) | OPEN | resource-algebra lists homomorphisms OPEN; to file from JNK-01
 | E-1 | An attacker cannot recover obliterated content or use a revoked key | OPEN | `+Types.adversaryCannotKnow+` holds only because `+Knows+` has no Adversary constructor; the *model-level* half is now proved in Agda as row E-1m (#145 item 3)
-| E-1m | In a world model, an adversary whose observation excludes the store does not know what it holds; obliteration leaves nothing to recover; rotation to a different key leaves no agent able to use the old one (premise `+old ≠ new+`; true by the definition of `+rotate+` in the model; that an unusable key cannot decrypt is X-1) | PROVEN | `+verification/proofs/agda/Epistemic.agda+`; `+tests/reject-agda/{AdversaryKnows,OldKeyStillUsable}.agda+` refused
+| E-1m | In a world model, an adversary whose observation excludes the store does not know what it holds; obliteration leaves nothing to recover; rotation to a different key leaves no agent able to use the old one (premise `+old ≠ new+`; true by the definition of `+rotate+` in the model; that an unusable key cannot decrypt is X-1) | PROVEN | `+verification/proofs/agda/Epistemic.agda+`; rechecked in Rocq and Lean (`+verification/proofs/{rocq,lean}/Epistemic+`, `+PWG-2ii+`); `+tests/reject-agda/{AdversaryKnows,OldKeyStillUsable}.agda+` refused
 | X-1 | Hash one-wayness; physical erasure (cryptographic and physical assumptions, external to this repository) | ASSUMED | not theorems of this repo
 | T-1 | Undoing a fully executed transaction's operations in reverse order restores the state it began in, given each step's undo restores its execute (the sequential Theorem 3.4) | PROVEN | `+TransactionAtomicity.rollback-restores+`; rechecked in Rocq and Lean (`+verification/proofs/{rocq,lean}/Rollback+`, `+PWG-2ii+`); `+tests/reject-agda/ForwardRollback.agda+` refused
-| T-2 | In any single-active log (records with a decidable key and an active or settled phase), opening a fresh active record, a key- and phase-preserving edit, and a settling transition each preserve the invariant and rewrite only the active record, so a settled one is never modified | PROVEN | `+SingleActiveLog.{begin-good,modify-good,finish-good,update-active}+`; `+tests/reject-agda/SettleWithoutSettling.agda+` refused; januskey's instance is `+TransactionAtomicity.lifecycle-preserves-good+`; `+tests/reject-agda/CommitWhenIdle.agda+` refused
-| T-3 | In any single-active log satisfying the invariant, at most one record is active, and exactly one when the pointer is set | PROVEN | `+SingleActiveLog.at-most-one-active+` (januskey's transactions are an instance)
+| T-2 | In any single-active log (records with a decidable key and an active or settled phase), opening a fresh active record, a key- and phase-preserving edit, and a settling transition each preserve the invariant and rewrite only the active record, so a settled one is never modified | PROVEN | `+SingleActiveLog.{begin-good,modify-good,finish-good,update-active}+`; rechecked in Rocq and Lean (`+verification/proofs/{rocq,lean}/SingleActiveLog+`, `+PWG-2ii+`); `+tests/reject-agda/SettleWithoutSettling.agda+` refused; januskey's instance is `+TransactionAtomicity.lifecycle-preserves-good+`; `+tests/reject-agda/CommitWhenIdle.agda+` refused
+| T-3 | In any single-active log satisfying the invariant, at most one record is active, and exactly one when the pointer is set | PROVEN | `+SingleActiveLog.at-most-one-active+`; rechecked in Rocq and Lean (`+verification/proofs/{rocq,lean}/SingleActiveLog+`, `+PWG-2ii+`) (januskey's transactions are an instance)
 | T-4 | A rollback that fails part-way can be retried to completion | TESTED | `+rollback_resume_test+` drives the real `+jk+`: after one undo error and a repair, `+jk rollback+` skips the already undone operation and finishes (before the fix the retry stopped at it every time, reproduced 2026-10-26); fixed in `+cmd_rollback+`
 | T-5 | The transaction log is never left disagreeing with memory by a failed save, and is replaced by rename rather than overwritten in place, with an fsync before the rename by construction (no test observes the fsync) (a randomly named temporary file opened with the old file's mode, removed only if this save created it) rather than overwritten in place | TESTED | `+transaction::tests::failed_save_*+`: a save that fails at the final step leaves begin, add_operation, commit and rollback unapplied in memory; mutants (memory first, plain `+fs::write+`, no temp cleanup, shared temp name, truncating open, no permission copy) each fail a test. Not claimed: crash-safety of the rename itself is by construction, not crash-injected; the directory fsync is best effort, because failing the save after the rename would leave disk new and memory old; concurrent writers are out of scope (each save's content is intact, the last rename wins)
 | T-6 | A failed execute leaves the filesystem unchanged, and each undo restores the state its execute started from (premises of T-1; single steps are TESTED by `+execute_then_undo_is_identity+`) | ASSUMED | not checked for the failure path
@@ -125,30 +125,31 @@ and is kept for provenance only. Neither uses a confidence percentage and this
 repository does not publish one.
 
 Of the 12 PROVEN rows, five are the theory rows — **G-1, T-1, T-2, T-3, E-1m** — and
-their artefact is Agda (`+verification/proofs/agda/+`). They are **`+PWG-3+`,
-receipt pending re-run** (PROOF-POLICY §8, owner ruling 2026-11-04, which
-governs over the mathesis brief):
-each is `+PROVEN+` under the §2.1 invocation and no Rocq or Lean leg exists. The
-last receipt for the modules is a green `+agda-proofs.yml+` run
-(https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251])
-at commit `+23bc8c3+`, Agda 2.6.4.3, with `+resource-algebra+` pinned at
-`+cf9235c+`, running `+Reversibility+`, `+TransactionAtomicity+` and
-`+Epistemic+` under `+--safe --without-K --cubical-compatible+`. The gate gained
-an import-cone postulate scan after it, so the first green run of the changed
-gate on `+main+` is the receipt that replaces it. The cone, the axioms (none in
-the development; the prover's four universe-level primitives are checked by
-name and reported) and the superseded receipts (runs 41687715055 at
-`+fc188c4+` and 40867211509 at
-`+4afb710+`) are recorded in
+their artefact is Agda (`+verification/proofs/agda/+`). They are **`+PWG-2ii+`,
+receipt pending** (PROOF-POLICY §8, owner ruling 2026-11-04, which
+governs over the mathesis brief). Each is `+PROVEN+` under the §2.1 invocation,
+and each has a Rocq leg and a Lean leg, re-proved by hand and reconciled
+statement by statement (`+verification/proofs/rocq/+`,
+`+verification/proofs/lean/+`). The receipt for all of it is the first green
+`+agda-proofs.yml+` run on `+main+` after the legs landed, which checks Agda
+2.6.4.3, with `+resource-algebra+` pinned at `+cf9235c+`, on `+Reversibility+`,
+`+TransactionAtomicity+`, `+SingleActiveLog+` and `+Epistemic+` under
+`+--safe --without-K --cubical-compatible+`, and the Rocq and Lean legs in a
+second job. A doc-only follow-up records its run ID and commit. The cone, the axioms (none in the
+development, in any of the three provers; the Agda prover's four universe-level
+primitives are checked by name and reported), the statement comparisons and the
+superseded receipts are recorded in
 link:docs/theory/PROOF-GRADES.adoc[`+docs/theory/PROOF-GRADES.adoc+`].
-Correspondence state for them: `+AGDA-VERIFIED+`.
+Correspondence state for them: `+AGDA-VERIFIED+` for the source, and
+`+RECONCILED+` for each leg.
 
-*PWG census, theory theorems of this repository (denominator 5):* `+PWG-3+` 4
-(G-1, T-2, T-3, E-1m) · `+PWG-2i+` 0 · `+PWG-2ii+` 1 (T-1) · `+PWG-1+` 0 ·
-`+ungraded+` 0. G-3 names this repository's FFI bridge, so PROOF-POLICY §1
-classes it as engineering and it is outside the ladder. T-1's Rocq and Lean legs are re-proved and reconciled
-(`+docs/theory/PROOF-GRADES.adoc+`, §T-1); the other four have not been
-attempted, and each still owes both (§8.4: a grade is not a discharge).
+*PWG census, theory theorems of this repository (denominator 5):* `+PWG-2ii+` 5
+(G-1, T-1, T-2, T-3, E-1m), receipt pending · `+PWG-3+` 0 · `+PWG-2i+` 0 ·
+`+PWG-1+` 0 · `+ungraded+` 0. G-3 names this repository's FFI bridge, so
+PROOF-POLICY §1 classes it as engineering and it is outside the ladder.
+`+PWG-1+` would also need current receipts on every commit for every counted
+witness, which nothing here records yet. A grade is not a discharge (§8.4): the
+premises each row names stay where they are.
 
 The other seven PROVEN rows — A-1, A-2, C-1 to C-5 — are Idris2 theorems. Under
 PROOF-POLICY §1 those are interface and ABI contracts, so the theory ladder does
@@ -159,12 +160,11 @@ contracts, and **Verus** (PROOF-POLICY §1.2, owner ruling 2026-11-07; not SPARK
 and not Idris2); neither verifier has a contract or proof in this tree yet,
 which is why no Rust row is proved.
 
-Only T-1 is above `+PWG-3+`: it is `+PWG-2ii+`, with Rocq and Lean legs re-proved
-and reconciled. No row is `+PWG-2i+` or `+PWG-1+`, and none is claimed to be. The row-by-row mapping and the receipt in full are in
-`+docs/theory/PROOF-GRADES.adoc+`. Since 2026-11-01 the gate runs
-PROOF-POLICY §2.1's canonical invocation
-(`+--safe --without-K --cubical-compatible …+`); the CI receipt for that flag
-set is run 42076969251 above.
+No row is `+PWG-1+` or `+foundation-diverse+`, and none is claimed to be. The
+row-by-row mapping and the receipts in full are in
+`+docs/theory/PROOF-GRADES.adoc+`. Since 2026-11-01 the gate runs PROOF-POLICY
+§2.1's canonical invocation (`+--safe --without-K --cubical-compatible …+`); the
+receipt for that flag set is the pending run above.
 
 === Current State
 

@@ -3,7 +3,8 @@
 # SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
 # Recheck legs of the Agda theory theorems (PROOF-POLICY §2): the Rocq files
 # under verification/proofs/rocq and the Lean files under
-# verification/proofs/lean must check with no axioms, and every fixture under
+# verification/proofs/lean must check, every `Print Assumptions` and
+# `#print axioms` in them must report no axioms, and every fixture under
 # tests/reject-rocq and tests/reject-lean must be refused with the message its
 # `expect:` line names. Prover versions are asserted by the caller (CI) and
 # printed here. ROCQ and LEAN override the binaries.
@@ -40,9 +41,14 @@ for f in "${rocq_src[@]}"; do
   out="$(cd "$work/rocq" && "$rocq" -q -Q . JanusKey "$name" 2>&1)" || {
     printf '%s\n' "$out"; echo "ERROR: $f does not check" >&2; exit 1; }
   printf '%s\n' "$out"
-  grep -q '^Closed under the global context$' <<<"$out" || {
-    echo "ERROR: $f rests on assumptions (Print Assumptions is not closed)" >&2; exit 1; }
-  echo "[PASS] rocq leg checks, no assumptions: $f"
+  # Every `Print Assumptions` in the file must report a closed theorem: a file
+  # with several theorems must not pass on the strength of one of them.
+  want="$(grep -c '^Print Assumptions ' "$f" || true)"
+  got="$(grep -c '^Closed under the global context$' <<<"$out" || true)"
+  if [ "$want" -eq 0 ] || [ "$got" -ne "$want" ]; then
+    echo "ERROR: $f rests on assumptions ($got of $want Print Assumptions closed)" >&2; exit 1
+  fi
+  echo "[PASS] rocq leg checks, no assumptions ($want theorems): $f"
 done
 
 # Lean: compile each leg to an .olean so the fixtures can import it; the
@@ -52,9 +58,13 @@ for f in "${lean_src[@]}"; do
   out="$(LEAN_PATH="$work/lean" "$lean" -o "$work/lean/$mod.olean" "$f" 2>&1)" || {
     printf '%s\n' "$out"; echo "ERROR: $f does not check" >&2; exit 1; }
   printf '%s\n' "$out"
-  grep -q 'does not depend on any axioms' <<<"$out" || {
-    echo "ERROR: $f depends on axioms (or does not print them)" >&2; exit 1; }
-  echo "[PASS] lean leg checks, no axioms: $f"
+  # Every `#print axioms` in the file must report none.
+  want="$(grep -c '^#print axioms ' "$f" || true)"
+  got="$(grep -c 'does not depend on any axioms' <<<"$out" || true)"
+  if [ "$want" -eq 0 ] || [ "$got" -ne "$want" ]; then
+    echo "ERROR: $f depends on axioms ($got of $want #print axioms report none)" >&2; exit 1
+  fi
+  echo "[PASS] lean leg checks, no axioms ($want theorems): $f"
 done
 
 # Expected rejections: refused, and refused for the stated reason.
