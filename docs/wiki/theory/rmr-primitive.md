@@ -15,16 +15,21 @@
 ## Definition
 
 **RMR (Reversible Transaction)** is the property JanusKey aims at: for every
-operation `F` it applies to state `S`, it records enough to apply an inverse
-`F⁻¹` with `F⁻¹(F(S)) = S`.
+operation `F` it applies to state `S`, producing a new state `S′` and a record
+`r`, an inverse `F⁻¹` applied to the pair gives `F⁻¹(S′, r) = S`. The inverse
+needs `r`: the new state alone does not say what undo restores.
 
-Whether that holds in general is **open**. What holds today, concretely:
+Whether that holds in general is **open**. That sentence is one-sided and leaves
+the equality on states implicit; the precise statement — both directions
+(RMR-L, RMR-R), each relative to a named equality on states — is
+[MAA Property 1](maa-framework.md). What holds today, concretely:
 
 - each operation type has a named inverse (`OperationType::inverse`:
   `Delete↔Create`, `Modify↔Modify`, `Move↔Move`, `Copy→Delete`, `Chmod`,
   `Chown` self-inverse);
-- the information needed for that inverse is captured *before* the mutation
-  (content into the store, file metadata into the log);
+- the content a delete or modify needs is stored *before* the mutation, but the
+  operation's metadata is appended to the log *after* it, so a stop between the
+  two leaves the operation unfindable by undo (OPEN, T-9);
 - `execute` then `undo` restores the prior state under property testing
   (`property_tests::execute_then_undo_is_identity`);
 - rolling back a whole transaction in reverse order restores the state it
