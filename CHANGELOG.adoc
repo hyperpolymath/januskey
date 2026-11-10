@@ -17,6 +17,12 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Added
 
+* feat(transactions): a transaction log read from disk is checked against the
+lifecycle invariant the Agda theorems preserve, and refused if it breaks it
+(T-12, TESTED, evidence towards T-10 at the load boundary); the unused
+`TransactionManager::active_mut` is removed
+* ci(dashboard): the dashboard job runs Agda 2.6.4.3 from the proof job's
+pinned image (one Agda version across CI, owner decision 2026-11-09)
 * feat(proofs): `Epistemic.agda` replaces the vacuous Idris `Knows` modality with
 knowledge as indiscriminability: ignorance, obliteration and rotation-forgetting
 become propositions, with two expected-rejection fixtures; new ledger row E-1m

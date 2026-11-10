@@ -259,12 +259,14 @@ exists: the table in §The PWG-3 receipt cites run 42076969251, which ran the
 canonical invocation on all three modules, and the receipts from before the
 flag changed are marked `superseded` there.
 
-One related inconsistency is an open obligation, not a claim: the Agda version
-is pinned twice in CI and the two pins differ — `agda-proofs.yml` installs
-2.6.4.3 (the receipt above), while `dashboard-check.yml` installs 2.6.3 on the
-Idris2 image so it can run the PROVEN rows' checkers. A green dashboard
-therefore does not extend the receipt at 2.6.4.3. One version, one receipt:
-pinning the dashboard job to the same Agda is the fix.
+Until 2026-11-09 the Agda version was pinned twice in CI: `agda-proofs.yml`
+installed 2.6.4.3 (the receipt above), while `dashboard-check.yml` installed
+Ubuntu's 2.6.3 on the Idris2 image so it could run the PROVEN rows' checkers.
+Resolved by owner decision on 2026-11-09. The dashboard job now runs Agda from
+the image `agda-proofs.yml` pins: the same `debian:trixie-slim` digest and
+`agda-bin=2.6.4.3-1+b2`. It runs Idris2 from the image `idris-abi.yml` pins,
+and asserts the version string exactly as the proof job does. One version, one
+receipt.
 
 === Upgrade path, measured
 
@@ -310,7 +312,12 @@ repeated the counts, and the two copies drifted apart.
 | E-1m | In a world model, an agent whose observation excludes the store does not
   know what the store holds; obliteration leaves nothing to recover; rotation
   to a different key (premise `old ≠ new`) leaves no agent — the system included
-  — able to use the old one (true by the definition of `rotate` in the model) |
+  — able to use the old one (true by the definition of `rotate` in the model).
+  `adversary-ignorant` and `obliterate-ignorance` are proved for two particular
+  worlds whose stores differ and whose adversary observations are both empty;
+  the general form is `different-store-unknown`, which takes such a pair as its
+  hypothesis, so these show ignorance is expressible and true in the model, not
+  that the adversary is ignorant in every januskey state |
   `Epistemic.agda::adversary-ignorant`, `obliterate-cuts-recovery`,
   `obliterate-ignorance`, `rotate-forgets-old`
 |===

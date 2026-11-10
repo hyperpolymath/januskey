@@ -44,7 +44,7 @@ property-tests = "9 (2026-04-03 assessment, not re-derived)"
 regression-tests = "5 (2026-04-03 assessment, not re-derived)"
 idris2-proofs = "12 PROVEN ledger rows (the former 30 counted lemmas before the tautology purge; PROOF-NEEDS.adoc is authoritative)"
 benchmarks = "5 Criterion groups (no baseline recorded)"
-total = "5 benchmark groups + 12 PROVEN ledger rows — as declared in READINESS.adoc and measured by dashboard-check"
+total = "143 tests + 5 benchmark groups + 12 PROVEN ledger rows — as declared in READINESS.adoc and measured by dashboard-check"
 
 [proof-grades]
 # Proof Witness Grades, standards 3-practice/PROOF-POLICY.adoc §8 (the
@@ -55,7 +55,7 @@ receipt-commit = "see docs/theory/PROOF-GRADES.adoc, The PWG-3 receipt (the 4afb
 receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); no standard library; resource-algebra pinned at cf9235c"
 receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (PROOF-POLICY §2.1 canonical, plus two stricter flags)"
 not-graded = "the 7 Idris2 PROVEN rows (ABI/interface contracts, PROOF-POLICY §8.1); all 33 TESTED rows (observed behaviour); ASSUMED/DESIGNED/OPEN rows"
-open-obligations = "Rocq and Lean legs for the four PWG-3 rows (PROOF-POLICY §2); one Agda version across CI (agda-proofs pins 2.6.4.3, dashboard-check installs 2.6.3); no Creusot or Verus proof on the Rust, so no Rust behaviour is proved"
+open-obligations = "Rocq and Lean legs for the four PWG-3 rows (PROOF-POLICY §2); no Creusot or Verus proof on the Rust, so no Rust behaviour is proved"
 claimed-higher = "PWG-2ii for T-1 only (Rocq and Lean legs re-proved and reconciled); no PWG-2i or PWG-1 is claimed"
 
 [test-categories-complete]
