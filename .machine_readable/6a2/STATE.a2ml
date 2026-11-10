@@ -47,17 +47,16 @@ benchmarks = "5 Criterion groups (no baseline recorded)"
 total = "5 benchmark groups + 12 PROVEN ledger rows — as declared in READINESS.adoc and measured by dashboard-check"
 
 [proof-grades]
-# mathesis (estate-mathematical-architecture §5/§6) + standards
-# 3-practice/PROOF-POLICY.adoc. A grade is a second axis over the PROVEN/TESTED
-# ledger vocabulary, never a percentage. Detail: docs/theory/PROOF-GRADES.adoc.
-grade-3 = "G-1, T-1, T-2, T-3 — Agda theory modules under verification/proofs/agda; AGDA-VERIFIED"
-grade-3-pending = "E-1m — Epistemic.agda; no receipt yet, because the receipt-commit predates this module"
-receipt-commit = "4afb710e86646658f667f10bd6274ee47416bfc7 (agda-proofs.yml run 40867211509, success)"
-receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); resource-algebra pinned at cf9235c"
-receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (canonical per PROOF-POLICY §2.1 since 2026-11-01; the 4afb710 CI receipt predates the flag, so the next agda-proofs.yml run is its receipt)"
-not-graded = "the 7 Idris2 PROVEN rows (ABI/interface contracts, PROOF-POLICY §1); all 29 TESTED rows (observed behaviour); ASSUMED/DESIGNED/OPEN rows"
-open-obligations = "re-earn the Agda receipt in CI under the canonical flag set; one Agda version across CI (agda-proofs pins 2.6.4.3, dashboard-check installs 2.6.3); no Creusot contract on the Rust, and neither rustc nor crates.io is reachable from the agent sandbox (docs/estate/environment-toolchains.md), so no Rust behaviour is graded"
-claimed-higher = "none — no Grade 2i, 2ii or 1 is claimed"
+# Proof Witness Grades, standards 3-practice/PROOF-POLICY.adoc §8 (the
+# Mathesis brief's §5/§6 ladder, adopted with corrections). Never a
+# percentage. Receipts, lineage and per-row records: docs/theory/PROOF-GRADES.adoc.
+grade-3 = "PWG-3: G-1, T-2, T-3, E-1m; PWG-2ii: T-1 (Rocq and Lean legs re-proved and reconciled) — census 4 + 1 of 5 theory theorems (G-3 and T-10 are engineering under PROOF-POLICY §1; T-2 and T-3 are stated over the abstract SingleActiveLog)"
+receipt-commit = "see docs/theory/PROOF-GRADES.adoc, The PWG-3 receipt (the 4afb710 and fc188c4 receipts are superseded)"
+receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); no standard library; resource-algebra pinned at cf9235c"
+receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (PROOF-POLICY §2.1 canonical, plus two stricter flags)"
+not-graded = "the 7 Idris2 PROVEN rows (ABI/interface contracts, PROOF-POLICY §8.1); all 33 TESTED rows (observed behaviour); ASSUMED/DESIGNED/OPEN rows"
+open-obligations = "Rocq and Lean legs for the four PWG-3 rows (PROOF-POLICY §2); one Agda version across CI (agda-proofs pins 2.6.4.3, dashboard-check installs 2.6.3); no Creusot or Verus proof on the Rust, so no Rust behaviour is proved"
+claimed-higher = "PWG-2ii for T-1 only (Rocq and Lean legs re-proved and reconciled); no PWG-2i or PWG-1 is claimed"
 
 [test-categories-complete]
 unit = true

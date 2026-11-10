@@ -91,3 +91,12 @@ deps/
 build/
 dist/
 *.agdai
+
+# Rocq and Lean build outputs (scripts/check-recheck.sh builds in a temporary directory)
+*.vo
+*.vok
+*.vos
+*.glob
+.*.aux
+*.olean
+*.ilean

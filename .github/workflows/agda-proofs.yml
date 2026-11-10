@@ -31,3 +31,34 @@ jobs:
         run: test "$(agda --version)" = 'Agda version 2.6.4.3'
       - name: Proofs, sibling pin, expected rejections
         run: bash scripts/check-agda.sh
+  recheck:
+    # PROOF-POLICY §2 recheck legs: the Rocq and Lean re-proofs of the Agda
+    # theorems, with their expected-rejection fixtures. Local run: just test-recheck.
+    name: Rocq and Lean recheck legs, expected rejections
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      LEAN_VERSION: 4.35.0
+      LEAN_SHA256: 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d
+    steps:
+      - name: Install the pinned provers
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y coq=8.18.0+dfsg-1build2 zstd
+          curl --proto '=https' --tlsv1.2 -sSfL -o lean.tar.zst \
+            "https://github.com/leanprover/lean4/releases/download/v${LEAN_VERSION}/lean-${LEAN_VERSION}-linux.tar.zst"
+          echo "${LEAN_SHA256}  lean.tar.zst" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/lean"
+          tar --zstd -xf lean.tar.zst -C "$RUNNER_TEMP/lean"
+          rm lean.tar.zst
+          echo "$RUNNER_TEMP/lean/lean-${LEAN_VERSION}-linux/bin" >> "$GITHUB_PATH"
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify the checked prover versions
+        run: |
+          test "$(coqc --version | head -1)" = 'The Coq Proof Assistant, version 8.18.0'
+          lean --version | grep -q "^Lean (version ${LEAN_VERSION}, "
+      - name: Recheck legs, no axioms, expected rejections
+        run: bash scripts/check-recheck.sh

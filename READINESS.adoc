@@ -65,7 +65,7 @@ handling
 (run by idris-abi.yml, agda-proofs.yml and dashboard-check)
 |===
 
-*Total declared:* 142 tests + 5 benchmark groups; 12 proofs checked (PROVEN ledger rows; five of them Grade 3 under mathesis — see `docs/theory/PROOF-GRADES.adoc`) *Total
+*Total declared:* 141 tests + 5 benchmark groups; 12 proofs checked (PROVEN ledger rows; five are theory theorems under PROOF-POLICY §8: four at PWG-3 and T-1 at PWG-2ii — see `docs/theory/PROOF-GRADES.adoc`) *Total
 missing:* Fuzz, mutation, chaos, compatibility
 
 === Aspect Matrix
