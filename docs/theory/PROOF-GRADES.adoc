@@ -13,8 +13,10 @@ repository, and none is introduced here.
 [NOTE]
 ====
 *PWG census, theory theorems of this repository (denominator 5):*
-`PWG-3` 4 (G-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 1 (T-1) · `PWG-1` 0 ·
-`ungraded` 0. `+foundation-diverse`: none. Axioms: none.
+`PWG-3` 4 (G-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 0 · `PWG-1` 1 (T-1) ·
+`ungraded` 0. `+foundation-diverse`: none. Axioms: none. Derived by the pinned
+standards reader from `verification/receipts/januskey_praxis.deed` (§The
+machine-readable receipt below), not typed.
 
 The denominator is the ledger rows whose source of truth is an Agda theorem.
 PROOF-POLICY §1 puts a statement that names one repository's type, function or
@@ -91,40 +93,58 @@ this. A grade is a second axis laid over it, not a replacement: a row is
 `PROVEN` *because* a named artefact checks it, and separately has (or has not) a
 Proof Witness Grade.
 
-== The PWG-3 receipt
+== The receipt
 
-The theory artefacts are three Agda modules:
+The theory artefacts are four Agda modules:
 
 * `verification/proofs/agda/Reversibility.agda` — the Loss grade algebra:
   lossless traces have only lossless steps, obliteration absorbs, and a
   wrap/unwrap pair with a cancellation premise is a grade-𝟙 two-step trace.
 * `verification/proofs/agda/TransactionAtomicity.agda` — rollback restores the
-  state the transaction began in; the `TransactionManager` lifecycle keeps its
-  log invariant under begin, add_operation, commit and mark_rolled_back, and at
-  most one transaction is Active.
+  state the transaction began in; januskey's `TransactionManager` lifecycle as an
+  instance of the abstract log below.
+* `verification/proofs/agda/SingleActiveLog.agda` — the abstract log: any record
+  type with a decidable key and an active or settled phase keeps the invariant
+  under begin, add, commit and settle, and at most one record is Active (T-2,
+  T-3; the split of hyperpolymath/januskey#171).
 * `verification/proofs/agda/Epistemic.agda` — the model-level half of E-1
   (row E-1m, §The epistemic rewrite below).
 
-All three are checked by `scripts/check-agda.sh` (`just test-agda`), which is
+All four are checked by `scripts/check-agda.sh` (`just test-agda`), which is
 also the ledger's recorded checker for rows G-1, T-1, T-2, T-3 and E-1m.
 
-The gate changed in hyperpolymath/januskey#170: it now derives the import cone
-from Agda and scans it for postulates. A changed checker has to re-earn its
-receipt (§8.4), so the receipt below is the **last receipt for the three
-modules**, not yet a receipt for this gate. The first green `agda-proofs.yml` run
-on `main` after #170 is the receipt for the gate, and replaces this row, which
-then becomes `state: superseded`. Until then the grade is `PWG-3`, receipt
-pending re-run.
+=== The machine-readable receipt
+
+The receipt of record is `verification/receipts/januskey_praxis.deed`, a praxis
+deed with `:profile proof-receipt` (PROOF-POLICY §8.5.1). `scripts/proof-receipt.sh`
+writes it from two typed ledgers (the claims and the CI runs, each run copied
+from its log) and from git: the input set of each leg, every file's SHA-256 and
+the §8.5.1 digest are computed, never typed. `just test-receipt`, and the
+`agda-proofs.yml` job "Proof receipt, derived grades, git checks", regenerate it
+and refuse any difference, run the standards reader pinned by commit and
+SHA-256 (it derives every grade and refuses one the receipts do not support),
+run the §8.5.3 git checks (each manifest holds at its commit, the
+`resource-algebra` import holds at its pin, and the source commit is on `main`),
+and warn when a leg's inputs have changed since the receipt's source commit.
+This page is the human reading of that file.
+
+The receipt describes commit `b5034884dbe945139d03b38fe80cfdf1106a77e1` on `main`.
+The gate changed twice before it, in hyperpolymath/januskey#170 (the import-cone
+postulate scan) and #174 (a token may start after a skipped literal), and #171
+changed the modules' bytes and added `SingleActiveLog.agda`. A changed checker
+or changed inputs re-earn the receipt (§8.4), so every receipt from before those
+changes is `superseded`, and the current one is a run on `main` after all three.
 
 [cols="1,3",options="header"]
 |===
 | Field | Value
 
 | Workflow, run | `agda-proofs.yml`, run
-  https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251],
-  branch `main`, conclusion **success**; last receipt for the modules, before
-  the gate change above
-| Commit | `23bc8c38160a25c37917bce69cf05d91899b07e5` (started 2026-11-05T17:40:46Z)
+  https://github.com/hyperpolymath/januskey/actions/runs/43213340167[43213340167],
+  branch `main`, conclusion **success**: job "Reversibility as a grade (Loss
+  instance), expected rejections" (Agda) and job "Rocq and Lean recheck legs,
+  expected rejections" (T-1's legs, §T-1 below)
+| Commit | `b5034884dbe945139d03b38fe80cfdf1106a77e1` (started 2026-11-12T11:55:42Z)
 | Prover | `agda-bin=2.6.4.3-1+b2` on Debian trixie-slim
   (`@sha256:a29215f6…`), asserted by a passing step:
   `test "$(agda --version)" = 'Agda version 2.6.4.3'`
@@ -134,27 +154,26 @@ pending re-run.
   --ignore-interfaces --double-check`: the §2.1 canonical invocation, plus two
   stricter options
 | Import cone | the module set Agda reports with `--dependency-graph` for the
-  roots `Reversibility`, `TransactionAtomicity` and `Epistemic`: 14 modules.
-  First-party (6): the three roots and `ResourceAlgebra.Prelude`,
-  `ResourceAlgebra.Core` and `ResourceAlgebra.Instances.Loss` from
-  `resource-algebra` at `cf9235c532712a783a404c359a1055f40134794a`, fetched by
+  roots `Reversibility`, `TransactionAtomicity`, `Epistemic` and
+  `SingleActiveLog`: 15 modules, as the run prints ("7 first-party modules, 8
+  supplied with the prover"). First-party (7): the four roots and
+  `ResourceAlgebra.Prelude`, `ResourceAlgebra.Core` and
+  `ResourceAlgebra.Instances.Loss` from `resource-algebra` at
+  `cf9235c532712a783a404c359a1055f40134794a`, fetched by
   `scripts/fetch-siblings.sh` and re-checked from source under the same flags
-  (`--ignore-interfaces`). Supplied with the prover (8): `Agda.Primitive` and
-  `Agda.Builtin.{Bool,Equality,List,Maybe,Nat,Sigma,Unit}`
+  (`--ignore-interfaces`); the receipt records those three files and their
+  digests in an `(import …)` clause. Supplied with the prover (8):
+  `Agda.Primitive` and `Agda.Builtin.{Bool,Equality,List,Maybe,Nat,Sigma,Unit}`
 | Axioms | none in the development. `--safe` refuses `postulate`, and the
   comment-aware scan (`scripts/scan-postulates.sh`) finds 0 postulates in the
-  six first-party modules. The prover-supplied `Agda.Primitive` declares the
+  seven first-party modules. The prover-supplied `Agda.Primitive` declares the
   universe-level primitives (`Level`, `lzero`, `lsuc`, `_⊔_`) by two `postulate`
-  blocks, each bound by a `BUILTIN` pragma: they are the prover's trusted base,
-  not axioms of this development. The gate checks that those blocks declare
-  exactly those four names and that each has its `BUILTIN` binding, and fails on
-  any other prover-supplied postulate, so a prover pin that adds one does not
-  pass. The scan is new in #170, so its first receipt on `main` is the run that
-  replaces this row. The same figures came from the #170 branch in CI under
-  Agda 2.6.4.3 (run
-  https://github.com/hyperpolymath/januskey/actions/runs/42624327510[42624327510]
-  at `77fcedb`; branch evidence, not a receipt)
-| Result | The three modules type-check; the fixtures under
+  blocks, each bound by a `BUILTIN` pragma: they are the prover's trusted base
+  (PROOF-POLICY §8.4), listed in the receipt's `(trusted-base …)`, not axioms of
+  this development. The gate checks that those blocks declare exactly those four
+  names and that each has its `BUILTIN` binding, and fails on any other
+  prover-supplied postulate, so a prover pin that adds one does not pass
+| Result | The four modules type-check; the 7 fixtures under
   `tests/reject-agda/` are refused *with the message each fixture names*, so a
   fixture that starts passing, or starts failing for the wrong reason, fails the
   gate. Agda reports `UnsupportedIndexedMatch` warnings (§The §2.1 invocation
@@ -162,28 +181,22 @@ pending re-run.
   propositions, and are kept visible
 |===
 
-*The comment edits of hyperpolymath/januskey#171 (2026-11-09) are covered by
-the same re-run.* #171 edits the explanatory comments of `Reversibility.agda`
-and `TransactionAtomicity.agda`: the "What is NOT claimed" block named failure
-modes since fixed by T-4, T-5 and T-8, and a G-1 comment implied that the grade
-was derived from the cancellation law. No statement or proof term changed, but
-the bytes did, so the receipt above does not cover them either. #171 also adds a fourth root, `SingleActiveLog.agda` (the T-2/T-3 split), so
-the cone the next receipt records has seven first-party modules, not six. The first green
-`agda-proofs.yml` run on `main` after both pull requests is the receipt for the
-new gate and the new bytes together. On the branch the same gate passed on each
-revision of the comments (for example run
-https://github.com/hyperpolymath/januskey/actions/runs/42623188471[42623188471]
-at `a71dc76`; branch evidence, not a receipt).
-
-Earlier receipts, kept with their lineage (§8.4):
+Earlier receipts, kept with their lineage (§8.4) here and in the receipt file:
 
 [cols="1,1,3",options="header"]
 |===
 | Run, commit | State | Why
 
+| https://github.com/hyperpolymath/januskey/actions/runs/42736066407[42736066407], `e165438`
+| `superseded`
+| The first green run on `main` of the gate as #174 left it; replaced by the run
+  at the receipt's source commit
+| https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251], `23bc8c3`
+| `superseded`
+| Before the cone scan (#170) and before `SingleActiveLog.agda` (#171)
 | https://github.com/hyperpolymath/januskey/actions/runs/41687715055[41687715055], `fc188c4`
 | `superseded`
-| Canonical flags and all three modules; replaced by the run above at a later commit
+| Canonical flags and three modules; replaced by run 42076969251 at a later commit
 | https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509], `4afb710`
 | `superseded`
 | Before `--cubical-compatible` and before `Epistemic.agda`; it never covered E-1m
@@ -191,10 +204,11 @@ Earlier receipts, kept with their lineage (§8.4):
 
 Those are the `PWG-3` facts: the propositions type-check in Agda under the
 §2.1 invocation, in CI, at a named commit, with the prover version pinned and
-the import cone recorded; the receipt is re-earned by the first run of the
-changed gate, as above. For G-1, T-2, T-3 and E-1m no Rocq or Lean leg exists, so
-no recheck leg counts and their grade is `PWG-3`. T-1 has both legs and is
-`PWG-2ii` (§T-1 below). No witness in another foundation exists, so
+the import cone recorded. For G-1, T-2, T-3 and E-1m no Rocq or Lean leg exists, so
+no recheck leg counts and their grade is `PWG-3`. T-1 has both legs, and each
+counted witness (Agda, Rocq and Lean) has a current receipt from a pinned CI
+checker run on the receipt's source commit itself, so the reader derives
+`PWG-1` (§8.2; §T-1 below). No witness in another foundation exists, so
 `foundation_diverse` is false throughout.
 
 === Why four rows stop at PWG-3
@@ -202,7 +216,7 @@ no recheck leg counts and their grade is `PWG-3`. T-1 has both legs and is
 PWG-2i and above require an Agda → Dedukti → Rocq/Lean transport or a
 re-proof, with the outcome recorded as `transported`, `re-proved` or
 `unavailable` (PROOF-POLICY §2). For T-1 that work is done (§T-1 below, now
-`PWG-2ii`); for G-1, T-2, T-3 and E-1m it has not been done and is not
+`PWG-1`); for G-1, T-2, T-3 and E-1m it has not been done and is not
 claimed. A recheck would not change what these modules prove: §2.2 is explicit that compiling
 in a second prover does not establish the same proposition unless the
 correspondence is checked too.
@@ -255,9 +269,9 @@ re-checks the sibling from source instead of trusting compiled interfaces;
 The local run above is recorded as **reproduction** only: same prover version,
 PyPI provenance instead of Debian, and no CI provenance (PROOF-POLICY §2.3:
 receipts of execution come from CI). The CI receipt it was waiting for now
-exists: the table in §The PWG-3 receipt cites run 42076969251, which ran the
-canonical invocation on all three modules, and the receipts from before the
-flag changed are marked `superseded` there.
+exists: the table in §The receipt cited run 42076969251, which ran the
+canonical invocation on all three modules; it and the receipts from before the
+flag changed are now `superseded` there, in its lineage table
 
 Until 2026-11-09 the Agda version was pinned twice in CI: `agda-proofs.yml`
 installed 2.6.4.3 (the receipt above), while `dashboard-check.yml` installed
@@ -336,7 +350,7 @@ The same record holds for each of G-1, T-2, T-3 and E-1m, so it is given once.
 | source of truth
 | `PROVEN`
 | `AGDA-VERIFIED`
-| §The PWG-3 receipt above, with its lineage
+| §The receipt above, with its lineage
 
 | Rocq
 | none: not attempted
@@ -363,7 +377,8 @@ T-1 is the pilot for PROOF-POLICY §2, chosen because its statement is small and
 abstract. Its Agda module imports `ResourceAlgebra.Prelude` from the pinned
 sibling, but the `Rollback` part uses only three things from it: `_≡_` (Agda's
 builtin equality, re-exported) and the elementary `trans` and `cong`. Those are
-accounted for in the comparison below. `pwg: 2ii`, `foundation_diverse:
+accounted for in the comparison below. `pwg: 1` (derived by the reader: both legs count, and every counted
+witness has a current receipt at the source commit), `foundation_diverse:
 false`.
 
 [cols="1,1,1,1,3",options="header"]
@@ -374,14 +389,15 @@ false`.
 | source of truth
 | `PROVEN`
 | `AGDA-VERIFIED`
-| §The PWG-3 receipt above
+| §The receipt above
 
 | Rocq
 | `re-proved`
 | `PROVEN`
 | `RECONCILED`
 | `agda-proofs.yml` job "Rocq and Lean recheck legs", on this change and then
-  on `main`
+  on `main`; current receipt: run 43213340167 at `b503488`, the receipt's
+  source commit
 
 | Lean
 | `re-proved`
