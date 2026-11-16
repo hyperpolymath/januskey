@@ -53,6 +53,19 @@ pub fn claim_id(claim: &str) -> Option<&str> {
     is_row_id(head).then_some(head)
 }
 
+/// A head before `:` that looks like an ID but is not one (`T5`, `T-5M`): one
+/// word, starting with a capital letter, containing a digit. A typo like this
+/// must not pass as a row with no ID.
+pub fn malformed_id(claim: &str) -> Option<&str> {
+    let (head, _) = claim.split_once(':')?;
+    let head = head.trim();
+    let looks_like_id = !head.is_empty()
+        && !head.contains(char::is_whitespace)
+        && head.starts_with(|c: char| c.is_ascii_uppercase())
+        && head.contains(|c: char| c.is_ascii_digit());
+    (looks_like_id && !is_row_id(head)).then_some(head)
+}
+
 /// Parse the status table. Its header row must be exactly [`HEADER`]; a
 /// missing table is an error, not an empty registry.
 pub fn parse_status_table(src: &str) -> Result<Vec<Registered>, Vec<String>> {
@@ -75,11 +88,16 @@ pub fn parse_status_table(src: &str) -> Result<Vec<Registered>, Vec<String>> {
         if l.is_empty() {
             continue;
         }
-        let cells: Vec<&str> = l
-            .trim_start_matches('|')
-            .split('|')
-            .map(str::trim)
-            .collect();
+        // Exactly one leading delimiter: AsciiDoc reads a row without one as
+        // continuation text and `||` as an empty first cell, so either would
+        // let the registry diverge from the table a reader sees.
+        let Some(body) = l.strip_prefix('|').filter(|b| !b.starts_with('|')) else {
+            errors.push(format!(
+                "PROOF-NEEDS.adoc:{n}: status-table rows must start with exactly one '|'"
+            ));
+            continue;
+        };
+        let cells: Vec<&str> = body.split('|').map(str::trim).collect();
         if cells.len() < 3 {
             errors.push(format!(
                 "PROOF-NEEDS.adoc:{n}: status-table rows must fit on one line (ID | Claim | Status | Artefact)"
@@ -137,7 +155,13 @@ pub fn check_ids(registry: &[Registered], claims: &[Claim]) -> (Vec<String>, usi
                 "PROOF-NEEDS.adoc:{}: ledger row names {id}, which the status table does not register",
                 c.line
             )),
-            None => unprefixed += 1,
+            None => match malformed_id(&c.claim) {
+                Some(head) => problems.push(format!(
+                    "PROOF-NEEDS.adoc:{}: ledger row starts with '{head}:', which is not a row ID (expected e.g. T-10 or E-1m)",
+                    c.line
+                )),
+                None => unprefixed += 1,
+            },
         }
     }
 
@@ -245,6 +269,40 @@ mod tests {
                     .contains("T-1 is TESTED in the status table but its ledger rows are PROVEN")),
             "{p:?}"
         );
+    }
+
+    #[test]
+    fn a_typoed_ledger_prefix_is_rejected_not_counted_as_unprefixed() {
+        for typo in ["T5", "T-5M", "T-1X"] {
+            let doc = DOC.replace(
+                "|An unregistered property test",
+                &format!("|{typo}: a typo"),
+            );
+            let (p, unprefixed) = run(&doc);
+            assert!(
+                p.iter()
+                    .any(|e| e.contains(&format!("'{typo}:', which is not a row ID"))),
+                "{typo}: {p:?}"
+            );
+            assert_eq!(unprefixed, 0, "{typo}");
+        }
+        assert_eq!(malformed_id("Execute then undo: holds"), None);
+        assert_eq!(malformed_id("src/abi uses no proof bypass: x"), None);
+    }
+
+    #[test]
+    fn a_registry_row_without_exactly_one_leading_bar_is_rejected() {
+        for bad in [
+            "T-1 | Rollback restores | PROVEN | `x`",
+            "|| T-1 | Rollback restores | PROVEN | `x`",
+        ] {
+            let doc = DOC.replace("| T-1 | Rollback restores | PROVEN | `x`", bad);
+            let e = parse_status_table(&doc).unwrap_err();
+            assert!(
+                e.iter().any(|e| e.contains("exactly one '|'")),
+                "{bad}: {e:?}"
+            );
+        }
     }
 
     #[test]

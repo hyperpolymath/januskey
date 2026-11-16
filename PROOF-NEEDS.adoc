@@ -49,8 +49,9 @@ module, lemma, fixture or log line. Every row is also a row of the claims
 ledger below, which `+dashboard-check+` runs on every pull request; the two
 tables must agree. This table is the registry of row IDs (owner decision
 2026-11-16), and `+dashboard-check+` refuses an ID registered twice, a ledger
-row whose `+ID:+` is not registered, a registered ID with no ledger row, and a
-status here that none of its ledger rows has. Before adding a row, pick the
+row whose `+ID:+` is not registered or is malformed (`+T5:+`, `+T-5M:+`), a
+registered ID with no ledger row, a status here that none of its ledger rows
+has, and a row here that does not start with exactly one `+|+`. Before adding a row, pick the
 next free number in its series.
 
 [cols="1,3,1,2",options="header"]
