@@ -109,6 +109,15 @@ pub fn parse_status_table(src: &str) -> Result<Vec<Registered>, Vec<String>> {
             ));
             continue;
         };
+        // AsciiDoc reads `\|` as a literal pipe inside a cell, so splitting on
+        // every `|` would count cells differently from the rendered table. The
+        // registry has no use for a literal pipe: refuse it, and name `{vbar}`.
+        if body.contains("\\|") {
+            errors.push(format!(
+                "PROOF-NEEDS.adoc:{n}: escaped '\\|' in a status-table row; write {{vbar}} for a literal pipe"
+            ));
+            continue;
+        }
         let cells: Vec<&str> = body.split('|').map(str::trim).collect();
         if cells.len() != 4 {
             errors.push(format!(
@@ -336,6 +345,15 @@ mod tests {
             let e = parse_status_table(&DOC.replace(base, bad)).unwrap_err();
             assert!(e.iter().any(|e| e.contains(msg)), "{bad}: {e:?}");
         }
+        // An escaped pipe: AsciiDoc renders three cells where a naive split sees four.
+        let escaped = DOC.replace(base, "| T-1 | Rollback \\| PROVEN | `x`");
+        assert!(
+            parse_status_table(&escaped)
+                .unwrap_err()
+                .iter()
+                .any(|e| e.contains("{vbar}")),
+            "escaped pipe"
+        );
         // The opening |=== displaced from just above the header.
         let displaced = DOC.replacen("|===\n| ID |", "|===\n\n| ID |", 1);
         assert!(parse_status_table(&displaced).unwrap_err()[0].contains("directly follow"));
