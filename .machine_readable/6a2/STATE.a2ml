@@ -50,10 +50,13 @@ total = "144 tests + 5 benchmark groups + 12 PROVEN ledger rows — as declared 
 # Proof Witness Grades, standards 3-practice/PROOF-POLICY.adoc §8 (the
 # Mathesis brief's §5/§6 ladder, adopted with corrections). Never a
 # percentage. Receipts, lineage and per-row records: docs/theory/PROOF-GRADES.adoc.
+grade-3 = "derived from verification/receipts/januskey_praxis.deed by the pinned standards reader: PWG-1 for T-1 (Agda, Rocq and Lean receipts at b503488); PWG-3 for G-1, T-2, T-3, E-1m, whose Rocq and Lean legs are re-proved and reconciled but have no receipt yet — census 4 + 1 of 5 theory theorems (G-3 and T-10 are engineering under PROOF-POLICY §1; T-2 and T-3 are stated over the abstract SingleActiveLog)"
+receipt-commit = "verification/receipts/januskey_praxis.deed: source commit b503488, run 43213340167; earlier runs superseded (see docs/theory/PROOF-GRADES.adoc)"
 receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); no standard library; resource-algebra pinned at cf9235c"
 receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (PROOF-POLICY §2.1 canonical, plus two stricter flags)"
 not-graded = "the 7 Idris2 PROVEN rows (ABI/interface contracts, PROOF-POLICY §8.1); all 33 TESTED rows (observed behaviour); ASSUMED/DESIGNED/OPEN rows"
-open-obligations = "no Creusot or Verus proof on the Rust, so no Rust behaviour is proved"
+open-obligations = "record the first green main run of the recheck legs of G-1, T-2, T-3 and E-1m in the receipt; no Creusot or Verus proof on the Rust, so no Rust behaviour is proved"
+claimed-higher = "PWG-1 for T-1 only, as derived from the receipt; no PWG-2i or PWG-2ii, and no foundation-diverse witness"
 
 [test-categories-complete]
 unit = true
