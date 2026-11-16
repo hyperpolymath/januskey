@@ -13,8 +13,10 @@ repository, and none is introduced here.
 [NOTE]
 ====
 *PWG census, theory theorems of this repository (denominator 5):*
-`PWG-2ii` 5 (G-1, T-1, T-2, T-3, E-1m), receipt pending · `PWG-3` 0 ·
-`PWG-2i` 0 · `PWG-1` 0 · `ungraded` 0. `+foundation-diverse`: none. Axioms:
+`PWG-3` 5 (G-1, T-1, T-2, T-3, E-1m), each awaiting promotion to `PWG-2ii` ·
+`PWG-2ii` 0 · `PWG-2i` 0 · `PWG-1` 0 · `ungraded` 0. All ten recheck legs
+check, but their receipt is pending (§The recheck receipt), and a grade is
+derived from receipts, never asserted (§8.4). `+foundation-diverse`: none. Axioms:
 none, in any of the three provers.
 
 The denominator is the ledger rows whose source of truth is an Agda theorem.
@@ -116,21 +118,21 @@ Both run in `agda-proofs.yml`, as two jobs of one workflow.
 
 === The Agda receipt
 
-The receipt of record for the four modules is the first green run of
-`agda-proofs.yml` on `main` after the recheck legs landed: that run checks the
-Agda job and the recheck job together, so one run is the receipt for every
-witness. A doc-only follow-up records its run ID and commit in the first two
-rows below; a doc-only change touches no input, so it leaves the receipt
-current. The other rows hold for the bytes that run will check: they were
-observed on the pull request (branch evidence, PROOF-POLICY §2.3) and locally.
+The receipt for the four modules is the Agda job of run 43213340167 at
+`b503488`. The change that added the recheck legs touched no Agda input: no
+module, no Agda fixture, neither `check-agda.sh` nor `scan-postulates.sh`, and
+not the sibling pin. So that receipt is current for the Agda bytes after it too.
 
 [cols="1,3",options="header"]
 |===
 | Field | Value
 
-| Workflow, run | `agda-proofs.yml` on `main`, job "Reversibility as a grade (Loss
-  instance), expected rejections": *pending*, recorded by the follow-up
-| Commit | *pending*: a merge commit at or after the recheck legs
+| Workflow, run | `agda-proofs.yml`, run
+  https://github.com/hyperpolymath/januskey/actions/runs/43213340167[43213340167],
+  branch `main`, job "Reversibility as a grade (Loss instance), expected
+  rejections", conclusion **success**
+| Commit | `b5034884dbe945139d03b38fe80cfdf1106a77e1` (run created
+  2026-11-12T11:55:42Z)
 | Prover | `agda-bin=2.6.4.3-1+b2` on Debian trixie-slim
   (`@sha256:a29215f6…`), asserted by a passing step:
   `test "$(agda --version)" = 'Agda version 2.6.4.3'`
@@ -163,9 +165,8 @@ observed on the pull request (branch evidence, PROOF-POLICY §2.3) and locally.
   gate. Agda reports `UnsupportedIndexedMatch` warnings (§The §2.1 invocation
   below): they concern computation under cubical transports, not the
   propositions, and are kept visible
-| State | *pending* until the follow-up. If a later change touches an Agda module,
-  an Agda fixture, `check-agda.sh`, `scan-postulates.sh` or the sibling pin
-  first, the run after that change is the receipt instead
+| State | `current`. A later change to an Agda module, an Agda fixture,
+  `check-agda.sh`, `scan-postulates.sh` or the sibling pin supersedes it
 |===
 
 Earlier receipts, kept with their lineage (§8.4):
@@ -174,11 +175,6 @@ Earlier receipts, kept with their lineage (§8.4):
 |===
 | Run, commit | State | Why
 
-| https://github.com/hyperpolymath/januskey/actions/runs/43213340167[43213340167], `b503488`
-| `superseded`
-| The last green run on `main` before the recheck legs landed (2026-11-12). Its
-  Agda job checked the same Agda inputs this change leaves untouched; its
-  recheck job checked only T-1's legs, under the gate before this change
 | https://github.com/hyperpolymath/januskey/actions/runs/42736066407[42736066407], `e165438`
 | `superseded`
 | The first run of #174's scanner fix (a token may start after a skipped
@@ -205,20 +201,25 @@ Earlier receipts, kept with their lineage (§8.4):
 
 === The recheck receipt
 
-The receipt of record for all five rows' legs is the job "Rocq and Lean recheck
-legs, expected rejections" of the same run as §The Agda receipt. T-1's legs
-were first checked on `main` at `0834ce7` (run 42646851111 above), with the gate
-as #171 left it; the change that added the legs for G-1, T-2, T-3 and E-1m also
-changed `check-recheck.sh` (§The recheck legs below), so that run is not their
-receipt either. Until the follow-up records the run, the five rows read
-`PWG-2ii`, *receipt pending*: the legs check locally and on the pull request,
-which is evidence, not a receipt (PROOF-POLICY §2.3).
+The receipt for all five rows' legs will be the job "Rocq and Lean recheck legs,
+expected rejections" of the first green `agda-proofs.yml` run on `main` after the
+legs landed. A doc-only follow-up records its run ID and commit, and promotes
+the five rows to `PWG-2ii` in this page, `PROOF-NEEDS.adoc`, `READINESS.adoc`
+and `STATE.a2ml` together; a doc-only change touches no input, so it leaves both
+receipts current.
+
+Until then the five rows are `PWG-3`, T-1 included. T-1's legs were checked on
+`main` at `0834ce7` (run 42646851111) and again at `b503488` (run 43213340167),
+but under the gate before this change. This change altered `check-recheck.sh`
+(§The recheck legs below), and a changed checker re-earns its receipt (§8.4).
+The legs check locally and on the pull request, which is evidence, not a receipt
+(PROOF-POLICY §2.3).
 
 Those are the facts the grades rest on. The Agda propositions type-check under
 the §2.1 invocation, in CI, at a named commit, with the prover version pinned and
 the import cone recorded: that is `PWG-3`. Each of the five rows also has a Rocq
-leg and a Lean leg, re-proved and reconciled (§The recheck legs below): that
-makes it `PWG-2ii`. No witness in another foundation exists, so
+leg and a Lean leg, re-proved and reconciled (§The recheck legs below): with a
+current receipt for them, that makes it `PWG-2ii`. No witness in another foundation exists, so
 `foundation_diverse` is false throughout. `PWG-1` would also need current
 receipts on every commit for every counted witness, which nothing here records
 yet.
@@ -302,7 +303,7 @@ The ledger rows fall into three classes under PROOF-POLICY §1. `PROOF-NEEDS.ado
 is the only place the rows are counted: an earlier revision of this page
 repeated the counts, and the two copies drifted apart.
 
-=== PWG-2ii — theory, proved in Agda, rechecked in Rocq and Lean
+=== PWG-3 — theory, proved in Agda; rechecked in Rocq and Lean, `PWG-2ii` pending
 
 [cols="1,3,2",options="header"]
 |===
@@ -341,7 +342,8 @@ repeated the counts, and the two copies drifted apart.
 ==== Leg records (PROOF-POLICY §8.5)
 
 Every theory row now has both recheck legs, re-proved by hand, so one record
-serves all five. `pwg: 2ii`, `foundation_diverse: false`.
+serves all five. `pwg: 3` (with `2ii` pending the recheck receipt),
+`foundation_diverse: false`.
 
 [cols="1,1,1,1,3",options="header"]
 |===
@@ -513,7 +515,11 @@ strength of one. Mutants with `Admitted` on `modify_good` in Rocq and with
 `sorry` on `finish_good` in Lean each fail it ("6 of 7"), and so do the same
 mutants on the refusal lemma `modify_refused_when_idle`. Before that change
 the gate looked for one clean line per file, which was enough while each file
-held one theorem.
+held one theorem. The gate also counts the commands as the provers parse them,
+with any run of whitespace between the two words, and fails outright on any
+report that lists an axiom: an `Admitted` theorem whose report was written
+`Print  Assumptions` (two spaces), beside one clean report, passed the
+count-only gate and fails this one, and so does the Lean twin.
 
 *Non-vacuity.* Each leg has a twin of one Agda fixture, built against the leg's
 own definitions:
@@ -567,7 +573,7 @@ twin.
   `tests/reject-lean/HiddenLoss.lean` `f2efff5587ec2be3b321a74ae23a79dc8e0829db0990d8a1d087a8e40a33235d`,
   `tests/reject-lean/OldKeyStillUsable.lean` `cb047bacf831d68dac8107b7e0517d156d9f9e30ab9d6a11f1bb997d20dbff1b`,
   `tests/reject-lean/SettleWithoutSettling.lean` `09b8c3ba423f34c4da21332c30c4cd99f37cd67197f2293ecdd8c7e6424bfd7d`,
-  `scripts/check-recheck.sh` `107e445d198da05a3de3db063218e5e7120da3fbadcf0d1d90cbb9ad4ef5022c`
+  `scripts/check-recheck.sh` `da9a38194ddbb40a5f43b115b83662772fbdd9595a878a8952c0e048224697ac`
 | Observed | Locally, with the same two versions: every leg checks with every
   report clean, every fixture is refused as named, and every true counterpart
   checks; `[check-recheck] OK`. The job on a pull request is branch evidence.

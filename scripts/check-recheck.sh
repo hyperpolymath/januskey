@@ -43,8 +43,13 @@ for f in "${rocq_src[@]}"; do
   printf '%s\n' "$out"
   # Every `Print Assumptions` in the file must report a closed theorem: a file
   # with several theorems must not pass on the strength of one of them.
-  want="$(grep -c '^Print Assumptions ' "$f" || true)"
+  # Count the commands as Rocq parses them (any run of whitespace between the
+  # two words), and fail outright on any report that lists an axiom.
+  want="$(grep -cE '^[[:space:]]*Print[[:space:]]+Assumptions[[:space:]]' "$f" || true)"
   got="$(grep -c '^Closed under the global context$' <<<"$out" || true)"
+  if grep -q '^Axioms:' <<<"$out"; then
+    echo "ERROR: $f rests on assumptions (a Print Assumptions report lists axioms)" >&2; exit 1
+  fi
   if [ "$want" -eq 0 ] || [ "$got" -ne "$want" ]; then
     echo "ERROR: $f rests on assumptions ($got of $want Print Assumptions closed)" >&2; exit 1
   fi
@@ -58,9 +63,13 @@ for f in "${lean_src[@]}"; do
   out="$(LEAN_PATH="$work/lean" "$lean" -o "$work/lean/$mod.olean" "$f" 2>&1)" || {
     printf '%s\n' "$out"; echo "ERROR: $f does not check" >&2; exit 1; }
   printf '%s\n' "$out"
-  # Every `#print axioms` in the file must report none.
-  want="$(grep -c '^#print axioms ' "$f" || true)"
+  # Every `#print axioms` in the file must report none. Count the commands as
+  # Lean parses them, and fail outright on any report that lists an axiom.
+  want="$(grep -cE '^[[:space:]]*#print[[:space:]]+axioms[[:space:]]' "$f" || true)"
   got="$(grep -c 'does not depend on any axioms' <<<"$out" || true)"
+  if grep -q 'depends on axioms' <<<"$out"; then
+    echo "ERROR: $f depends on axioms (an #print axioms report lists them)" >&2; exit 1
+  fi
   if [ "$want" -eq 0 ] || [ "$got" -ne "$want" ]; then
     echo "ERROR: $f depends on axioms ($got of $want #print axioms report none)" >&2; exit 1
   fi
