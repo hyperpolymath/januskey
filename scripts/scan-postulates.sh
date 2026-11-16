@@ -42,7 +42,9 @@ hits="$(LC_ALL=C awk -v ws="$ws" '
     code = ""; i = 1; n = length(line)
     while (i <= n) {
       c = substr(line, i, 1); two = substr(line, i, 2)
-      prev = (i > 1) ? substr(line, i - 1, 1) : ""
+      # The last character emitted as code, not the raw one before i: a skipped
+      # literal, comment or pragma leaves a space, so a token may start after it.
+      prev = (code == "") ? "" : substr(code, length(code), 1)
       if (pragma) {                        # inside {-# … #-}: skip to the first #-}
         if (substr(line, i, 3) == "#-}") { pragma = 0; i += 3; code = code " " } else i++
         continue

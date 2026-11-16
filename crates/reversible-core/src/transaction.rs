@@ -106,6 +106,54 @@ impl TransactionLog {
     }
 }
 
+/// Check the lifecycle invariant `Good` of
+/// `verification/proofs/agda/SingleActiveLog.agda` (januskey's instance in
+/// `TransactionAtomicity.agda` Part B) on a log read from disk.
+///
+/// The Agda theorems (ledger rows T-2 and T-3) prove that begin, add_operation,
+/// commit and mark_rolled_back preserve `Good`, so a log this code wrote
+/// satisfies it. A log read from disk is not guaranteed to — it may have been
+/// edited, or written by another version — and without this check the proved
+/// invariant would rest on an unchecked premise at load (row T-12; the
+/// refinement itself is T-10, OPEN).
+///
+/// `Good` holds when either the active pointer is unset and no transaction is
+/// Active, or the pointer names an id whose *first* transaction is Active and
+/// every other transaction is Committed or RolledBack. `begin`, the update path
+/// and the rollback path all select the first transaction with the active id,
+/// which is why "first" is the one checked.
+fn check_invariant(log: &TransactionLog) -> std::result::Result<(), String> {
+    let active_at = match &log.active_transaction_id {
+        None => None,
+        Some(id) => {
+            let at = log
+                .transactions
+                .iter()
+                .position(|t| t.id == *id)
+                .ok_or_else(|| format!("active transaction {id} is not in the log"))?;
+            if !log.transactions[at].is_active() {
+                return Err(format!(
+                    "active transaction {id} is {:?}, not Active",
+                    log.transactions[at].state
+                ));
+            }
+            Some(at)
+        }
+    };
+    match log
+        .transactions
+        .iter()
+        .enumerate()
+        .find(|(i, t)| t.is_active() && Some(*i) != active_at)
+    {
+        Some((_, t)) => Err(format!(
+            "transaction {} is Active but the active pointer is {:?}",
+            t.id, log.active_transaction_id
+        )),
+        None => Ok(()),
+    }
+}
+
 /// Build a sibling temporary pathname that is unique to this save.
 ///
 /// A random component, not a process id, so writers in different PID
@@ -233,8 +281,10 @@ impl TransactionManager {
                     Ok(buf)
                 })
             })?;
-            serde_json::from_str(&content)
-                .map_err(|e| ReversibleError::MetadataCorrupted(e.to_string()))?
+            let log: TransactionLog = serde_json::from_str(&content)
+                .map_err(|e| ReversibleError::MetadataCorrupted(e.to_string()))?;
+            check_invariant(&log).map_err(ReversibleError::MetadataCorrupted)?;
+            log
         } else {
             TransactionLog::new()
         };
@@ -328,12 +378,6 @@ impl TransactionManager {
             .active_transaction_id
             .as_ref()
             .and_then(|id| self.log.transactions.iter().find(|t| t.id == *id))
-    }
-
-    /// Get mutable active transaction
-    pub fn active_mut(&mut self) -> Option<&mut Transaction> {
-        let active_id = self.log.active_transaction_id.clone()?;
-        self.log.transactions.iter_mut().find(|t| t.id == active_id)
     }
 
     /// Append an operation ID to the active transaction and persist the log.
@@ -825,5 +869,86 @@ mod tests {
             .begin(None)
             .expect("failed to begin first transaction");
         assert!(manager.begin(None).is_err());
+    }
+
+    /// Write `log` where a manager will load it, and try to load it.
+    fn load(log: &TransactionLog) -> Result<TransactionManager> {
+        let tmp = TempDir::new().expect("temp dir");
+        let path = tmp.path().join("transactions.json");
+        std::fs::write(&path, serde_json::to_string(log).expect("serialise")).expect("write");
+        TransactionManager::new(path)
+    }
+
+    fn tx_in(state: TransactionState, id: &str) -> Transaction {
+        let mut t = Transaction::new(None);
+        t.id = id.to_string();
+        t.state = state;
+        t
+    }
+
+    fn log_of(txs: Vec<Transaction>, active: Option<&str>) -> TransactionLog {
+        TransactionLog {
+            version: "1.0".to_string(),
+            transactions: txs,
+            active_transaction_id: active.map(str::to_string),
+        }
+    }
+
+    /// T-12: a log read from disk must satisfy the invariant `Good` that the
+    /// Agda lifecycle theorems (T-2, T-3) preserve; each way of breaking it is
+    /// refused as corrupted rather than loaded.
+    #[test]
+    fn a_loaded_log_that_breaks_the_invariant_is_refused() {
+        use TransactionState::{Active, Committed, RolledBack};
+        let cases = [
+            (
+                "pointer to a missing transaction",
+                log_of(vec![tx_in(Committed, "a")], Some("b")),
+            ),
+            (
+                "pointer to a settled transaction",
+                log_of(vec![tx_in(Committed, "a")], Some("a")),
+            ),
+            (
+                "Active with no pointer",
+                log_of(vec![tx_in(Active, "a")], None),
+            ),
+            (
+                "two Active transactions",
+                log_of(vec![tx_in(Active, "a"), tx_in(Active, "b")], Some("a")),
+            ),
+            (
+                "pointer id whose first transaction is settled",
+                log_of(vec![tx_in(RolledBack, "a"), tx_in(Active, "a")], Some("a")),
+            ),
+        ];
+        for (what, log) in cases {
+            match load(&log) {
+                Err(ReversibleError::MetadataCorrupted(_)) => {}
+                Err(e) => panic!("{what}: refused with the wrong error: {e}"),
+                Ok(_) => panic!("{what}: a log that breaks the invariant was loaded"),
+            }
+        }
+    }
+
+    /// T-12, the positive control: logs the manager writes satisfy the
+    /// invariant, idle and busy, and load back unchanged.
+    #[test]
+    fn a_log_the_manager_wrote_loads_back() {
+        let tmp = TempDir::new().expect("temp dir");
+        let path = tmp.path().join("transactions.json");
+        let mut manager = TransactionManager::new(path.clone()).expect("new");
+        manager.begin(None).expect("begin");
+        manager.add_operation("op-1".to_string()).expect("add");
+        manager.commit().expect("commit");
+        manager.begin(None).expect("begin again");
+        manager.mark_rolled_back().expect("roll back");
+        let idle = TransactionManager::new(path.clone()).expect("an idle log loads");
+        assert_eq!(idle.all().len(), 2);
+        assert!(!idle.has_active());
+
+        manager.begin(None).expect("begin a third");
+        let busy = TransactionManager::new(path).expect("a busy log loads");
+        assert_eq!(busy.active_id(), manager.active_id());
     }
 }

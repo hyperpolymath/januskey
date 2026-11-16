@@ -66,27 +66,30 @@ This pushes toward: *complete, verifiable deletion capability*.
 
 ## The MAA Solution
 
-MAA introduces two formally verified primitives that satisfy both requirements:
+MAA proposes two primitives, one for each requirement. Neither is formally
+verified in full; the status of each part is stated below and in the ledger.
 
 ### RMR (Reversible Transaction)
 
-> A primitive for state transitions that records, before each change, what is needed to undo it — so that undo is a metadata lookup rather than a restore from backup. Whether every operation is *in fact* reversible is an open obligation, not a guarantee; see the claims ledger.
+> A primitive for state transitions that records what is needed to undo each change — so that undo is a metadata lookup rather than a restore from backup. For a delete or modify the original content is stored before the change; the operation's metadata is saved to the log after it, so a stop between the two leaves undo unable to find the operation (OPEN, T-9). Whether every operation is *in fact* reversible is an open obligation, not a guarantee; see the claims ledger.
 
-RMR provides:
+RMR aims at the following. These are goals, not established guarantees:
 
-- Complete state capture before changes
+- Capture of everything undo needs (the log record is written after the
+  change; T-9 is OPEN)
 
-- Guaranteed reversal capability
+- Reversal of every operation ("every operation is reversible" is OPEN, and
+  Chown undo is not implemented)
 
-- Full audit trail of all operations
+- A full audit trail of all operations
 
-- Accountability without data loss risk
+- Accountability without risk of data loss
 
 See: [RMR Primitive Specification](rmr-primitive.md)
 
 ### RMO (Obliterative Wipe)
 
-> A primitive for data erasure: best-effort overwrite, removal, store scrub, and a tamper-evident record of what was destroyed.
+> A primitive for data erasure: best-effort overwrite, removal, store scrub, and, when a JanusKey store exists, an unkeyed record of what was destroyed. The record is not tamper-evident.
 
 RMO provides:
 
@@ -135,37 +138,112 @@ The key insight of MAA is that RMR and RMO are not alternatives—they are compl
 
 2.  **RMO-on-request**: Users can invoke RMO to permanently erase
 
-3.  **Audit of RMO**: The *fact* that RMO was invoked is logged (but not the erased content)
+3.  **Audit of RMO**: The *fact* that RMO was invoked is logged (but not the erased content) when a JanusKey store exists and the record saves; see Property 3 for the cases where it is not
 
 4.  **No silent deletion**: RMO requires explicit user action
 
 ## Formal Properties
 
-### Property 1: Complete Reversibility (RMR)
+These are target properties. Each is stated with its status in the claims ledger
+(`PROOF-NEEDS.adoc`), and none is a theorem about the Rust as a whole.
 
-For any sequence of operations $O_1, O_2, \ldots, O_n$:
+### Property 1: Reversibility (RMR), two-sided and relative to an equality
 
-$$O_n^{-1}(O_{n-1}^{-1}(\ldots O_1^{-1}(O_1(O_2(\ldots O_n(S)))))) = S$$
+A reversibility claim is an equality *up to* an equivalence $\sim$ on states, and
+says nothing about any finer equality. Two are in use:
 
-The system can always return to any previous state.
+- $\sim_{tree}$: same relative paths and same bytes for the regular files under
+  the working tree. Permissions, owner/group, mtime, symlink identity, inode
+  identity and empty directories are not compared. This is what
+  `property_tests::execute_then_undo_is_identity` checks. Undo also restores
+  permission bits, but no test compares them; owner, group, mtime and symlink
+  identity are recorded and not restored ([RMR §2](rmr-primitive.md)).
+- $\sim_{model}$: propositional equality on the abstract state of
+  `verification/proofs/agda/TransactionAtomicity.agda`, with no mechanical link
+  to the filesystem.
 
-### Property 2: Formal Obliteration (RMO)
+Executing an operation produces a state *and* a record. Write $S$ for states
+(the working tree, or the model state) and $R$ for records: the operation's
+`OperationMetadata` log entry together with the content-store blobs it names.
+<!-- coderabbit-ai-generated:v1 -->
 
-After $\text{RMO}(d)$ for data $d$:
+<!-- coderabbit-ai-generated-section:v1:21ff3da5a38a4ba78758707df325c3722d28af0b88ad9babec973ec93e3e4e59 -->
 
-$$\nexists \text{ algorithm } A: A(\text{system\_state}) \to d$$
+An operation with precondition domain $D_F \subseteq S$ has a saved-execution
+relation $F \subseteq D_F \times (S \times R)$. Write $s\;F\;(t,r)$ when an
+execution from $s$ produces post-state $t$ and saves record $r$. The same input
+state can have multiple outputs, including records differing only in IDs or
+timestamps. Its recorded inverse consumes both, $F^{-1} : S \times R \to S$,
+because undo reads the record (`OperationExecutor::undo` looks the operation up
+in the log and retrieves the stored content by its hash).
 
-No algorithm can recover the obliterated data from system state.
+The target laws range over **every** saved output, including each such record:
 
-### Property 3: Accountability Preservation
+$$\text{RMR-L:}\quad \forall s \in D_F,\,(t,r).\; s\;F\;(t,r) \implies F^{-1}(t,r) \sim s$$
 
-$$\forall \text{RMO}(d): \text{log}(\text{timestamp}, \text{user}, \text{hash}(d))$$
+$$\text{RMR-R:}\quad \forall s \in D_F,\,(t,r).\; s\;F\;(t,r) \implies \big(\forall (t',r').\; F^{-1}(t,r)\;F\;(t',r') \implies t' \sim t\big)$$
 
-The fact of deletion is logged, maintaining accountability without content preservation.
+RMR-R additionally requires that $F^{-1}(t,r)$ is in $D_F$ and has at least one
+saved execution output; the universal clause must not hold merely because
+re-execution is impossible. Together the laws say that, up to $\sim$, the
+inverse given that execution's record undoes it, and every saved re-execution
+restores its post-state. The post-state alone does not determine what undo
+restores: deleting a file from two trees that differ only in that file's
+content gives $\sim$-equal post-states with different records, so no $F^{-1}$
+of the post-state alone could satisfy RMR-L for both. RMR-R compares states
+only; the new record $r'$ need not equal $r$ (IDs and timestamps may differ).
+
+RMR-R is over saved outputs only: $\text{Copy}^{-1}$ is a delete of the
+destination, and copying again does not restore arbitrary destination content.
+RMR-R follows from RMR-L if all state outputs on $\sim$-equivalent inputs are
+$\sim$-equivalent and the restored state is again in $D_F$ with a saved output;
+these additional conditions are not established or tested.
+
+<!-- /coderabbit-ai-generated:v1 -->
+
+Both equations assume the record was saved. `execute_*` changes the filesystem
+and then appends the record, so a stop between the two leaves a post-state with
+no record for undo to consume (T-9, OPEN).
+
+| Part | Status |
+|---|---|
+| RMR-L, one step, $\sim_{tree}$ | **TESTED** for Delete, Modify, Move, Copy, Create; Chmod is not in the test; Chown undo is unimplemented; the failure path is ASSUMED (T-6) |
+| RMR-L, a transaction undone in reverse order, $\sim_{model}$ | **PROVEN** in the model (T-1), given T-6 |
+| RMR-R | **OPEN** — no ledger row; neither proved nor tested |
+| "Every operation is reversible" | **OPEN** |
+
+### Property 2: Obliteration (RMO) — target, not established
+
+The target: after $\text{RMO}(d)$, no algorithm recovers $d$ from the system
+state. That an attacker cannot recover obliterated content is **OPEN** (ledger
+E-1; only its model-level shadow E-1m is proved). Hash one-wayness and physical
+erasure are **ASSUMED**, external to this repository (X-1). See
+[RMO Primitive Specification](rmo-primitive.md).
+
+### Property 3: Accountability Preservation — store-backed path only
+
+The target, stated only for an RMO run in a directory with an initialized
+JanusKey store, on the path where each record save succeeds:
+
+$$\forall\, \text{RMO}(d) \text{ store-backed, record saved}:\; \text{log}(\text{timestamp}, \text{user}, \text{hash}(d))$$
+
+The record (`ObliterationRecord`) holds the timestamp, user and content hash,
+never the content, and it is not tamper-evident (see RMO above). Outside that
+path the property is not claimed:
+
+| Part | Status |
+|---|---|
+| Store-backed `jk obliterate` of a path with a working file and unshared blobs, every save succeeding: one record for the file and one per shredded blob, persisted | **TESTED** — `obliteration_cas_test::obliterate_scrubs_blobs_log_and_undo` reopens the obliteration log and counts one record for the file plus one per blob (the ledger row "Obliterating a path shreds its unshared blobs and log entries, and undo then has nothing") |
+| `jk obliterate` with no initialized store | **OPEN**, false today, no ledger row — `cmd_obliterate` calls `obliterate_file` alone, which overwrites and removes the file and writes no record |
+| Store-backed, a record save fails | **OPEN**, no ledger row — `record_proof` and `ObliterationManager::obliterate` remove the content first and save the record after, so a failed save leaves the erasure with no durable record unless a later save in the same run writes the pending one |
+| Store-backed, working file absent and every blob shared with another path | **OPEN**, no ledger row, by inspection — `obliterate_path` purges the path's log entries and writes no obliteration record |
 
 ## Implementation in JanusKey
 
-JanusKey currently implements RMR fully. RMO support is planned.
+JanusKey implements RMR at the strength stated under Property 1, and RMO as
+`jk obliterate` (`crates/januskey-cli/src/obliteration.rs`). The "Planned RMO
+Implementation" sketch below predates that module; its step 4 ("non-existence
+proof") was never implemented and is not claimed (E-1, X-1).
 
 ### Current RMR Implementation
 
@@ -264,10 +342,12 @@ smaller, differently-shaped things, and the difference matters:
   (`verification/proofs/agda/TransactionAtomicity.agda`, ledger rows T-1..T-3).
   The claim "every operation is reversible" is **OPEN**, as is the mechanical
   correspondence between that model and the Rust.
-- **RMO:** nothing is proved. Overwriting is best effort; the record is
-  tamper-evident, not a certificate of absence. There is no mathematical proof
-  of non-existence, and there cannot be one from inside this process: the tool
-  cannot observe the media, the journal, or the backups.
+- **RMO:** E-1m proves properties of an abstract model, not the Rust
+  implementation. Overwriting is best effort; the record is an
+  unkeyed ledger that a writer can alter without detection, kept only when a
+  store exists, and it is not a certificate of absence. There is no
+  mathematical proof of non-existence, and there cannot be one from inside this
+  process: the tool cannot observe the media, the journal, or the backups.
 
 The claims ledger in `PROOF-NEEDS.adoc` is the authority for both, and
 `dashboard-check` fails the build when a dashboard's counts disagree with it.

@@ -174,12 +174,19 @@ Earlier receipts, kept with their lineage (§8.4):
 |===
 | Run, commit | State | Why
 
+| https://github.com/hyperpolymath/januskey/actions/runs/43213340167[43213340167], `b503488`
+| `superseded`
+| The last green run on `main` before the recheck legs landed (2026-11-12). Its
+  Agda job checked the same Agda inputs this change leaves untouched; its
+  recheck job checked only T-1's legs, under the gate before this change
+| https://github.com/hyperpolymath/januskey/actions/runs/42736066407[42736066407], `e165438`
+| `superseded`
+| The first run of #174's scanner fix (a token may start after a skipped
+  literal), which changed the Agda gate; green
 | https://github.com/hyperpolymath/januskey/actions/runs/42646851111[42646851111], `0834ce7`
 | `superseded`
 | The run at #171's merge, which added `SingleActiveLog` as a fourth root and
-  T-1's legs. Still queued behind the runner backlog when this was written;
-  the follow-up records its conclusion. It is superseded either way, because
-  the change after it altered `check-recheck.sh` and added legs
+  T-1's legs; green (both jobs)
 | https://github.com/hyperpolymath/januskey/actions/runs/42633520061[42633520061], `05ade78`
 | `superseded`
 | The first run of #170's gate (import cone and postulate scan) on `main`.
@@ -268,12 +275,14 @@ receipts of execution come from CI). The CI receipt it was waiting for was run
 is now itself `superseded` (§The Agda receipt), as are the receipts from before
 the flag changed.
 
-One related inconsistency is an open obligation, not a claim: the Agda version
-is pinned twice in CI and the two pins differ — `agda-proofs.yml` installs
-2.6.4.3 (the receipt above), while `dashboard-check.yml` installs 2.6.3 on the
-Idris2 image so it can run the PROVEN rows' checkers. A green dashboard
-therefore does not extend the receipt at 2.6.4.3. One version, one receipt:
-pinning the dashboard job to the same Agda is the fix.
+Until 2026-11-09 the Agda version was pinned twice in CI: `agda-proofs.yml`
+installed 2.6.4.3 (the receipt above), while `dashboard-check.yml` installed
+Ubuntu's 2.6.3 on the Idris2 image so it could run the PROVEN rows' checkers.
+Resolved by owner decision on 2026-11-09. The dashboard job now runs Agda from
+the image `agda-proofs.yml` pins: the same `debian:trixie-slim` digest and
+`agda-bin=2.6.4.3-1+b2`. It runs Idris2 from the image `idris-abi.yml` pins,
+and asserts the version string exactly as the proof job does. One version, one
+receipt.
 
 === Upgrade path, measured
 
@@ -319,7 +328,12 @@ repeated the counts, and the two copies drifted apart.
 | E-1m | In a world model, an agent whose observation excludes the store does not
   know what the store holds; obliteration leaves nothing to recover; rotation
   to a different key (premise `old ≠ new`) leaves no agent — the system included
-  — able to use the old one (true by the definition of `rotate` in the model) |
+  — able to use the old one (true by the definition of `rotate` in the model).
+  `adversary-ignorant` and `obliterate-ignorance` are proved for two particular
+  worlds whose stores differ and whose adversary observations are both empty;
+  the general form is `different-store-unknown`, which takes such a pair as its
+  hypothesis, so these show ignorance is expressible and true in the model, not
+  that the adversary is ignorant in every januskey state |
   `Epistemic.agda::adversary-ignorant`, `obliterate-cuts-recovery`,
   `obliterate-ignorance`, `rotate-forgets-old`
 |===

@@ -56,9 +56,28 @@ The **Mutually Assured Accountability (MAA) Framework** balances two opposing re
 
 These are implemented through dual primitives:
 
-- **RMR (Reversible Transaction)**: Guarantees perfect state reversal
+<!-- coderabbit-ai-generated:v1 -->
 
-- **RMO (Obliterative Wipe)**: Guarantees permanent, verifiable data erasure
+<!-- coderabbit-ai-generated-section:v1:84466b2489f7ee0e9fff9c3f8f42bf678e470d02788b73ed9e79778e5aa9d21c -->
+
+- **RMR (Reversible Transaction)**: Records each change's inverse; undo restores
+  the prior state up to a stated equality. This is tested for single steps when
+  the operation record is saved. If the process stops after a file change but
+  before the record is saved, undo cannot find the operation (T-9, OPEN). For
+  a transaction model it is proved under a premise: every step executed and each
+  step's undo restores the state that step started from (that premise is the
+  single-step property, tested, not proved). The right-inverse direction and
+  "every operation is reversible" are OPEN (see [MAA Property 1](maa-framework.md))
+
+
+<!-- /coderabbit-ai-generated:v1 -->
+- **RMO (Obliterative Wipe)**: Best-effort overwrite and removal. When a
+  JanusKey store exists, each removal is written to an unkeyed JSON ledger; a
+  writer can alter it without detection, and with no store no record is kept.
+  The ledger is written after the bytes are removed, so a failed ledger write
+  can leave a removal unrecorded, and a re-run skips the blob that is already
+  gone without recording it. Unrecoverability is OPEN (E-1) and physical
+  erasure is ASSUMED (X-1)
 
 <!-- -->
 
