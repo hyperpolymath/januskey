@@ -66,21 +66,33 @@ pub fn malformed_id(claim: &str) -> Option<&str> {
     (looks_like_id && !is_row_id(head)).then_some(head)
 }
 
-/// Parse the status table. Its header row must be exactly [`HEADER`]; a
-/// missing table is an error, not an empty registry.
+/// Parse the status table, reading it the way AsciiDoc does, so that the
+/// registry this check sees is the table a reader sees: the line just above
+/// the header is the table's opening `|===`; every row is one line that starts
+/// (untrimmed) with exactly one `|` and has exactly four cells; and the table
+/// is closed by `|===`. Blank lines inside the table are allowed. A missing
+/// table is an error, not an empty registry.
 pub fn parse_status_table(src: &str) -> Result<Vec<Registered>, Vec<String>> {
     let lines: Vec<&str> = src.lines().collect();
-    let Some(header) = lines.iter().position(|l| l.trim() == HEADER) else {
+    let Some(header) = lines.iter().position(|l| l.trim_end() == HEADER) else {
         return Err(vec![format!(
             "PROOF-NEEDS.adoc has no status table (header '{HEADER}')"
         )]);
     };
+    if header == 0 || lines[header - 1].trim_end() != "|===" {
+        return Err(vec![format!(
+            "PROOF-NEEDS.adoc:{}: the status table header must directly follow the table's opening |===",
+            header + 1
+        )]);
+    }
     let mut rows = Vec::new();
     let mut errors = Vec::new();
     let mut closed = false;
     for (i, raw) in lines.iter().enumerate().skip(header + 1) {
         let n = i + 1;
-        let l = raw.trim();
+        // Only trailing whitespace is ignored: an indented line is not a table
+        // row to AsciiDoc.
+        let l = raw.trim_end();
         if l == "|===" {
             closed = true;
             break;
@@ -98,9 +110,10 @@ pub fn parse_status_table(src: &str) -> Result<Vec<Registered>, Vec<String>> {
             continue;
         };
         let cells: Vec<&str> = body.split('|').map(str::trim).collect();
-        if cells.len() < 3 {
+        if cells.len() != 4 {
             errors.push(format!(
-                "PROOF-NEEDS.adoc:{n}: status-table rows must fit on one line (ID | Claim | Status | Artefact)"
+                "PROOF-NEEDS.adoc:{n}: status-table rows need exactly four cells on one line (ID | Claim | Status | Artefact), found {}",
+                cells.len()
             ));
             continue;
         }
@@ -303,6 +316,31 @@ mod tests {
                 "{bad}: {e:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_table_must_be_read_as_asciidoc_reads_it() {
+        let base = "| T-1 | Rollback restores | PROVEN | `x`";
+        // An indented row, a row with three cells, a row with five.
+        for (bad, msg) in [
+            (
+                " | T-1 | Rollback restores | PROVEN | `x`",
+                "exactly one '|'",
+            ),
+            ("| T-1 | Rollback restores | PROVEN", "found 3"),
+            (
+                "| T-1 | Rollback restores | PROVEN | `x` | extra",
+                "found 5",
+            ),
+        ] {
+            let e = parse_status_table(&DOC.replace(base, bad)).unwrap_err();
+            assert!(e.iter().any(|e| e.contains(msg)), "{bad}: {e:?}");
+        }
+        // The opening |=== displaced from just above the header.
+        let displaced = DOC.replacen("|===\n| ID |", "|===\n\n| ID |", 1);
+        assert!(parse_status_table(&displaced).unwrap_err()[0].contains("directly follow"));
+        let missing = DOC.replacen("|===\n| ID |", "| ID |", 1);
+        assert!(parse_status_table(&missing).unwrap_err()[0].contains("directly follow"));
     }
 
     #[test]
