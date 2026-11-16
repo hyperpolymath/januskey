@@ -34,7 +34,7 @@ out=verification/receipts/januskey_praxis.deed
 repo="hyperpolymath/januskey"
 # The commit the receipt describes: the main commit at which the current runs
 # below were earned.  On the default branch, so no echo is needed (§8.5.2).
-source_commit=b5034884dbe945139d03b38fe80cfdf1106a77e1
+source_commit=e8deeaf7bc7b70500d57c282828512c8f8ba81f9
 sibling_repo="hyperpolymath/resource-algebra"
 sibling_dir=_build/dependencies/resource-algebra
 
@@ -60,11 +60,11 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 # bridge, so it is engineering under §1 and has no claim here.
 claims() {
   cat <<'ROWS'
-G-1|agda
+G-1|agda rocq lean
 T-1|agda rocq lean
-T-2|agda
-T-3|agda
-E-1m|agda
+T-2|agda rocq lean
+T-3|agda rocq lean
+E-1m|agda rocq lean
 ROWS
 }
 
@@ -85,15 +85,18 @@ LEAN_CHECKER='Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290
 runs() {
   local u=https://github.com/hyperpolymath/januskey/actions/runs
   cat <<ROWS
-agda|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|current|
-agda|$u/42736066407|e16543866fa4fd31a94f3c7faa1fe0671b083a1b|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|superseded|the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit
+agda|$u/43945986467|e8deeaf7bc7b70500d57c282828512c8f8ba81f9|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|current|
+agda|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|superseded|replaced by run 43945986467 at the receipt's source commit (the Agda inputs are the same at both commits)
+agda|$u/42736066407|e16543866fa4fd31a94f3c7faa1fe0671b083a1b|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|superseded|the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by run 43213340167 at a later commit
 agda|$u/42076969251|23bc8c38160a25c37917bce69cf05d91899b07e5|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)|superseded|before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171)
 agda|$u/41687715055|fc188c44906faedfe91bfd414be3fda01ff4caf4|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)|superseded|canonical flags and three modules; replaced by run 42076969251 at a later commit
 agda|$u/40867211509|4afb710e86646658f667f10bd6274ee47416bfc7|$AGDA_CHECKER|agda --safe --without-K (before --cubical-compatible joined the gate)|superseded|before --cubical-compatible and before Epistemic.agda; it never covered E-1m, so it is listed for the other claims only|E-1m
-rocq|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$ROCQ_CHECKER|coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)|current|
-rocq|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$ROCQ_CHECKER|coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)|superseded|the first run on main (hyperpolymath/januskey#171); replaced by the run at the receipt's source commit
-lean|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$LEAN_CHECKER|lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)|current|
-lean|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$LEAN_CHECKER|lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)|superseded|the first run on main (hyperpolymath/januskey#171); replaced by the run at the receipt's source commit
+rocq|$u/43945986467|e8deeaf7bc7b70500d57c282828512c8f8ba81f9|$ROCQ_CHECKER|coqc -q -Q . JanusKey F.v for each F.v of verification/proofs/rocq (copies; every Print Assumptions must report a closed theorem; scripts/check-recheck.sh)|current|
+rocq|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$ROCQ_CHECKER|coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)|superseded|Rollback.v only; the legs of hyperpolymath/januskey#180 and its stricter gate came later; replaced by run 43945986467|G-1 T-2 T-3 E-1m
+rocq|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$ROCQ_CHECKER|coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)|superseded|the first run on main (hyperpolymath/januskey#171); replaced by run 43213340167 at a later commit|G-1 T-2 T-3 E-1m
+lean|$u/43945986467|e8deeaf7bc7b70500d57c282828512c8f8ba81f9|$LEAN_CHECKER|lean -o F.olean F.lean for each F.lean of verification/proofs/lean (every #print axioms must report none; scripts/check-recheck.sh)|current|
+lean|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$LEAN_CHECKER|lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)|superseded|Rollback.lean only; the legs of hyperpolymath/januskey#180 and its stricter gate came later; replaced by run 43945986467|G-1 T-2 T-3 E-1m
+lean|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$LEAN_CHECKER|lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)|superseded|the first run on main (hyperpolymath/januskey#171); replaced by run 43213340167 at a later commit|G-1 T-2 T-3 E-1m
 ROWS
 }
 

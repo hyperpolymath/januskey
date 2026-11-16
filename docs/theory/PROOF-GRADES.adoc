@@ -13,12 +13,12 @@ repository, and none is introduced here.
 [NOTE]
 ====
 *PWG census, theory theorems of this repository (denominator 5):*
-`PWG-3` 4 (G-1, T-2, T-3, E-1m) · `PWG-2i` 0 · `PWG-2ii` 0 · `PWG-1` 1 (T-1) ·
+`PWG-1` 5 (G-1, T-1, T-2, T-3, E-1m) · `PWG-2ii` 0 · `PWG-2i` 0 · `PWG-3` 0 ·
 `ungraded` 0. `+foundation-diverse`: none. Axioms: none. Derived by the pinned
 standards reader from `verification/receipts/januskey_praxis.deed` (§The
-machine-readable receipt below), not typed. G-1, T-2, T-3 and E-1m now also have
-Rocq and Lean legs (§The recheck legs below). They join the receipt once a CI
-run on `main` has checked them, and the reader then derives their grade.
+machine-readable receipt below), not typed: every theory row has an Agda, a Rocq
+and a Lean witness, each with a current receipt from a pinned CI checker run on
+the receipt's source commit (§The recheck legs below).
 
 The denominator is the ledger rows whose source of truth is an Agda theorem.
 PROOF-POLICY §1 puts a statement that names one repository's type, function or
@@ -130,16 +130,10 @@ run the §8.5.3 git checks (each manifest holds at its commit, the
 and warn when a leg's inputs have changed since the receipt's source commit.
 This page is the human reading of that file.
 
-The change that added the Rocq and Lean legs of G-1, T-2, T-3 and E-1m added
-files to `verification/proofs/rocq` and `verification/proofs/lean`, which are
-T-1's recheck inputs, and changed their checker, `scripts/check-recheck.sh`. The
-receipt still describes `b503488` and stays true of it, so T-1 is `PWG-1` there;
-the CI job warns that HEAD has moved on. The follow-up that records the first
-green `main` run after that change adds it to the run ledger, adds the four
-rows' legs to the claim list, and the reader derives all five grades afresh.
-
-The receipt describes commit `b5034884dbe945139d03b38fe80cfdf1106a77e1` on `main`.
-The gate changed twice before it, in hyperpolymath/januskey#170 (the import-cone
+The receipt describes commit `e8deeaf7bc7b70500d57c282828512c8f8ba81f9` on `main`,
+the merge of hyperpolymath/januskey#180, which added the Rocq and Lean legs of
+G-1, T-2, T-3 and E-1m and made `scripts/check-recheck.sh` count every axiom
+report. Before it, the gate changed in hyperpolymath/januskey#170 (the import-cone
 postulate scan) and #174 (a token may start after a skipped literal), and #171
 changed the modules' bytes and added `SingleActiveLog.agda`. A changed checker
 or changed inputs re-earn the receipt (§8.4), so every receipt from before those
@@ -150,11 +144,13 @@ changes is `superseded`, and the current one is a run on `main` after all three.
 | Field | Value
 
 | Workflow, run | `agda-proofs.yml`, run
-  https://github.com/hyperpolymath/januskey/actions/runs/43213340167[43213340167],
+  https://github.com/hyperpolymath/januskey/actions/runs/43945986467[43945986467],
   branch `main`, conclusion **success**: job "Reversibility as a grade (Loss
   instance), expected rejections" (Agda) and job "Rocq and Lean recheck legs,
-  expected rejections" (T-1's legs, §The recheck legs below)
-| Commit | `b5034884dbe945139d03b38fe80cfdf1106a77e1` (started 2026-11-12T11:55:42Z)
+  expected rejections" (all five rows' legs: 4 Rocq and 4 Lean files, 22 axiom
+  reports in each prover, every one clean; 8 refusals as named; §The recheck
+  legs below)
+| Commit | `e8deeaf7bc7b70500d57c282828512c8f8ba81f9` (started 2026-11-16T20:04:43Z)
 | Prover | `agda-bin=2.6.4.3-1+b2` on Debian trixie-slim
   (`@sha256:a29215f6…`), asserted by a passing step:
   `test "$(agda --version)" = 'Agda version 2.6.4.3'`
@@ -197,10 +193,14 @@ Earlier receipts, kept with their lineage (§8.4) here and in the receipt file:
 |===
 | Run, commit | State | Why
 
+| https://github.com/hyperpolymath/januskey/actions/runs/43213340167[43213340167], `b503488`
+| `superseded`
+| T-1's legs only (`Rollback.v`, `Rollback.lean`), before #180; the Agda inputs are
+  unchanged at `e8deeaf`, and run 43945986467 there replaces it
 | https://github.com/hyperpolymath/januskey/actions/runs/42736066407[42736066407], `e165438`
 | `superseded`
-| The first green run on `main` of the gate as #174 left it; replaced by the run
-  at the receipt's source commit
+| The first green run on `main` of the gate as #174 left it; replaced by run
+  43213340167 at a later commit
 | https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251], `23bc8c3`
 | `superseded`
 | Before the cone scan (#170) and before `SingleActiveLog.agda` (#171)
@@ -212,29 +212,26 @@ Earlier receipts, kept with their lineage (§8.4) here and in the receipt file:
 | Before `--cubical-compatible` and before `Epistemic.agda`; it never covered E-1m
 |===
 
-Those are the `PWG-3` facts: the propositions type-check in Agda under the
-§2.1 invocation, in CI, at a named commit, with the prover version pinned and
-the import cone recorded. For G-1, T-2, T-3 and E-1m the Rocq and Lean legs
-exist (§The recheck legs below), but no CI run on `main` has checked them yet, so
-no receipt counts them and their grade is `PWG-3`. T-1 has both legs, and each
-counted witness (Agda, Rocq and Lean) has a current receipt from a pinned CI
-checker run on the receipt's source commit itself, so the reader derives
-`PWG-1` (§8.2; §The recheck legs below). No witness in another foundation exists, so
+Those are the Agda facts: the propositions type-check under the §2.1
+invocation, in CI, at a named commit, with the prover version pinned and the
+import cone recorded. Every theory row also has Rocq and Lean legs, re-proved and
+reconciled (§The recheck legs below), and the same run checked them at the same
+commit. Each counted witness (Agda, Rocq and Lean) therefore has a current receipt
+from a pinned CI checker run on the receipt's source commit itself, so the reader
+derives `PWG-1` for all five rows (§8.2). No witness in another foundation exists, so
 `foundation_diverse` is false throughout.
 
-=== Why four rows are at PWG-3
+=== How the four rows reached PWG-1
 
-`PWG-2i` and above require Rocq or Lean legs, with the outcome recorded as
-`transported`, `re-proved` or `unavailable` (PROOF-POLICY §2), and a current
-receipt for each counted leg. All four rows now have both legs, re-proved and
-reconciled (§The recheck legs below). What they lack is the receipt: the first
-green `main` run of the recheck job after the legs landed. When that run is
-recorded in the receipt's run ledger and claim list, the reader derives their
-grade: `PWG-1` if every counted witness is checked at the receipt's source
-commit, as for T-1 (§8.2). A recheck would not change what these modules prove:
-§2.2 is explicit that compiling in a second prover does not establish the same
-proposition unless the correspondence is checked too, which is why each leg
-carries its statement comparison.
+Until hyperpolymath/januskey#180, G-1, T-2, T-3 and E-1m had no Rocq or Lean leg
+and were `PWG-3`. #180 re-proved all four by hand in both provers and reconciled
+each statement (§The recheck legs below). The first green run of the recheck job
+on `main` after it, run 43945986467 at `e8deeaf`, is their first receipt; the
+receipt's run ledger and claim list record it, and the reader derives `PWG-1`.
+A recheck alone would not change what these modules prove: §2.2 is explicit that
+compiling in a second prover does not establish the same proposition unless the
+correspondence is checked too, which is why each leg carries its statement
+comparison.
 
 == The §2.1 invocation: adopted, and measured (2026-11-01)
 
@@ -354,10 +351,9 @@ repeated the counts, and the two copies drifted apart.
 ==== Leg records (PROOF-POLICY §8.5)
 
 Every theory row now has both recheck legs, re-proved by hand, so one record
-serves all five; only the receipts differ. T-1: `pwg: 1`, derived by the reader
-from run 43213340167 at `b503488`, which checked all three of its witnesses.
-G-1, T-2, T-3 and E-1m: `pwg: 3`. Their legs have no CI receipt yet, so the
-receipt's claim list does not include them, and the reader counts none.
+serves all five, and so does one run: `pwg: 1` for every row, derived by the
+reader from run 43945986467 at `e8deeaf`, which checked all three witnesses of
+each.
 `foundation_diverse: false` throughout.
 
 [cols="1,1,1,1,3",options="header"]
@@ -374,10 +370,10 @@ receipt's claim list does not include them, and the reader counts none.
 | `re-proved`
 | `PROVEN`
 | `RECONCILED`
-| T-1: run 43213340167, job "Rocq and Lean recheck legs", at `b503488`, in the
-  receipt. The other four: none yet. Their first receipt is that job's first
-  green run on `main` after the legs landed, which then joins the receipt's run
-  ledger
+| All five rows: run 43945986467, job "Rocq and Lean recheck legs", at
+  `e8deeaf`, current in the receipt. T-1's earlier receipts (run 43213340167 at
+  `b503488`, run 42646851111 at `0834ce7`) checked `Rollback` only and are
+  `superseded`
 
 | Lean
 | `re-proved`
