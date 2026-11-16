@@ -96,6 +96,11 @@ test-agda:
 test-recheck:
     bash scripts/check-recheck.sh
 
+# Proof receipt (PROOF-POLICY §8.5): regenerate and compare, derive grades with the pinned reader, git checks.
+test-receipt:
+    bash scripts/fetch-siblings.sh
+    bash scripts/proof-receipt.sh --check
+
 # Idris2 ABI <-> januskey.h <-> ffi/zig agreement (sizes, status codes, enums, symbols); no compiler needed.
 abi-layout-check:
     bash scripts/check-abi-layout.sh
