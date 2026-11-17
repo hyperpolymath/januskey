@@ -170,9 +170,10 @@ checkers run on the receipt's source commit (§8.2). §8.2 accepts "a pinned
 kernel run in CI" on the same terms as a checker service, so the CI runner
 needs no digest-pinned container of its own. How the three provers are
 installed is a separate matter, §6's, recorded under "Toolchain deviations"
-below. A later change to a leg's inputs makes the receipt stale (the CI job
-warns), and the grade then holds for `+e8deeaf+` until a run of the new commit is
-recorded (§8.4, "regression drops the grade"). The row-by-row mapping is in
+below. A change to a leg's inputs fails the receipt gate until a run of the
+new inputs is recorded, or the current run is marked `+superseded+` or
+`+regressed+`, which drops the grade until then (§8.4, "regression drops the
+grade"). The row-by-row mapping is in
 `+docs/theory/PROOF-GRADES.adoc+`. Since 2026-11-01 the gate runs
 PROOF-POLICY §2.1's canonical invocation
 (`+--safe --without-K --cubical-compatible …+`).
