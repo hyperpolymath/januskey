@@ -170,8 +170,10 @@ receipt is `+superseded+`: that run used `+lean+` directly, and §8.2 names
 `+lean+` under `+lake+` (owner ruling 2026-11-17). The legs now build under
 `+lake+`. The Rocq receipt is `+superseded+` too: moving the Lean legs under
 `+lake+` changed `+scripts/check-recheck.sh+`, the checker both legs run
-through, and a changed checker re-earns the receipt. Once a run of both legs on
-`+main+` is recorded, the reader derives `+PWG-1+` again. §8.2 accepts "a pinned
+through, and a changed checker re-earns the receipt. `+PWG-1+` needs all three
+witnesses receipted at one source commit, so once one run on `+main+` that
+checks Agda, Rocq and Lean together
+is recorded as the new source commit, the reader derives `+PWG-1+` again. §8.2 accepts "a pinned
 kernel run in CI" on the same terms as a checker service, and the owner ruled
 on 2026-11-16 that pinned means a digest-pinned image: a fresh runner with
 version pins is not enough (hyperpolymath/januskey#184). The Agda job has

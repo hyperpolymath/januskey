@@ -233,8 +233,12 @@ checker both legs run through, and a changed checker re-earns the receipt
 (§Reporting rules below). The Rocq steps of the script are byte-identical, but
 the rule is about the checker, not about which of its lines changed. With no
 current Rocq or Lean receipt neither leg counts, so the reader derives `PWG-3`
-(Agda only). The first run of both legs on `main` after that change will be
-recorded, and the reader will derive `PWG-1` again. No witness in another foundation exists, so
+(Agda only). `PWG-1` needs all three witnesses receipted at one source commit.
+So the first run on `main` after that change that checks Agda, Rocq and Lean
+together will be recorded as the receipt's new source commit, and the reader
+will derive `PWG-1` again. Recording only the Rocq and Lean legs of a later run
+would leave Agda receipted at `e8deeaf`, and the reader would not derive `PWG-1`. No witness in
+another foundation exists, so
 `foundation_diverse` is false throughout.
 
 === What the grade rests on
@@ -263,7 +267,8 @@ builds with `lake build`.
 So the Rocq and Lean rows of the run at `e8deeaf` are both `superseded` in the
 receipt: the run was outside a pinned image, the Lean legs ran directly, and
 the change that moved them under `lake` edited the script both legs run
-through. The grade is `PWG-3` until a run of both legs on `main`, in the pinned
+through. The grade is `PWG-3` until one run on `main` of all three witnesses,
+with the Rocq and Lean legs in the pinned
 image and under `lake`, is recorded.
 
 How the provers are installed is §6's concern, not §8.2's. None is installed
@@ -393,9 +398,10 @@ repeated the counts, and the two copies drifted apart.
 ==== Leg records (PROOF-POLICY §8.5)
 
 Every theory row now has both recheck legs, re-proved by hand, so one record
-serves all five. `pwg: 2i` for each, derived by the reader. Run 43945986467 at
-`e8deeaf` checked all three witnesses of every row, but its Lean receipt is
-`superseded` because that run did not use `lake`.
+serves all five. `pwg: 3` for each, derived by the reader. Run 43945986467 at
+`e8deeaf` checked all three witnesses of every row, but its Rocq and Lean
+receipts are `superseded` (§What the grade rests on above), so only the Agda
+leg counts.
 `foundation_diverse: false` throughout.
 
 [cols="1,1,1,1,3",options="header"]
