@@ -14,8 +14,8 @@ workflows:
         - 'actions/deploy-pages@v5.0.1'
         - 'actions/upload-pages-artifact@v5.0.0'
         - 'haskell-actions/setup@v2.12.1'
-    '.github/workflows/codeql.yml':
-        - 'metadatastician/standards@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12'
+    '.github/workflows/ci.yml':
+        - 'actions/checkout@v7.0.1'
     '.github/workflows/dashboard-check.yml':
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@v1'
@@ -29,20 +29,10 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@v1'
         - 'swatinem/rust-cache@v2.9.3'
-    '.github/workflows/governance.yml':
-        - 'metadatastician/standards@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12'
-    '.github/workflows/hypatia-scan.yml':
-        - 'metadatastician/standards@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12'
     '.github/workflows/idris-abi.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/label-triage.yml': []
     '.github/workflows/labels.yml': []
-    '.github/workflows/mirror.yml':
-        - 'metadatastician/standards@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12'
-    '.github/workflows/rust-ci.yml':
-        - 'metadatastician/standards@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12'
-    '.github/workflows/scorecard.yml':
-        - 'metadatastician/standards@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12'
     '.github/workflows/secret-scanner.yml':
         - 'metadatastician/standards@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12'
     '.github/workflows/squabble.yml':
