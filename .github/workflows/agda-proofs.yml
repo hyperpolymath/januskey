@@ -96,6 +96,7 @@ jobs:
         run: |
           test "$(coqc --version | head -1)" = 'The Coq Proof Assistant, version 8.18.0'
           lean --version | grep -q "^Lean (version ${LEAN_VERSION}, "
+          lake --version | grep -qF "(Lean version ${LEAN_VERSION})"
       - name: Recheck legs, no axioms, expected rejections
         run: bash scripts/check-recheck.sh
   receipt:

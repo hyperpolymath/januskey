@@ -108,7 +108,7 @@ agda|$u/40867211509|4afb710e86646658f667f10bd6274ee47416bfc7|$agda_checker|agda 
 rocq|$u/43945986467|$e|$rocq_checker|$(receipt_invocation rocq)|2f9a91ec283573822579d64feb5db2faf4d028e5597578c25b14b8ff865e5824|4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK|current||
 rocq|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$rocq_checker|$rocq_t1|2e86900da60f3e8cde1198f69fc6f7b0b9d73c5fe0ab2ae42f7b66ef1b7fd50d|$rocq_said_t1|superseded|T-1's leg only, under the gate before hyperpolymath/januskey#180; replaced by the run at #180's merge|
 rocq|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$rocq_checker|$rocq_t1|2e86900da60f3e8cde1198f69fc6f7b0b9d73c5fe0ab2ae42f7b66ef1b7fd50d|$rocq_said_t1|superseded|the first run on main (hyperpolymath/januskey#171); replaced by the run at the receipt's source commit|
-lean|$u/43945986467|$e|$lean_checker|$(receipt_invocation lean)|7146f3dce43d6160bb2d902d56984ac5fbccf8880b7336127b4cb7568da5db1f|4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK|current||
+lean|$u/43945986467|$e|$lean_checker|lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)|7146f3dce43d6160bb2d902d56984ac5fbccf8880b7336127b4cb7568da5db1f|4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK|superseded|ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake|
 lean|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$lean_checker|$lean_t1|2b89f7de00ec28537f8c1dd66d771048a3ee649183ed12c04f1d51b4246d37a8|$lean_said_t1|superseded|T-1's leg only, under the gate before hyperpolymath/januskey#180; replaced by the run at #180's merge|
 lean|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$lean_checker|$lean_t1|2b89f7de00ec28537f8c1dd66d771048a3ee649183ed12c04f1d51b4246d37a8|$lean_said_t1|superseded|the first run on main (hyperpolymath/januskey#171); replaced by the run at the receipt's source commit|
 ROWS
@@ -157,7 +157,7 @@ receipt_invocation() {
   case "$1" in
     agda) printf '%s\n' "$agda_flags verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)" ;;
     rocq) printf '%s\n' 'coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)' ;;
-    lean) printf '%s\n' 'lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)' ;;
+    lean) printf '%s\n' 'lake build in a copy of verification/proofs/lean (lakefile.toml, lean-toolchain and Epistemic, Reversibility, Rollback, SingleActiveLog; scripts/check-recheck.sh)' ;;
     *) receipt_die "unknown prover: $1" ;;
   esac
 }
@@ -167,12 +167,13 @@ receipt_invocation() {
 #        prover), and scripts/fetch-siblings.sh, which holds the sibling's
 #        pin, so a repin changes this digest.  No libraries file is read.
 #  rocq: the .v files of verification/proofs/rocq.
-#  lean: the .lean files of verification/proofs/lean (no lakefile is used).
+#  lean: the .lean files of verification/proofs/lean and its Lake package
+#        files (lakefile.toml, lean-toolchain), which the build reads.
 receipt_inputs() {
   case "$1" in
     agda) git ls-files -- 'verification/proofs/agda/*.agda'; printf '%s\n' scripts/fetch-siblings.sh ;;
     rocq) git ls-files -- 'verification/proofs/rocq/*.v' ;;
-    lean) git ls-files -- 'verification/proofs/lean/*.lean' ;;
+    lean) git ls-files -- 'verification/proofs/lean/*.lean' verification/proofs/lean/lakefile.toml verification/proofs/lean/lean-toolchain ;;
     *) receipt_die "unknown prover: $1" ;;
   esac
 }
