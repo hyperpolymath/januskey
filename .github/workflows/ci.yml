@@ -21,11 +21,13 @@ jobs:
     permissions:
       contents: read
   rust-ci:
-    uses: ./.github/workflows/rust-ci.yml
+    # Called directly, not through rust-ci.yml: the suite reads the pin back
+    # from the top-level workflow file (this one). See rust-ci.yml's header.
+    # Keep this SHA identical to the one in rust-ci.yml. Its jobs ask for
+    # contents: read only; granting less is a startup_failure.
     permissions:
-      actions: read
       contents: read
-      security-events: write
+    uses: hyperpolymath/proven-cicd-and-workflows/.github/workflows/rust-ci.yml@9eb0bbf9bd80b7964ce5b9957e75821b3cd4a55b # cicd-suite main
   dashboard-check:
     uses: ./.github/workflows/dashboard-check.yml
     permissions:
