@@ -13,7 +13,7 @@ repository, and none is introduced here.
 [NOTE]
 ====
 *PWG census, theory theorems of this repository (denominator 5):*
-`PWG-1` 0 · `PWG-2ii` 0 · `PWG-2i` 5 (G-1, T-1, T-2, T-3, E-1m) · `PWG-3` 0 ·
+`PWG-1` 0 · `PWG-2ii` 0 · `PWG-2i` 0 · `PWG-3` 5 (G-1, T-1, T-2, T-3, E-1m) ·
 `ungraded` 0. `+foundation-diverse`: none. Axioms: none, in any of the three
 provers. Derived by the pinned standards reader from
 `verification/receipts/januskey_praxis.deed` (§The machine-readable receipt
@@ -221,15 +221,20 @@ Earlier receipts, kept with their lineage (§8.4) here and in the receipt file:
 Those are the facts the grades rest on. The propositions type-check in Agda
 under the §2.1 invocation, in CI, at a named commit, with the prover version
 pinned and the import cone recorded (`PWG-3`). Each of the five rows has a Rocq
-leg and a Lean leg, re-proved and reconciled (§The recheck legs below), and every
-counted witness has a current receipt from a pinned CI checker run on the
-receipt's source commit itself. The Lean receipt from that run is now
+leg and a Lean leg, re-proved and reconciled (§The recheck legs below), and each
+of the three provers has a receipt from a pinned CI checker run on the
+receipt's source commit itself. Only the Agda receipt is still current. The
+Lean receipt from that run is now
 `superseded`: the legs ran `lean` directly, and the owner ruled on 2026-11-17
 that §8.2's "`lean` under `lake`" means what it says (§What the grade rests on
-below). With no current Lean receipt the Lean leg does not count, so the reader
-derives `PWG-2i` (Agda and Rocq). The legs now run under `lake`; the first
-run of them on `main` will be recorded, and the reader will derive `PWG-1`
-again. No witness in another foundation exists, so
+below). The Rocq receipt from that run is `superseded` as well. The change
+that moved the Lean legs under `lake` edited `scripts/check-recheck.sh`, the
+checker both legs run through, and a changed checker re-earns the receipt
+(§Reporting rules below). The Rocq steps of the script are byte-identical, but
+the rule is about the checker, not about which of its lines changed. With no
+current Rocq or Lean receipt neither leg counts, so the reader derives `PWG-3`
+(Agda only). The first run of both legs on `main` after that change will be
+recorded, and the reader will derive `PWG-1` again. No witness in another foundation exists, so
 `foundation_diverse` is false throughout.
 
 === What the grade rests on
@@ -247,8 +252,9 @@ until 2026-11-17 the legs ran `lean` directly on single files, and §8.2 names
 `lean` under `lake`. The owner ruled that a direct run does not qualify. The
 legs are now a Lake package (`verification/proofs/lean/lakefile.toml`) that
 `scripts/check-recheck.sh` builds with `lake build`. The direct run at
-`e8deeaf` is `superseded` in the receipt, and the grade is `PWG-2i` until a
-run under `lake` on `main` is recorded.
+`e8deeaf` is `superseded` in the receipt. So is the Rocq run at `e8deeaf`,
+because the same change edited the script both legs run through. The grade is
+`PWG-3` until a run of both legs on `main` is recorded.
 
 How the provers are installed is §6's concern, not §8.2's. None is installed
 through a Guix manifest or the repo's own container, so each is a recorded
