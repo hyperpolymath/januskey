@@ -30,7 +30,7 @@ wf=.github/workflows/ci.yml
 # drift WORKFLOW: prints "jobs|needs"; equal and non-empty means no drift.
 drift() {
   local j n
-  j="$(sed -n '/^jobs:/,$ s/^  \([A-Za-z_][A-Za-z0-9_-]*\):$/\1/p' "$1" | grep -vx 'gate' | sort | tr '\n' ' ')"
+  j="$(sed -n '/^jobs:/,$ s/^  \([A-Za-z_][A-Za-z0-9_-]*\):[[:space:]]*\(#.*\)\{0,1\}$/\1/p' "$1" | grep -vx 'gate' | sort | tr '\n' ' ')"
   n="$(sed -n 's/^    needs: \[\(.*\)\]$/\1/p' "$1" | tr -d ',' | tr ' ' '\n' | sort | tr '\n' ' ')"
   echo "$j|$n"
 }
@@ -41,6 +41,11 @@ mut="$(mktemp)"
 sed 's/^  gate:$/  integration_tests:\n    runs-on: ubuntu-latest\n  gate:/' "$wf" > "$mut"
 d="$(drift "$mut")"; rm -f "$mut"
 if [ "${d%%|*}" != "${d#*|}" ]; then echo "ok   drift check catches an underscore job missing from needs"; else echo "FAIL drift check missed integration_tests"; fail=1; fi
+# Mutation: a job header with an inline comment (valid YAML) must be detected too.
+mut="$(mktemp)"
+sed 's/^  gate:$/  smoke: # quick suite\n    runs-on: ubuntu-latest\n  gate:/' "$wf" > "$mut"
+d="$(drift "$mut")"; rm -f "$mut"
+if [ "${d%%|*}" != "${d#*|}" ]; then echo "ok   drift check catches a commented job header missing from needs"; else echo "FAIL drift check missed a commented job header"; fail=1; fi
 grep -q '^    name: CI/gate$' "$wf" && echo "ok   job name is exactly CI/gate" || { echo "FAIL job name"; fail=1; }
 grep -q '^    if: \${{ always() }}$' "$wf" && echo "ok   gate runs always()" || { echo "FAIL gate lacks always()"; fail=1; }
 
