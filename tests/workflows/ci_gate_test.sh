@@ -20,11 +20,27 @@ chk "one cancelled fails"     1 '{"a":{"result":"success"},"b":{"result":"cancel
 chk "one skipped fails"       1 '{"a":{"result":"success"},"b":{"result":"skipped"}}'
 chk "empty needs fails"       1 '{}'
 chk "malformed fails"         1 'not json'
+chk "array input fails"       1 '[{"result":"success"}]'
+chk "string input fails"      1 '"x"'
+chk "number input fails"      1 '3'
+chk "null input fails"        1 'null'
+chk "underscore job passes"   0 '{"integration_tests":{"result":"success"}}'
 
 wf=.github/workflows/ci.yml
-jobs="$(sed -n '/^jobs:/,$ s/^  \([a-z0-9-]*\):$/\1/p' "$wf" | grep -vx 'gate' | sort | tr '\n' ' ')"
-needs="$(sed -n 's/^    needs: \[\(.*\)\]$/\1/p' "$wf" | tr -d ',' | tr ' ' '\n' | sort | tr '\n' ' ')"
+# drift WORKFLOW: prints "jobs|needs"; equal and non-empty means no drift.
+drift() {
+  local j n
+  j="$(sed -n '/^jobs:/,$ s/^  \([A-Za-z_][A-Za-z0-9_-]*\):$/\1/p' "$1" | grep -vx 'gate' | sort | tr '\n' ' ')"
+  n="$(sed -n 's/^    needs: \[\(.*\)\]$/\1/p' "$1" | tr -d ',' | tr ' ' '\n' | sort | tr '\n' ' ')"
+  echo "$j|$n"
+}
+d="$(drift "$wf")"; jobs="${d%%|*}"; needs="${d#*|}"
 if [ -n "$jobs" ] && [ "$jobs" = "$needs" ]; then echo "ok   gate needs every other job ($needs)"; else echo "FAIL needs drift: jobs=[$jobs] needs=[$needs]"; fail=1; fi
+# Mutation: an underscore-named job absent from gate.needs must be detected.
+mut="$(mktemp)"
+sed 's/^  gate:$/  integration_tests:\n    runs-on: ubuntu-latest\n  gate:/' "$wf" > "$mut"
+d="$(drift "$mut")"; rm -f "$mut"
+if [ "${d%%|*}" != "${d#*|}" ]; then echo "ok   drift check catches an underscore job missing from needs"; else echo "FAIL drift check missed integration_tests"; fail=1; fi
 grep -q '^    name: CI/gate$' "$wf" && echo "ok   job name is exactly CI/gate" || { echo "FAIL job name"; fail=1; }
 grep -q '^    if: \${{ always() }}$' "$wf" && echo "ok   gate runs always()" || { echo "FAIL gate lacks always()"; fail=1; }
 

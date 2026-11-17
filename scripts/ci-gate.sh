@@ -18,6 +18,7 @@ set -euo pipefail
 command -v jq >/dev/null 2>&1 || { echo "ci-gate: jq is required" >&2; exit 2; }
 [ -n "${NEEDS_JSON:-}" ] || { echo "ci-gate: NEEDS_JSON is not set" >&2; exit 2; }
 
+jq -e 'type == "object"' <<<"$NEEDS_JSON" >/dev/null 2>&1 || { echo "::error::ci-gate: NEEDS_JSON is not a JSON object"; exit 1; }
 total="$(jq -e 'length' <<<"$NEEDS_JSON")" || { echo "::error::ci-gate: NEEDS_JSON is not a JSON object"; exit 1; }
 if [ "$total" -eq 0 ]; then
   echo "::error::CI/gate aggregates no jobs (denominator = 0); refusing to pass."
