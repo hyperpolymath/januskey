@@ -166,14 +166,54 @@ which is why no Rust row is proved.
 
 All five rows are `+PWG-1+`: their Rocq and Lean legs are re-proved and
 reconciled, and all three witnesses of each have current receipts from pinned CI
-checkers run on the receipt's source commit (§8.2). The Rocq and Lean checkers
-run on a CI runner, not in a digest-pinned container; if §8.2's "isolated"
-requires one (an open owner question), the five fall back to `+PWG-2ii+`. A later change to a leg's inputs makes the receipt stale (the CI job
+checkers run on the receipt's source commit (§8.2). §8.2 accepts "a pinned
+kernel run in CI" on the same terms as a checker service, so the CI runner
+needs no digest-pinned container of its own. How the three provers are
+installed is a separate matter, §6's, recorded under "Toolchain deviations"
+below. A later change to a leg's inputs makes the receipt stale (the CI job
 warns), and the grade then holds for `+e8deeaf+` until a run of the new commit is
 recorded (§8.4, "regression drops the grade"). The row-by-row mapping is in
 `+docs/theory/PROOF-GRADES.adoc+`. Since 2026-11-01 the gate runs
 PROOF-POLICY §2.1's canonical invocation
 (`+--safe --without-K --cubical-compatible …+`).
+
+=== Toolchain deviations (PROOF-POLICY §6)
+
+§6 asks CI to install proof toolchains through the repo's Guix manifest or its
+container, and to record a `deviation` for any other route. januskey has
+neither a Guix manifest nor a container for its provers, so all three CI legs
+are deviations. Each install below downloads the named packages, refuses them
+unless their SHA-256 matches, installs exactly those files, and then asserts the
+version it got (`+.github/workflows/agda-proofs.yml+`, which carries the same
+digests). The digests are the archives' own, checked on 2026-11-17 against the
+downloaded packages.
+
+[cols="1,2,4,1", options="header"]
+|===
+| ID | Leg | Tool, version, digest of what is installed | State
+
+| D-1
+| Agda (the source leg of G-1, T-1, T-2, T-3, E-1m), job `+proofs+`
+| Debian trixie `+agda-bin=2.6.4.3-1+b2+` (SHA-256 `+31052ce0b53e9cf061c9386a0416525318a66bbd1bfaa4bef93f0f43dec8b748+`) and `+libghc-agda-dev=2.6.4.3-1+b2+`, which ships `+Agda.Primitive+` (SHA-256 `+58d8551bec42796d2aa9f6baaa253eb23095e118869fe235be6d4aa2e130ce60+`), in `+debian:trixie-slim@sha256:a29215f6…+`
+| `open`
+
+| D-2
+| Rocq (the re-proved leg of all five), job `+recheck+`
+| Ubuntu noble `+coq=8.18.0+dfsg-1build2+` (SHA-256 `+22897a17a75d8930276f5eedd5cd29ac940f1ab4d4661b6a49ccc63577e54d3b+`), `+libcoq-core-ocaml+` with the kernel (SHA-256 `+027c8fb39db20de4910f8a75e0b9a32c0fbc27c6f532375ed7604757f71c12a9+`) and `+libcoq-stdlib+` with `+Init+` (SHA-256 `+af139bb3af8c71b5e991944a61eef5bba28038a715f71146fa046241bb614b23+`), all `+8.18.0+dfsg-1build2+`, on `+ubuntu-24.04+`
+| `open`
+
+| D-3
+| Lean (the re-proved leg of all five), job `+recheck+`
+| Upstream release `+lean-4.35.0-linux.tar.zst+` (SHA-256 `+7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d+`), on `+ubuntu-24.04+`
+| `open`
+|===
+
+Why not Guix or a container: the repository has not had a Guix manifest or a
+prover container, and whether Guix packages these exact versions (Agda
+2.6.4.3, Coq 8.18.0, Lean 4.35.0) has not been checked. A Guix manifest is
+the planned route, with one digest-pinned container as the fallback. A
+deviation closes when its job installs from either, and its state then
+names the change that closed it.
 
 === Current State
 

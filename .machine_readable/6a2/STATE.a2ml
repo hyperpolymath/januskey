@@ -50,12 +50,12 @@ total = "144 tests + 5 benchmark groups + 12 PROVEN ledger rows — as declared 
 # Proof Witness Grades, standards 3-practice/PROOF-POLICY.adoc §8 (the
 # Mathesis brief's §5/§6 ladder, adopted with corrections). Never a
 # percentage. Receipts, lineage and per-row records: docs/theory/PROOF-GRADES.adoc.
-grade-3 = "derived from verification/receipts/januskey_praxis.deed by the pinned standards reader: PWG-1 for G-1, T-1, T-2, T-3, E-1m (Agda, Rocq and Lean receipts at e8deeaf, run 43945986467) — census 5 of 5 theory theorems (G-3 and T-10 are engineering under PROOF-POLICY §1; T-2 and T-3 are stated over the abstract SingleActiveLog); PWG-2ii if §8.2 'isolated' is read as a digest-pinned container (open owner question)"
+grade-3 = "derived from verification/receipts/januskey_praxis.deed by the pinned standards reader: PWG-1 for G-1, T-1, T-2, T-3, E-1m (Agda, Rocq and Lean receipts at e8deeaf, run 43945986467) — census 5 of 5 theory theorems (G-3 and T-10 are engineering under PROOF-POLICY §1; T-2 and T-3 are stated over the abstract SingleActiveLog)"
 receipt-commit = "verification/receipts/januskey_praxis.deed: source commit e8deeaf, run 43945986467; earlier runs superseded (see docs/theory/PROOF-GRADES.adoc)"
 receipt-prover = "Agda 2.6.4.3 (agda-bin=2.6.4.3-1+b2); no standard library; resource-algebra pinned at cf9235c"
 receipt-flags = "--safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check (PROOF-POLICY §2.1 canonical, plus two stricter flags)"
 not-graded = "the 7 Idris2 PROVEN rows (ABI/interface contracts, PROOF-POLICY §8.1); all 33 TESTED rows (observed behaviour); ASSUMED/DESIGNED/OPEN rows"
-open-obligations = "owner ruling on whether the Rocq and Lean CI runner counts as isolated for PWG-1 (PROOF-POLICY §8.2); no Creusot or Verus proof on the Rust, so no Rust behaviour is proved"
+open-obligations = "PROOF-POLICY §6 toolchain deviations D-1 to D-3 open (provers installed from Debian, Ubuntu and the Lean release, digest-checked; no Guix manifest or repo container yet, see PROOF-NEEDS.adoc); no Creusot or Verus proof on the Rust, so no Rust behaviour is proved"
 claimed-higher = "PWG-1 for all five theory rows, as derived from the receipt; no foundation-diverse witness"
 
 [test-categories-complete]

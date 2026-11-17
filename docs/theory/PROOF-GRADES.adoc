@@ -221,15 +221,24 @@ checker run on the receipt's source commit itself, so the reader derives `PWG-1`
 
 === What `PWG-1` rests on
 
-`PWG-1` needs every counted witness checked by a pinned checker, isolated, on
-the receipt's source commit (§8.2). The Agda checker runs in a container pinned
-by digest. The Rocq checker is `coq=8.18.0+dfsg-1build2` on an ephemeral
-`ubuntu-24.04` runner, and Lean is the release tarball checked by SHA-256, also
-on that runner; neither runs in a digest-pinned container. The reader accepts
-that, as it does for secret-types' `PWG-1` receipt. If the owner reads §8.2's
-"isolated" as requiring a digest-pinned container (an open question since
-hyperpolymath/januskey#181), all five rows fall back to `PWG-2ii` until the
-Rocq and Lean jobs move into one. A recheck would not change what these modules
+`PWG-1` needs every counted witness checked by "a headless, isolated, pinned
+checker run on the exact source commit" (§8.2). §8.2 settles what that means
+for CI: "A pinned kernel run in CI (`agda`, `rocq compile` or `coqc`, `lean`
+under `lake`) qualifies on the same terms." The Agda checker runs in a
+container pinned by digest. The Rocq checker is `coq=8.18.0+dfsg-1build2` on an
+ephemeral `ubuntu-24.04` runner, and Lean is the release tarball checked by
+SHA-256, also on that runner. Each is a pinned kernel run in CI, so the
+question left open in hyperpolymath/januskey#181 (whether the runner needed a
+digest-pinned container) is answered by the policy text, and the five rows stay
+`PWG-1`. One residual difference: §8.2 names `lean` under `lake`, and the legs
+run `lean` directly on single files with no packages, which `lake` would only
+wrap.
+
+How the provers are installed is §6's concern, not §8.2's. None is installed
+through a Guix manifest or the repo's own container, so each is a recorded
+deviation (D-1 Agda, D-2 Rocq, D-3 Lean; PROOF-NEEDS.adoc, "Toolchain
+deviations"), and CI refuses any package whose SHA-256 differs from the one
+recorded. A recheck would not change what these modules
 prove: §2.2 is explicit that compiling in a second prover does not establish the
 same proposition unless the correspondence is checked too, which is why each leg
 carries its statement comparison.
