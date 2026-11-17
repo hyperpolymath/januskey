@@ -117,17 +117,25 @@ also the ledger's recorded checker for rows G-1, T-1, T-2, T-3 and E-1m.
 === The machine-readable receipt
 
 The receipt of record is `verification/receipts/januskey_praxis.deed`, a praxis
-deed with `:profile proof-receipt` (PROOF-POLICY §8.5.1). `scripts/proof-receipt.sh`
-writes it from two typed ledgers (the claims and the CI runs, each run copied
-from its log) and from git: the input set of each leg, every file's SHA-256 and
-the §8.5.1 digest are computed, never typed. `just test-receipt`, and the
-`agda-proofs.yml` job "Proof receipt, derived grades, git checks", regenerate it
-and refuse any difference, run the standards reader pinned by commit and
-SHA-256 (it derives every grade and refuses one the receipts do not support),
-run the §8.5.3 git checks (each manifest holds at its commit, the
-`resource-algebra` import holds at its pin, and the source commit is on `main`),
-and warn when a leg's inputs have changed since the receipt's source commit.
-This page is the human reading of that file.
+deed with `:profile proof-receipt` (PROOF-POLICY §8.5.1). It is written by the
+estate's shared generator (standards `scripts/proof-receipt.sh`), which
+`scripts/proof-receipt.sh` here fetches with the reader, the reference digest and
+the §8.5.3 checker at one standards commit, each checked against its SHA-256.
+The home script holds only januskey's own data: the claim list, the run ledger
+(each run copied from its log), the run scopes (a superseded run is listed only
+under the claims it checked), and the hooks naming each leg's invocation and
+input set. Every file's SHA-256 and every §8.5.1 digest are computed from git,
+never typed; a superseded run's digest is the reference digest of its leg's
+inputs at that run's commit. `just test-receipt`, and the `agda-proofs.yml` job
+"Proof receipt, derived grades, git checks", regenerate the receipt and refuse
+any difference, run the §8.5.3 git checks (each manifest holds at its commit,
+the `resource-algebra` import holds at its pin, and the source commit is on
+`main`), and run the pinned reader, which derives every grade and refuses one
+the receipts do not support, with a negative control. They also refuse a
+receipt whose current runs no longer describe the tree: a change to a leg's
+inputs must record a new run, or mark the current one `superseded` or
+`regressed`, which drops the grade until a new run is recorded (§8.4). This
+page is the human reading of that file.
 
 The receipt describes commit `e8deeaf7bc7b70500d57c282828512c8f8ba81f9` on `main`,
 the merge of hyperpolymath/januskey#180, which added the Rocq and Lean legs of
