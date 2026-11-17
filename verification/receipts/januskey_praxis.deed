@@ -79,7 +79,7 @@
                :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
                :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
                :state superseded
-               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change"))
+               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
@@ -87,7 +87,7 @@
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake")))
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")))
   (claim :id "T-1" :pwg PWG-3 :foundation-diverse #f
     (leg :prover agda :route source :token proven :state AGDA-VERIFIED
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
@@ -150,7 +150,7 @@
                :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
                :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
                :state superseded
-               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change")
+               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")
       ; the run reported: 1 rocq leg checks with no assumptions (Rollback); the job refused its 2 fixtures (1 Rocq, 1 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43213340167"
                :commit "b5034884dbe945139d03b38fe80cfdf1106a77e1"
@@ -172,7 +172,7 @@
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake")
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")
       ; the run reported: 1 lean leg checks with no axioms (Rollback); the job refused its 2 fixtures (1 Rocq, 1 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43213340167"
                :commit "b5034884dbe945139d03b38fe80cfdf1106a77e1"
@@ -249,7 +249,7 @@
                :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
                :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
                :state superseded
-               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change"))
+               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
@@ -257,7 +257,7 @@
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake")))
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")))
   (claim :id "T-3" :pwg PWG-3 :foundation-diverse #f
     (leg :prover agda :route source :token proven :state AGDA-VERIFIED
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
@@ -320,7 +320,7 @@
                :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
                :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
                :state superseded
-               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change"))
+               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
@@ -328,7 +328,7 @@
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake")))
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")))
   (claim :id "E-1m" :pwg PWG-3 :foundation-diverse #f
     (leg :prover agda :route source :token proven :state AGDA-VERIFIED
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
@@ -384,7 +384,7 @@
                :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
                :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
                :state superseded
-               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change"))
+               :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
@@ -392,5 +392,5 @@
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake")))
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")))
 )

@@ -240,21 +240,31 @@ recorded, and the reader will derive `PWG-1` again. No witness in another founda
 === What the grade rests on
 
 `PWG-1` needs every counted witness checked by "a headless, isolated, pinned
-checker run on the exact source commit" (§8.2). §8.2 settles what that means
-for CI: "A pinned kernel run in CI (`agda`, `rocq compile` or `coqc`, `lean`
-under `lake`) qualifies on the same terms." The Agda checker runs in a
-container pinned by digest. The Rocq checker is `coq=8.18.0+dfsg-1build2` on an
-ephemeral `ubuntu-24.04` runner, and Lean is the release tarball checked by
-SHA-256, also on that runner. The Agda and Rocq runs are pinned kernel runs in CI, so the question left
-open in hyperpolymath/januskey#181 (whether the runner needed a
-digest-pinned container) is answered by the policy text. Lean is different:
-until 2026-11-17 the legs ran `lean` directly on single files, and §8.2 names
-`lean` under `lake`. The owner ruled that a direct run does not qualify. The
-legs are now a Lake package (`verification/proofs/lean/lakefile.toml`) that
-`scripts/check-recheck.sh` builds with `lake build`. The direct run at
-`e8deeaf` is `superseded` in the receipt. So is the Rocq run at `e8deeaf`,
-because the same change edited the script both legs run through. The grade is
-`PWG-3` until a run of both legs on `main` is recorded.
+checker run on the exact source commit" (§8.2). §8.2 adds: "A pinned kernel
+run in CI (`agda`, `rocq compile` or `coqc`, `lean` under `lake`) qualifies on
+the same terms." The owner ruled on 2026-11-16 what "pinned" and "isolated"
+require (hyperpolymath/januskey#184, which answers the question left open in
+hyperpolymath/januskey#181): the checker must run in a digest-pinned image.
+A fresh runner with version and SHA-256 pins is not enough.
+
+The Agda checker has always run in a container pinned by digest. At `e8deeaf`
+the Rocq and Lean checkers ran on an ephemeral `ubuntu-24.04` runner, outside
+any pinned image, so that run cannot earn `PWG-1` for those legs. Since #184
+the recheck job runs in `ubuntu:24.04` pinned by digest, with
+`coq=8.18.0+dfsg-1build2` and the Lean release tarball checked by SHA-256
+inside it.
+
+Lean has a second condition. Until 2026-11-17 the legs ran `lean` directly on
+single files, and §8.2 names `lean` under `lake`. The owner ruled that a direct
+run does not qualify. The legs are now a Lake package
+(`verification/proofs/lean/lakefile.toml`) that `scripts/check-recheck.sh`
+builds with `lake build`.
+
+So the Rocq and Lean rows of the run at `e8deeaf` are both `superseded` in the
+receipt: the run was outside a pinned image, the Lean legs ran directly, and
+the change that moved them under `lake` edited the script both legs run
+through. The grade is `PWG-3` until a run of both legs on `main`, in the pinned
+image and under `lake`, is recorded.
 
 How the provers are installed is §6's concern, not §8.2's. None is installed
 through a Guix manifest or the repo's own container, so each is a recorded

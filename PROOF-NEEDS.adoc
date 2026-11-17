@@ -172,8 +172,12 @@ receipt is `+superseded+`: that run used `+lean+` directly, and §8.2 names
 `+lake+` changed `+scripts/check-recheck.sh+`, the checker both legs run
 through, and a changed checker re-earns the receipt. Once a run of both legs on
 `+main+` is recorded, the reader derives `+PWG-1+` again. §8.2 accepts "a pinned
-kernel run in CI" on the same terms as a checker service, so the CI runner
-needs no digest-pinned container of its own. How the three provers are
+kernel run in CI" on the same terms as a checker service, and the owner ruled
+on 2026-11-16 that pinned means a digest-pinned image: a fresh runner with
+version pins is not enough (hyperpolymath/januskey#184). The Agda job has
+always run in one, and the recheck job does since #184. The run at `+e8deeaf+`
+predates that for Rocq and Lean, which is a further reason its receipts for
+those legs are `+superseded+`. How the three provers are
 installed is a separate matter, §6's, recorded under "Toolchain deviations"
 below. A change to a leg's inputs fails the receipt gate until a run of the
 new inputs is recorded, or the current run is marked `+superseded+` or
@@ -205,12 +209,12 @@ downloaded packages.
 
 | D-2
 | Rocq (the re-proved leg of all five), job `+recheck+`
-| Ubuntu noble `+coq=8.18.0+dfsg-1build2+` (SHA-256 `+22897a17a75d8930276f5eedd5cd29ac940f1ab4d4661b6a49ccc63577e54d3b+`), `+libcoq-core-ocaml+` with the kernel (SHA-256 `+027c8fb39db20de4910f8a75e0b9a32c0fbc27c6f532375ed7604757f71c12a9+`) and `+libcoq-stdlib+` with `+Init+` (SHA-256 `+af139bb3af8c71b5e991944a61eef5bba28038a715f71146fa046241bb614b23+`), all `+8.18.0+dfsg-1build2+`, on `+ubuntu-24.04+`
+| Ubuntu noble `+coq=8.18.0+dfsg-1build2+` (SHA-256 `+22897a17a75d8930276f5eedd5cd29ac940f1ab4d4661b6a49ccc63577e54d3b+`), `+libcoq-core-ocaml+` with the kernel (SHA-256 `+027c8fb39db20de4910f8a75e0b9a32c0fbc27c6f532375ed7604757f71c12a9+`) and `+libcoq-stdlib+` with `+Init+` (SHA-256 `+af139bb3af8c71b5e991944a61eef5bba28038a715f71146fa046241bb614b23+`), all `+8.18.0+dfsg-1build2+`, in the image `+ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8+` since hyperpolymath/januskey#184
 | `open`
 
 | D-3
 | Lean (the re-proved leg of all five), job `+recheck+`
-| Upstream release `+lean-4.35.0-linux.tar.zst+` (SHA-256 `+7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d+`), on `+ubuntu-24.04+`
+| Upstream release `+lean-4.35.0-linux.tar.zst+` (SHA-256 `+7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d+`), in the image `+ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8+` since hyperpolymath/januskey#184
 | `open`
 |===
 
