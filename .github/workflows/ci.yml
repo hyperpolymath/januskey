@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+name: CI
+# One entry point for the checks the `main` ruleset requires. `needs:` only
+# works inside a single workflow, so the gated workflows (agda-proofs.yml,
+# rust-ci.yml, dashboard-check.yml) are reusable (`on: workflow_call`) and are
+# called from here. They have no push/pull_request triggers of their own, so
+# nothing runs twice. `gate` is the required status check `CI/gate`: it passes
+# only if every called workflow ended `success` (scripts/ci-gate.sh). A new
+# gated workflow must be called here AND listed in the gate's `needs:`;
+# tests/workflows/ci_gate_test.sh fails if it is not.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  agda-proofs:
+    uses: ./.github/workflows/agda-proofs.yml
+    permissions:
+      contents: read
+  rust-ci:
+    uses: ./.github/workflows/rust-ci.yml
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+  dashboard-check:
+    uses: ./.github/workflows/dashboard-check.yml
+    permissions:
+      actions: read
+      contents: read
+  gate:
+    name: CI/gate
+    needs: [agda-proofs, rust-ci, dashboard-check]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: All required jobs succeeded
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: bash scripts/ci-gate.sh
