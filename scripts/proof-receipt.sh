@@ -34,7 +34,7 @@ out=verification/receipts/januskey_praxis.deed
 repo="hyperpolymath/januskey"
 # The commit the receipt describes: the main commit at which the current runs
 # below were earned.  On the default branch, so no echo is needed (§8.5.2).
-source_commit=b5034884dbe945139d03b38fe80cfdf1106a77e1
+source_commit=246b03d8888a08e9540611b3b7ddeb8052004f8e
 sibling_repo="hyperpolymath/resource-algebra"
 sibling_dir=_build/dependencies/resource-algebra
 
@@ -42,8 +42,8 @@ sibling_dir=_build/dependencies/resource-algebra
 # reference digest script and the §8.5.3 git checker, all at one commit, each
 # with its sha256.  They keep the standards layout under _build/standards,
 # because the checker finds the reader and the digest script by their paths.
-STANDARDS_COMMIT=513cba8d1f6153389685bf34375f5aeaf9bcd150
-READER_SHA256=03634a2636f6aea202d777584978f8c7d99dc3c4fea7488d1300ba372b4386bd
+STANDARDS_COMMIT=ce28e7d9a505fc35a0de9273aa7750ba0d1804be
+READER_SHA256=9ded4520daf304555021afe9f58fd2184453c97d7d329c668022426fd3ede8ca
 DIGEST_SHA256=dfc6dde01a3a79df638eebe4cad0eae584d8f17280077e149174c0667e9508f4
 CHECKER_SHA256=f2375747238464535d1b4a61f658f07cb2f8504c69bfb1812311c79429a4e23e
 STANDARDS_RAW="https://raw.githubusercontent.com/metadatastician/standards/$STANDARDS_COMMIT"
@@ -60,20 +60,24 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 # bridge, so it is engineering under §1 and has no claim here.
 claims() {
   cat <<'ROWS'
-G-1|agda
+G-1|agda rocq lean
 T-1|agda rocq lean
-T-2|agda
-T-3|agda
-E-1m|agda
+T-2|agda rocq lean
+T-3|agda rocq lean
+E-1m|agda rocq lean
 ROWS
 }
 
 # ── The run ledger ────────────────────────────────────────────────────────────
 # One row per checker run, copied from the log of the agda-proofs.yml job that
-# printed it.  One run of a leg checks every theorem of that leg, so each row
-# is a receipt of that leg for every claim that has the leg.
+# printed it (since hyperpolymath/januskey#190 those jobs run inside ci.yml,
+# so newer run ids are CI runs).  One run of a leg checks every theorem of that
+# leg, so each row is a receipt of that leg for every claim that has the leg.
 # prover | run | commit (40 hex) | checker | invocation | state | reason |
-# claims the run did not cover (space-separated; the row is left out of them)
+# claims the run did not cover (space-separated; the row is left out of them) |
+# image: the digest-pinned container the checker ran in (PROOF-POLICY §8.2,
+# :image), copied from the job's `container:`; empty when it ran on a bare
+# runner.  The reader derives PWG-1 only when every counted leg has one.
 # A current row's inputs are computed at its commit; the axioms of every
 # current row are empty, because each gate fails on any axiom (check-agda.sh:
 # --safe and the cone scan; check-recheck.sh: Print Assumptions closed,
@@ -82,18 +86,27 @@ AGDA_CHECKER='Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, contain
 AGDA_FLAGS='agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src'
 ROCQ_CHECKER='The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)'
 LEAN_CHECKER='Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)'
+# The `container:` of each job in .github/workflows/agda-proofs.yml.
+AGDA_IMAGE='debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f'
+RECHECK_IMAGE='ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8'
 runs() {
   local u=https://github.com/hyperpolymath/januskey/actions/runs
   cat <<ROWS
-agda|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|current|
-agda|$u/42736066407|e16543866fa4fd31a94f3c7faa1fe0671b083a1b|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|superseded|the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit
+agda|$u/44131609502|246b03d8888a08e9540611b3b7ddeb8052004f8e|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|current|||$AGDA_IMAGE
+agda|$u/43945986467|e8deeaf7bc7b70500d57c282828512c8f8ba81f9|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|superseded|replaced by run 44131609502 at the receipt's source commit (hyperpolymath/januskey#184 changed only the recheck job, so the Agda inputs are the same at both commits)
+agda|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|superseded|replaced by run 43945986467 at the receipt's source commit (the Agda inputs are the same at both commits)
+agda|$u/42736066407|e16543866fa4fd31a94f3c7faa1fe0671b083a1b|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)|superseded|the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by run 43213340167 at a later commit
 agda|$u/42076969251|23bc8c38160a25c37917bce69cf05d91899b07e5|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)|superseded|before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171)
 agda|$u/41687715055|fc188c44906faedfe91bfd414be3fda01ff4caf4|$AGDA_CHECKER|$AGDA_FLAGS verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)|superseded|canonical flags and three modules; replaced by run 42076969251 at a later commit
 agda|$u/40867211509|4afb710e86646658f667f10bd6274ee47416bfc7|$AGDA_CHECKER|agda --safe --without-K (before --cubical-compatible joined the gate)|superseded|before --cubical-compatible and before Epistemic.agda; it never covered E-1m, so it is listed for the other claims only|E-1m
-rocq|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$ROCQ_CHECKER|coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)|current|
-rocq|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$ROCQ_CHECKER|coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)|superseded|the first run on main (hyperpolymath/januskey#171); replaced by the run at the receipt's source commit
-lean|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$LEAN_CHECKER|lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)|current|
-lean|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$LEAN_CHECKER|lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)|superseded|the first run on main (hyperpolymath/januskey#171); replaced by the run at the receipt's source commit
+rocq|$u/44131609502|246b03d8888a08e9540611b3b7ddeb8052004f8e|$ROCQ_CHECKER|coqc -q -Q . JanusKey F.v for each F.v of verification/proofs/rocq (copies; every Print Assumptions must report a closed theorem; scripts/check-recheck.sh)|current|||$RECHECK_IMAGE
+rocq|$u/43945986467|e8deeaf7bc7b70500d57c282828512c8f8ba81f9|$ROCQ_CHECKER|coqc -q -Q . JanusKey F.v for each F.v of verification/proofs/rocq (copies; every Print Assumptions must report a closed theorem; scripts/check-recheck.sh)|superseded|ran on a bare ubuntu-24.04 runner, not in a digest-pinned image, so not isolated under PROOF-POLICY §8.2 (owner ruling 2026-11-16); replaced by run 44131609502 (hyperpolymath/januskey#184)
+rocq|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$ROCQ_CHECKER|coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)|superseded|Rollback.v only; the legs of hyperpolymath/januskey#180 and its stricter gate came later; replaced by run 43945986467|G-1 T-2 T-3 E-1m
+rocq|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$ROCQ_CHECKER|coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)|superseded|the first run on main (hyperpolymath/januskey#171); replaced by run 43213340167 at a later commit|G-1 T-2 T-3 E-1m
+lean|$u/44131609502|246b03d8888a08e9540611b3b7ddeb8052004f8e|$LEAN_CHECKER|lean -o F.olean F.lean for each F.lean of verification/proofs/lean (every #print axioms must report none; scripts/check-recheck.sh)|current|||$RECHECK_IMAGE
+lean|$u/43945986467|e8deeaf7bc7b70500d57c282828512c8f8ba81f9|$LEAN_CHECKER|lean -o F.olean F.lean for each F.lean of verification/proofs/lean (every #print axioms must report none; scripts/check-recheck.sh)|superseded|ran on a bare ubuntu-24.04 runner, not in a digest-pinned image, so not isolated under PROOF-POLICY §8.2 (owner ruling 2026-11-16); replaced by run 44131609502 (hyperpolymath/januskey#184)
+lean|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$LEAN_CHECKER|lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)|superseded|Rollback.lean only; the legs of hyperpolymath/januskey#180 and its stricter gate came later; replaced by run 43945986467|G-1 T-2 T-3 E-1m
+lean|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$LEAN_CHECKER|lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)|superseded|the first run on main (hyperpolymath/januskey#171); replaced by run 43213340167 at a later commit|G-1 T-2 T-3 E-1m
 ROWS
 }
 
@@ -148,8 +161,8 @@ emit_files() {   # indent, manifest text
   done <<<"$2"
 }
 emit_receipts() {  # prover claim
-  local prover="$1" claim="$2" p run commit checker inv state reason notfor m pin im
-  while IFS='|' read -r p run commit checker inv state reason notfor; do
+  local prover="$1" claim="$2" p run commit checker inv state reason notfor image m pin im
+  while IFS='|' read -r p run commit checker inv state reason notfor image; do
     [ "$p" = "$prover" ] || continue
     case " $notfor " in *" $claim "*) continue ;; esac
     printf '      (receipt :run "%s"\n' "$run"
@@ -157,6 +170,7 @@ emit_receipts() {  # prover claim
     printf '               :checker "%s"\n' "$checker"
     printf '               :invocation "%s"\n' "$inv"
     if [ "$state" = current ]; then
+      [ -z "$image" ] || printf '               :image "%s"\n' "$image"
       m="$(inputs "$prover" "$commit" | manifest . "$commit")"
       printf '               :inputs-sha256 "%s"\n' "$(digest_of "$m"$'\n')"
       printf '               :state current\n'
