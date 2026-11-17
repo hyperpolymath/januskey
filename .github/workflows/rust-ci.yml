@@ -1,32 +1,36 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
-# Rust CI — thin wrapper calling the shared estate reusable in
-# hyperpolymath/standards. Configure once, propagate everywhere.
-# See: docs/CI-REUSABLE-WORKFLOWS.adoc in standards.
+# Rust CI — thin caller of the estate's strict Rust gate in
+# hyperpolymath/proven-cicd-and-workflows (rust-ci.yml, a reusable workflow).
+# This repository cannot call reusables owned by metadatastician (every such
+# run ended startup_failure), so the previous call to
+# metadatastician/standards rust-ci-reusable.yml is replaced.
+#
+# Weekly only: pull_request and push runs come from ci.yml, whose `rust-ci`
+# job holds the same pin. The suite's gate scripts are selected by reading the
+# TOP-LEVEL workflow file's `uses:` line back (GITHUB_WORKFLOW_REF), which is
+# ci.yml under a ci.yml call, so a nested call through this file could not be
+# verified and ci.yml calls the suite directly. Keep the two pins identical.
+#
+# The weekly run still catches a new RustSec advisory against an unchanged
+# Cargo.lock. The old `enable_audit: true` (cargo audit) is replaced by the
+# suite's `deny` job (cargo-deny: advisories, bans, sources); the suite's
+# `enable_audit` input is a documented no-op.
+#
+# De-onboarded from actions.lock on purpose, as the suite's caller template
+# requires: an onboarded cross-repository reusable startup-fails with zero
+# jobs under sha_pinning_required. No `secrets:`: the reusable consumes none.
 name: Rust CI
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-  # Weekly, so a new RustSec advisory against an unchanged Cargo.lock is still
-  # caught (the scheduled cargo-audit.yml was folded into this workflow).
   schedule:
     - cron: '0 6 * * 1'
 
 permissions:
-  actions: read
   contents: read
 
 jobs:
   rust-ci:
-    uses: metadatastician/standards/.github/workflows/rust-ci-reusable.yml@a797d308c0517d4e2d21cc7f1cb08d41f82b1a12
     permissions:
-      actions: read
       contents: read
-      security-events: write
-    with:
-      # Replaces the retired cargo-audit.yml (standards CI regularisation spec:
-      # fold the audit into rust-ci through enable_audit).
-      enable_audit: true
+    uses: hyperpolymath/proven-cicd-and-workflows/.github/workflows/rust-ci.yml@9eb0bbf9bd80b7964ce5b9957e75821b3cd4a55b # cicd-suite main
