@@ -1,14 +1,18 @@
 ## Machine-Readable Artefacts
 
-The repository's canonical machine-readable metadata tree contains structured
-project metadata, including:
+A2ML is retired across the estate. The `.a2ml` files under `.machine_readable/`
+(`6a2/STATE.a2ml`, `6a2/META.a2ml`, `6a2/ECOSYSTEM.a2ml`, `6a2/AGENTIC.a2ml`,
+`6a2/NEUROSYM.a2ml`, `6a2/PLAYBOOK.a2ml` and others) are legacy and await
+migration to deeds: see hyperpolymath/januskey#187. Read them only as history.
+Never add a fact to one; you may delete a field that a deed already holds.
 
-- `.machine_readable/6a2/STATE.a2ml` - Current project state and progress
-- `.machine_readable/6a2/META.a2ml` - Architecture decisions and development practices
-- `.machine_readable/6a2/ECOSYSTEM.a2ml` - Position in the ecosystem and related projects
-- `.machine_readable/6a2/AGENTIC.a2ml` - AI agent interaction patterns
-- `.machine_readable/6a2/NEUROSYM.a2ml` - Neurosymbolic integration config
-- `.machine_readable/6a2/PLAYBOOK.a2ml` - Operational runbook
+Where the facts are now:
+
+- Proof grades, receipts and checkers: `verification/receipts/januskey_praxis.deed`,
+  generated and checked by `scripts/proof-receipt.sh` (PROOF-POLICY §8.5).
+- Proof obligations and their status:
+  `PROOF-NEEDS.adoc`; per-row grade records: `docs/theory/PROOF-GRADES.adoc`.
+- Readiness and test counts: `READINESS.adoc`, reconciled by `dashboard-check`.
 
 ---
 
@@ -22,6 +26,7 @@ project metadata, including:
 |---------------|----------|-------|
 | **AffineScript** | Primary application code | Affine-typed, compiles to typed-wasm or ESM |
 | **Bun** | JS runtime & package management (tier 1) | Default for all new work. Runs compiled ESM/JS directly — no bundler step. Uses an npm-compatible `package.json` plus `bun.lock` — both are expected, not anti-patterns. |
+| **Deno** | JS runtime (tier 2) | Permitted, not preferred (owner ruling 2026-10-14; order Bun > Deno > pnpm > npm). Reads the same `package.json`. |
 | **Rust** | Performance-critical, systems, WASM | Preferred for CLI tools |
 | **Gossamer** | Application shell | Estate-standard application shell |
 | **Dioxus** | Mobile apps (native UI) | Pure Rust, React-like |
@@ -40,10 +45,9 @@ project metadata, including:
 |--------|-------------|
 | TypeScript | AffineScript |
 | ReScript | AffineScript |
-| Deno | Bun |
 | Node.js | Bun |
-| npm | Bun |
-| pnpm/yarn | Bun |
+| npm | Bun (npm is tier 4: a last resort, permitted but never preferred; never track `package-lock.json`) |
+| yarn | Bun (pnpm is tier 3, permitted; yarn is not in the tier list) |
 | Go | Rust |
 | Python | Rust/AffineScript |
 | Java/Kotlin | Rust/Gossamer/Dioxus |
