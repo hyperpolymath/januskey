@@ -40,14 +40,16 @@ sibling_dir=_build/dependencies/resource-algebra
 
 # The pinned standard: the reader readProofReceipt (PROOF-POLICY §8.5.1), the
 # reference digest script and the §8.5.3 git checker, all at one commit, each
-# with its sha256.  They keep the standards layout under _build/standards,
+# with its sha256.  They keep the standards layout under _build/standards/<commit>,
 # because the checker finds the reader and the digest script by their paths.
 STANDARDS_COMMIT=ce28e7d9a505fc35a0de9273aa7750ba0d1804be
 READER_SHA256=9ded4520daf304555021afe9f58fd2184453c97d7d329c668022426fd3ede8ca
 DIGEST_SHA256=dfc6dde01a3a79df638eebe4cad0eae584d8f17280077e149174c0667e9508f4
 CHECKER_SHA256=f2375747238464535d1b4a61f658f07cb2f8504c69bfb1812311c79429a4e23e
 STANDARDS_RAW="https://raw.githubusercontent.com/metadatastician/standards/$STANDARDS_COMMIT"
-std_dir=_build/standards
+# Keyed by commit, so a re-pin fetches the new files instead of finding the
+# old ones cached and failing their checksum.
+std_dir="_build/standards/$STANDARDS_COMMIT"
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
