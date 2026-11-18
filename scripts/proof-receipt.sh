@@ -34,12 +34,12 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 export LC_ALL=C.UTF-8
 
 # ── The pinned standard ───────────────────────────────────────────────────────
-RECEIPT_STANDARDS_COMMIT=15ef29e4b3229f5d70f5a4d817ab4377568ed503
+RECEIPT_STANDARDS_COMMIT=146fb8f8ccdf5cf9e697b9f488486e1fd2822330
 RECEIPT_STD=_build/standards
 standards_raw="https://raw.githubusercontent.com/metadatastician/standards/$RECEIPT_STANDARDS_COMMIT"
 pinned_files=(
-  "scripts/proof-receipt.sh:d7d8977e57f6f8fab44d6258987e98eb26169f394e2f647b3d99c47ee87945c4"
-  "1-formats/deed/tools/deed_lint.js:8978546740ca2d6a1d90b769fe02159883cb18f1eb2c44b2eeb737bab341dcd2"
+  "scripts/proof-receipt.sh:b7e294e031fa3b17511746537f3dbde1d40f08f2188e7b5f8cd9f0265e5573d7"
+  "1-formats/deed/tools/deed_lint.js:de5b38d7752625ec665329e45b6d6bb244589b4e098dc2e63371088cd660678c"
   "scripts/proof-inputs-sha256.sh:dfc6dde01a3a79df638eebe4cad0eae584d8f17280077e149174c0667e9508f4"
   "scripts/check-proof-receipt.sh:f2375747238464535d1b4a61f658f07cb2f8504c69bfb1812311c79429a4e23e"
 )
