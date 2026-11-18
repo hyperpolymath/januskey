@@ -209,13 +209,18 @@ Earlier receipts, kept with their lineage (§8.4) here and in the receipt file:
   at the receipt's source commit
 | https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251], `23bc8c3`
 | `superseded`
-| Before the cone scan (#170) and before `SingleActiveLog.agda` (#171)
+| Before the cone scan (#170) and before `SingleActiveLog.agda` (#171), where
+  T-2 and T-3 are now stated: it checked their earlier statements in
+  `TransactionAtomicity.agda`, so the receipt lists it for G-1, T-1 and E-1m only
 | https://github.com/hyperpolymath/januskey/actions/runs/41687715055[41687715055], `fc188c4`
 | `superseded`
-| Canonical flags and three modules; replaced by run 42076969251 at a later commit
+| Canonical flags and three modules, before `SingleActiveLog.agda`: listed for
+  G-1, T-1 and E-1m only; replaced by run 42076969251 at a later commit
 | https://github.com/hyperpolymath/januskey/actions/runs/40867211509[40867211509], `4afb710`
 | `superseded`
-| Before `--cubical-compatible` and before `Epistemic.agda`; it never covered E-1m
+| Before `--cubical-compatible`, `Epistemic.agda` and `SingleActiveLog.agda`: it
+  never covered E-1m, nor T-2 and T-3 as now stated, so it is listed for G-1 and
+  T-1 only
 |===
 
 Those are the facts the grades rest on. The propositions type-check in Agda
@@ -419,7 +424,8 @@ leg counts.
 | `PROVEN`
 | `RECONCILED`
 | run 43945986467, job "Rocq and Lean recheck legs", at `e8deeaf`, in the
-  receipt (§The machine-readable receipt above)
+  receipt (§The machine-readable receipt above). That receipt is `superseded`,
+  so the leg does not count toward the grade until a new run is recorded
 
 | Lean
 | `re-proved`
@@ -766,7 +772,8 @@ PROOF-POLICY §1 and the ABI belongs in Idris2.
 * `AGDA-PENDING` is the correct correspondence state for a module committed but
   not yet checked. No row in this repository is in that state today: the five
   graded rows are `AGDA-VERIFIED` at the commit above, and each of their Rocq
-  and Lean legs is `re-proved` and `RECONCILED`. No leg is `unavailable`:
+  and Lean legs is `re-proved` and `RECONCILED` (a statement about the leg; the
+  receipts of those legs are `superseded`, §Leg records). No leg is `unavailable`:
   under §2 that route means a leg that cannot be built, and a hand re-proof was
   available for all ten.
 * Grade counts appear only as the census at the top of this page: a count per

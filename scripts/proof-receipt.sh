@@ -16,7 +16,10 @@
 #             checks, check that each current receipt still describes the
 #             tree, and run the pinned reader with its negative control
 #   --run-row PROVER --run URL --commit SHA --checker TEXT --reported TEXT
-#             print the ledger row of a run that just passed
+#             --axioms none [--image NAME@sha256:<64 hex>]
+#             print the ledger row of a run that just passed.  --axioms is
+#             what the run's own report listed ("none" when it listed
+#             none).  Without --image the row cannot count toward PWG-1
 #
 # What is typed and what is derived.  The claim list and the run ledger are
 # typed here, each ledger row copied from the CI log of its run.  Every
@@ -93,6 +96,10 @@ agda_said_cone='import cone 7 first-party modules and 8 supplied with the prover
 receipt_runs() {
   local u=https://github.com/hyperpolymath/januskey/actions/runs
   local e=e8deeaf7bc7b70500d57c282828512c8f8ba81f9
+  # The invocation of an earlier run is typed here, not taken from the hook,
+  # so a later change to a hook cannot re-describe a run that is past.
+  local agda_inv4="$agda_flags verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+  local rocq_inv4='coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)'
   local agda_inv3="$agda_flags verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
   local rocq_t1='coqc -q -Q . JanusKey Rollback.v (a copy of verification/proofs/rocq/Rollback.v; scripts/check-recheck.sh)'
   local lean_t1='lean -o Rollback.olean verification/proofs/lean/Rollback.lean (scripts/check-recheck.sh)'
@@ -100,12 +107,12 @@ receipt_runs() {
   local lean_said_t1='1 lean leg checks with no axioms (Rollback); the job refused its 2 fixtures (1 Rocq, 1 Lean) as expected; [check-recheck] OK'
   cat <<ROWS
 agda|$u/43945986467|$e|$agda_checker|$(receipt_invocation agda)|6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8|$agda_said_cone|current|||hyperpolymath/resource-algebra@cf9235c532712a783a404c359a1055f40134794a=adddbf38fe2ce754f50fc70f5743f381763fb6387e5f99ce8a7d0a38176df9c9|0c1f64c3c7f0a26cbc92595168858485a9883f6196d287497dcc805faf5c58eb
-agda|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$agda_checker|$(receipt_invocation agda)|6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8|$agda_said_cone|superseded|the run at hyperpolymath/januskey#179; replaced by the run at #180's merge, the receipt's source commit|
-agda|$u/42736066407|e16543866fa4fd31a94f3c7faa1fe0671b083a1b|$agda_checker|$(receipt_invocation agda)|6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8|$agda_said_cone|superseded|the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit|
-agda|$u/42076969251|23bc8c38160a25c37917bce69cf05d91899b07e5|$agda_checker|$agda_inv3|a56ccfa9187aa5a285210ef380af91eb1d857e9f6e32c1275b87498923092787|6 fixtures refused as expected; [check-agda] OK|superseded|before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171)|
-agda|$u/41687715055|fc188c44906faedfe91bfd414be3fda01ff4caf4|$agda_checker|$agda_inv3|a56ccfa9187aa5a285210ef380af91eb1d857e9f6e32c1275b87498923092787|6 fixtures refused as expected; [check-agda] OK|superseded|canonical flags and three modules; replaced by run 42076969251 at a later commit|
-agda|$u/40867211509|4afb710e86646658f667f10bd6274ee47416bfc7|$agda_checker|agda --safe --without-K (before --cubical-compatible joined the gate)|14b816f8950f28250ca82e4c77c7b2771dce30b405fa55c23ac7d0ad0ebd4591|4 fixtures refused as expected; [check-agda] OK|superseded|before --cubical-compatible and before Epistemic.agda; it never covered E-1m, so it is listed for the other claims only|
-rocq|$u/43945986467|$e|$rocq_checker|$(receipt_invocation rocq)|2f9a91ec283573822579d64feb5db2faf4d028e5597578c25b14b8ff865e5824|4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK|superseded|its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)|
+agda|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$agda_checker|$agda_inv4|6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8|$agda_said_cone|superseded|the run at hyperpolymath/januskey#179; replaced by the run at #180's merge, the receipt's source commit|
+agda|$u/42736066407|e16543866fa4fd31a94f3c7faa1fe0671b083a1b|$agda_checker|$agda_inv4|6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8|$agda_said_cone|superseded|the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit|
+agda|$u/42076969251|23bc8c38160a25c37917bce69cf05d91899b07e5|$agda_checker|$agda_inv3|a56ccfa9187aa5a285210ef380af91eb1d857e9f6e32c1275b87498923092787|6 fixtures refused as expected; [check-agda] OK|superseded|before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171), so it checked the earlier statements of T-2 and T-3 and is listed for G-1, T-1 and E-1m only|
+agda|$u/41687715055|fc188c44906faedfe91bfd414be3fda01ff4caf4|$agda_checker|$agda_inv3|a56ccfa9187aa5a285210ef380af91eb1d857e9f6e32c1275b87498923092787|6 fixtures refused as expected; [check-agda] OK|superseded|canonical flags and three modules, before SingleActiveLog.agda, so it is listed for G-1, T-1 and E-1m only; replaced by run 42076969251 at a later commit|
+agda|$u/40867211509|4afb710e86646658f667f10bd6274ee47416bfc7|$agda_checker|agda --safe --without-K (before --cubical-compatible joined the gate)|14b816f8950f28250ca82e4c77c7b2771dce30b405fa55c23ac7d0ad0ebd4591|4 fixtures refused as expected; [check-agda] OK|superseded|before --cubical-compatible, before Epistemic.agda and before SingleActiveLog.agda; it never covered E-1m, nor T-2 and T-3 as now stated, so it is listed for G-1 and T-1 only|
+rocq|$u/43945986467|$e|$rocq_checker|$rocq_inv4|2f9a91ec283573822579d64feb5db2faf4d028e5597578c25b14b8ff865e5824|4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK|superseded|its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)|
 rocq|$u/43213340167|b5034884dbe945139d03b38fe80cfdf1106a77e1|$rocq_checker|$rocq_t1|2e86900da60f3e8cde1198f69fc6f7b0b9d73c5fe0ab2ae42f7b66ef1b7fd50d|$rocq_said_t1|superseded|T-1's leg only, under the gate before hyperpolymath/januskey#180; replaced by the run at #180's merge|
 rocq|$u/42646851111|0834ce73717a1faafa23fc1df55d85d54ee1e2b7|$rocq_checker|$rocq_t1|2e86900da60f3e8cde1198f69fc6f7b0b9d73c5fe0ab2ae42f7b66ef1b7fd50d|$rocq_said_t1|superseded|the first run on main (hyperpolymath/januskey#171); replaced by the run at the receipt's source commit|
 lean|$u/43945986467|$e|$lean_checker|lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)|7146f3dce43d6160bb2d902d56984ac5fbccf8880b7336127b4cb7568da5db1f|4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK|superseded|ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)|
@@ -116,13 +123,18 @@ ROWS
 
 # ── Run scopes ────────────────────────────────────────────────────────────────
 # A superseded run that did not check every claim with its leg is listed
-# under the claims it checked only: the first Agda run predates
-# Epistemic.agda (E-1m), and the first Rocq and Lean runs re-proved T-1
-# alone (Rollback.v, Rollback.lean).
+# under the claims it checked only.  The three Agda runs before
+# hyperpolymath/januskey#171 predate SingleActiveLog.agda, where T-2 and T-3
+# are now stated and proved: they checked the earlier statements in
+# TransactionAtomicity.agda, not these claims.  The first of them also
+# predates Epistemic.agda (E-1m).  The first Rocq and Lean runs re-proved
+# T-1 alone (Rollback.v, Rollback.lean).
 receipt_run_scope() {
   local u=https://github.com/hyperpolymath/januskey/actions/runs
   cat <<ROWS
-agda|$u/40867211509|G-1 T-1 T-2 T-3
+agda|$u/42076969251|G-1 T-1 E-1m
+agda|$u/41687715055|G-1 T-1 E-1m
+agda|$u/40867211509|G-1 T-1
 rocq|$u/43213340167|T-1
 rocq|$u/42646851111|T-1
 lean|$u/43213340167|T-1
@@ -166,14 +178,15 @@ receipt_invocation() {
 #        check-agda.sh resolves the rest of the cone to the sibling or the
 #        prover), and scripts/fetch-siblings.sh, which holds the sibling's
 #        pin, so a repin changes this digest.  No libraries file is read.
-#  rocq: the .v files of verification/proofs/rocq.
+#  rocq: the .v files directly in verification/proofs/rocq (check-recheck.sh
+#        copies that level only, so the pattern is a glob that stops at "/").
 #  lean: the .lean files of verification/proofs/lean and its Lake package
 #        files (lakefile.toml, lean-toolchain), which the build reads.
 receipt_inputs() {
   case "$1" in
     agda) git ls-files -- 'verification/proofs/agda/*.agda'; printf '%s\n' scripts/fetch-siblings.sh ;;
-    rocq) git ls-files -- 'verification/proofs/rocq/*.v' ;;
-    lean) git ls-files -- 'verification/proofs/lean/*.lean' verification/proofs/lean/lakefile.toml verification/proofs/lean/lean-toolchain ;;
+    rocq) git ls-files -- ':(glob)verification/proofs/rocq/*.v' ;;
+    lean) git ls-files -- ':(glob)verification/proofs/lean/*.lean' verification/proofs/lean/lakefile.toml verification/proofs/lean/lean-toolchain ;;
     *) receipt_die "unknown prover: $1" ;;
   esac
 }
@@ -198,14 +211,18 @@ receipt_status_ids() {
 }
 # The claims whose Rocq and Lean legs docs/theory/PROOF-GRADES.adoc records as
 # RECONCILED: its one leg record serves every graded claim, so each graded
-# claim is listed when both leg rows of that record say RECONCILED.
+# claim is listed when a leg row of that record says RECONCILED, which is the
+# test the generator applies to the claim list.
 receipt_recorded_legs() {
   local rec
   rec="$(awk '/^==== Leg records \(PROOF-POLICY §8.5\)/{f=1} f&&/^\|===$/{n++; if(n==2) exit} f' docs/theory/PROOF-GRADES.adoc)"
-  if awk '/^\| Rocq$/{l="rocq"} /^\| Lean$/{l="lean"} l && /^\| `RECONCILED`$/{ok[l]=1} END{exit !(ok["rocq"] && ok["lean"])}' <<<"$rec"; then
+  if awk '/^\| Rocq$/{l="rocq"} /^\| Lean$/{l="lean"} l && /^\| `RECONCILED`$/{ok[l]=1} END{exit !(ok["rocq"] || ok["lean"])}' <<<"$rec"; then
     receipt_status_ids
   fi
 }
 
 . "$RECEIPT_STD/scripts/proof-receipt.sh"
+# With no argument, check: the shared generator would write, and a bare
+# run should never replace the receipt.
+if [ "$#" -eq 0 ]; then set -- --check; fi
 receipt_main "$@"

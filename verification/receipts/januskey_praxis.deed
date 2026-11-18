@@ -57,21 +57,21 @@
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
                :state superseded
-               :reason "before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171)")
+               :reason "before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171), so it checked the earlier statements of T-2 and T-3 and is listed for G-1, T-1 and E-1m only")
       ; the run reported: 6 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/41687715055"
                :commit "fc188c44906faedfe91bfd414be3fda01ff4caf4"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
                :state superseded
-               :reason "canonical flags and three modules; replaced by run 42076969251 at a later commit")
+               :reason "canonical flags and three modules, before SingleActiveLog.agda, so it is listed for G-1, T-1 and E-1m only; replaced by run 42076969251 at a later commit")
       ; the run reported: 4 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/40867211509"
                :commit "4afb710e86646658f667f10bd6274ee47416bfc7"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K (before --cubical-compatible joined the gate)"
                :state superseded
-               :reason "before --cubical-compatible and before Epistemic.agda; it never covered E-1m, so it is listed for the other claims only"))
+               :reason "before --cubical-compatible, before Epistemic.agda and before SingleActiveLog.agda; it never covered E-1m, nor T-2 and T-3 as now stated, so it is listed for G-1 and T-1 only"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
@@ -128,21 +128,21 @@
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
                :state superseded
-               :reason "before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171)")
+               :reason "before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171), so it checked the earlier statements of T-2 and T-3 and is listed for G-1, T-1 and E-1m only")
       ; the run reported: 6 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/41687715055"
                :commit "fc188c44906faedfe91bfd414be3fda01ff4caf4"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
                :state superseded
-               :reason "canonical flags and three modules; replaced by run 42076969251 at a later commit")
+               :reason "canonical flags and three modules, before SingleActiveLog.agda, so it is listed for G-1, T-1 and E-1m only; replaced by run 42076969251 at a later commit")
       ; the run reported: 4 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/40867211509"
                :commit "4afb710e86646658f667f10bd6274ee47416bfc7"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K (before --cubical-compatible joined the gate)"
                :state superseded
-               :reason "before --cubical-compatible and before Epistemic.agda; it never covered E-1m, so it is listed for the other claims only"))
+               :reason "before --cubical-compatible, before Epistemic.agda and before SingleActiveLog.agda; it never covered E-1m, nor T-2 and T-3 as now stated, so it is listed for G-1 and T-1 only"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
@@ -220,28 +220,7 @@
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
                :state superseded
-               :reason "the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit")
-      ; the run reported: 6 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/42076969251"
-               :commit "23bc8c38160a25c37917bce69cf05d91899b07e5"
-               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
-               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
-               :state superseded
-               :reason "before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171)")
-      ; the run reported: 6 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/41687715055"
-               :commit "fc188c44906faedfe91bfd414be3fda01ff4caf4"
-               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
-               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
-               :state superseded
-               :reason "canonical flags and three modules; replaced by run 42076969251 at a later commit")
-      ; the run reported: 4 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/40867211509"
-               :commit "4afb710e86646658f667f10bd6274ee47416bfc7"
-               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
-               :invocation "agda --safe --without-K (before --cubical-compatible joined the gate)"
-               :state superseded
-               :reason "before --cubical-compatible and before Epistemic.agda; it never covered E-1m, so it is listed for the other claims only"))
+               :reason "the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
@@ -291,28 +270,7 @@
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
                :state superseded
-               :reason "the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit")
-      ; the run reported: 6 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/42076969251"
-               :commit "23bc8c38160a25c37917bce69cf05d91899b07e5"
-               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
-               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
-               :state superseded
-               :reason "before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171)")
-      ; the run reported: 6 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/41687715055"
-               :commit "fc188c44906faedfe91bfd414be3fda01ff4caf4"
-               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
-               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
-               :state superseded
-               :reason "canonical flags and three modules; replaced by run 42076969251 at a later commit")
-      ; the run reported: 4 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/40867211509"
-               :commit "4afb710e86646658f667f10bd6274ee47416bfc7"
-               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
-               :invocation "agda --safe --without-K (before --cubical-compatible joined the gate)"
-               :state superseded
-               :reason "before --cubical-compatible and before Epistemic.agda; it never covered E-1m, so it is listed for the other claims only"))
+               :reason "the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
@@ -369,14 +327,14 @@
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
                :state superseded
-               :reason "before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171)")
+               :reason "before the import-cone postulate scan (hyperpolymath/januskey#170) and before SingleActiveLog.agda (hyperpolymath/januskey#171), so it checked the earlier statements of T-2 and T-3 and is listed for G-1, T-1 and E-1m only")
       ; the run reported: 6 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/41687715055"
                :commit "fc188c44906faedfe91bfd414be3fda01ff4caf4"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic}.agda (scripts/check-agda.sh)"
                :state superseded
-               :reason "canonical flags and three modules; replaced by run 42076969251 at a later commit"))
+               :reason "canonical flags and three modules, before SingleActiveLog.agda, so it is listed for G-1, T-1 and E-1m only; replaced by run 42076969251 at a later commit"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
