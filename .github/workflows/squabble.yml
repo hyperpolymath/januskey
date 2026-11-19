@@ -58,7 +58,7 @@ jobs:
           persist-credentials: false
 
       - name: squabble chains (fails only on a blocking finding)
-        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@d04055f4a26c4a0a5fa4f5149d40f0c42aeac274 # main 2026-10-12, squabble v0.1.0
+        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@b62a5ce01efdbf5c86977f35e3507759fcb4c22d # main 2026-10-12, squabble v0.1.0
         with:
           args: |
             chains
@@ -87,7 +87,7 @@ jobs:
       - name: squabble fight
         id: fight
         continue-on-error: true
-        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@d04055f4a26c4a0a5fa4f5149d40f0c42aeac274 # main 2026-10-12, squabble v0.1.0
+        uses: hyperpolymath/cicd-squabbler/.github/actions/squabble@b62a5ce01efdbf5c86977f35e3507759fcb4c22d # main 2026-10-12, squabble v0.1.0
         with:
           args: |
             fight
