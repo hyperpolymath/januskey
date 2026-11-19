@@ -9,10 +9,8 @@
 name: Dashboard Check
 
 on:
-  pull_request:
-    branches: ['**']
-  push:
-    branches: [main, master]
+  # Called from ci.yml, whose `CI/gate` aggregates it; no triggers of its own.
+  workflow_call:
 
 permissions:
   actions: read

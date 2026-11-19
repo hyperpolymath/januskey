@@ -6,9 +6,8 @@ name: Agda proofs
 # Checks verification/proofs/agda/Reversibility.agda under the kernel flags
 # and refuses the fixtures under tests/reject-agda. Local run: just test-agda.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  # Called from ci.yml, whose `CI/gate` aggregates it; no triggers of its own.
+  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -34,24 +33,30 @@ jobs:
   recheck:
     # PROOF-POLICY §2 recheck legs: the Rocq and Lean re-proofs of the Agda
     # theorems, with their expected-rejection fixtures. Local run: just test-recheck.
+    # The checkers run in a digest-pinned image, as the Agda job does, so the
+    # checker of every witness is pinned and isolated (§8.2, owner ruling
+    # 2026-11-16: a fresh runner with version pins alone is not enough for PWG-1).
     name: Rocq and Lean recheck legs, expected rejections
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # ubuntu:24.04, resolved 2026-11-16; re-pin deliberately, like the provers below.
+    container: ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8
     env:
       LEAN_VERSION: 4.35.0
       LEAN_SHA256: 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d
+      DEBIAN_FRONTEND: noninteractive
     steps:
       - name: Install the pinned provers
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y coq=8.18.0+dfsg-1build2 zstd
+          apt-get update
+          apt-get install --no-install-recommends -y ca-certificates curl git zstd coq=8.18.0+dfsg-1build2
           curl --proto '=https' --tlsv1.2 -sSfL -o lean.tar.zst \
             "https://github.com/leanprover/lean4/releases/download/v${LEAN_VERSION}/lean-${LEAN_VERSION}-linux.tar.zst"
           echo "${LEAN_SHA256}  lean.tar.zst" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/lean"
-          tar --zstd -xf lean.tar.zst -C "$RUNNER_TEMP/lean"
+          mkdir -p /opt/lean
+          tar --zstd -xf lean.tar.zst -C /opt/lean
           rm lean.tar.zst
-          echo "$RUNNER_TEMP/lean/lean-${LEAN_VERSION}-linux/bin" >> "$GITHUB_PATH"
+          echo "/opt/lean/lean-${LEAN_VERSION}-linux/bin" >> "$GITHUB_PATH"
       - name: Checkout
         uses: actions/checkout@v7.0.1
         with:

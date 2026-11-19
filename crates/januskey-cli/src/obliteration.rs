@@ -368,7 +368,7 @@ fn secure_overwrite(path: &Path) -> Result<usize> {
 
 /// Obliterate an arbitrary file on disk (not necessarily in the content
 /// store): hash its current content, securely overwrite it with
-/// [`OVERWRITE_PASSES`] passes, remove it, and return a proof of erasure.
+/// `OVERWRITE_PASSES` (three) passes, remove it, and return a proof of erasure.
 ///
 /// This touches only the working file. It is the fallback used by
 /// `jk obliterate <path>` when no `.januskey/` store exists; when one does,
