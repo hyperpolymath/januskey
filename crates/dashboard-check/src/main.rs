@@ -24,6 +24,7 @@
 // non-zero with a report otherwise. `--check` is the default and only mode.
 
 mod claims;
+mod ids;
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -317,6 +318,18 @@ fn check_claims(root: &Path, r: &mut Report) {
             return;
         }
     };
+    match ids::parse_status_table(&ledger.text) {
+        Ok(registry) => {
+            let (problems, unprefixed) = ids::check_ids(&registry, &claims);
+            r.problems.extend(problems);
+            r.observed.push(format!(
+                "{} row IDs registered, each once, each with a ledger row; \
+                 {unprefixed} ledger rows carry no ID",
+                registry.len()
+            ));
+        }
+        Err(errors) => r.problems.extend(errors),
+    }
     for c in &claims {
         match claims::check_claim(root, c, &claims::run_command) {
             Ok(()) => r
