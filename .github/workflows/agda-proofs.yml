@@ -17,11 +17,28 @@ jobs:
     timeout-minutes: 15
     # trixie-slim, resolved 2026-10-13; re-pin deliberately, like the prover below.
     container: debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+    env:
+      # PROOF-POLICY §6 deviation D-1 (PROOF-NEEDS.adoc, "Toolchain deviations"):
+      # the prover comes from Debian's archive, not a Guix manifest or the repo's
+      # own container. These are the archive's SHA-256 for the two packages that
+      # hold it: the binary, and the library that ships Agda.Primitive.
+      AGDA_VERSION: 2.6.4.3-1+b2
+      AGDA_BIN_SHA256: 31052ce0b53e9cf061c9386a0416525318a66bbd1bfaa4bef93f0f43dec8b748
+      LIBGHC_AGDA_DEV_SHA256: 58d8551bec42796d2aa9f6baaa253eb23095e118869fe235be6d4aa2e130ce60
     steps:
-      - name: Install the pinned prover
+      - name: Install the pinned prover (digest-checked, deviation D-1)
         run: |
           apt-get update
-          apt-get install --no-install-recommends -y ca-certificates git agda-bin=2.6.4.3-1+b2
+          apt-get install --no-install-recommends -y ca-certificates git
+          cd "$RUNNER_TEMP"
+          apt-get download "agda-bin=${AGDA_VERSION}" "libghc-agda-dev=${AGDA_VERSION}"
+          printf '%s  %s\n' \
+            "${AGDA_BIN_SHA256}" "agda-bin_${AGDA_VERSION}_amd64.deb" \
+            "${LIBGHC_AGDA_DEV_SHA256}" "libghc-agda-dev_${AGDA_VERSION}_amd64.deb" \
+            | sha256sum -c -
+          apt-get install --no-install-recommends -y \
+            "./agda-bin_${AGDA_VERSION}_amd64.deb" "./libghc-agda-dev_${AGDA_VERSION}_amd64.deb"
+          rm ./*.deb
       - name: Checkout
         uses: actions/checkout@v7.0.1
         with:
@@ -42,14 +59,33 @@ jobs:
     # ubuntu:24.04, resolved 2026-11-16; re-pin deliberately, like the provers below.
     container: ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8
     env:
+      # PROOF-POLICY §6 deviations D-2 (Rocq, from Ubuntu's archive) and D-3
+      # (Lean, from the upstream release tarball); PROOF-NEEDS.adoc, "Toolchain
+      # deviations". The Rocq digests are the archive's SHA-256 for the driver,
+      # the kernel library and the library that ships Init.
+      COQ_VERSION: 8.18.0+dfsg-1build2
+      COQ_SHA256: 22897a17a75d8930276f5eedd5cd29ac940f1ab4d4661b6a49ccc63577e54d3b
+      LIBCOQ_CORE_OCAML_SHA256: 027c8fb39db20de4910f8a75e0b9a32c0fbc27c6f532375ed7604757f71c12a9
+      LIBCOQ_STDLIB_SHA256: af139bb3af8c71b5e991944a61eef5bba28038a715f71146fa046241bb614b23
       LEAN_VERSION: 4.35.0
       LEAN_SHA256: 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d
       DEBIAN_FRONTEND: noninteractive
     steps:
-      - name: Install the pinned provers
+      - name: Install the pinned provers (digest-checked, deviations D-2 and D-3)
         run: |
           apt-get update
-          apt-get install --no-install-recommends -y ca-certificates curl git zstd coq=8.18.0+dfsg-1build2
+          apt-get install --no-install-recommends -y ca-certificates curl git zstd
+          cd "$RUNNER_TEMP"
+          apt-get download "coq=${COQ_VERSION}" "libcoq-core-ocaml=${COQ_VERSION}" \
+            "libcoq-stdlib=${COQ_VERSION}"
+          printf '%s  %s\n' \
+            "${COQ_SHA256}" "coq_${COQ_VERSION}_amd64.deb" \
+            "${LIBCOQ_CORE_OCAML_SHA256}" "libcoq-core-ocaml_${COQ_VERSION}_amd64.deb" \
+            "${LIBCOQ_STDLIB_SHA256}" "libcoq-stdlib_${COQ_VERSION}_amd64.deb" \
+            | sha256sum -c -
+          apt-get install --no-install-recommends -y "./coq_${COQ_VERSION}_amd64.deb" \
+            "./libcoq-core-ocaml_${COQ_VERSION}_amd64.deb" "./libcoq-stdlib_${COQ_VERSION}_amd64.deb"
+          rm ./*.deb
           curl --proto '=https' --tlsv1.2 -sSfL -o lean.tar.zst \
             "https://github.com/leanprover/lean4/releases/download/v${LEAN_VERSION}/lean-${LEAN_VERSION}-linux.tar.zst"
           echo "${LEAN_SHA256}  lean.tar.zst" | sha256sum -c -
@@ -65,6 +101,7 @@ jobs:
         run: |
           test "$(coqc --version | head -1)" = 'The Coq Proof Assistant, version 8.18.0'
           lean --version | grep -q "^Lean (version ${LEAN_VERSION}, "
+          lake --version | grep -qF "(Lean version ${LEAN_VERSION})"
       - name: Recheck legs, no axioms, expected rejections
         run: bash scripts/check-recheck.sh
   receipt:

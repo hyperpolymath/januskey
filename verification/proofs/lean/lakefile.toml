@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell
+#
+# The Lean recheck legs as a Lake package: scripts/check-recheck.sh runs
+# `lake build` on a copy of this directory (PROOF-POLICY §8.2 names `lean`
+# under `lake` as a pinned kernel run). No dependencies, no Mathlib.
+name = "januskeyLegs"
+defaultTargets = ["JanuskeyLegs"]
+
+[[lean_lib]]
+name = "JanuskeyLegs"
+roots = ["Epistemic", "Reversibility", "Rollback", "SingleActiveLog"]
