@@ -11,7 +11,7 @@
   :canonical-name "januskey-proof-receipt"
   :profile proof-receipt
   :repository "hyperpolymath/januskey"
-  :source-commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+  :source-commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
   (trusted-base
     (primitive :prover agda :module "Agda.Primitive" :name "Level" :binding "BUILTIN LEVEL")
     (primitive :prover agda :module "Agda.Primitive" :name "lzero" :binding "BUILTIN LEVELZERO")
@@ -20,10 +20,11 @@
   (claim :id "G-1" :pwg PWG-3 :foundation-diverse #f
     (leg :prover agda :route source :token proven :state AGDA-VERIFIED
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
-               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :image "debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
                :inputs-sha256 "6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8"
                :state current
                (inputs-manifest
@@ -37,6 +38,13 @@
                  (file :path "src/ResourceAlgebra/Instances/Loss.agda" :sha256 "79863d1124d8fcb61a70f6a7710ec1b9ce44568b2f901d0efb875d24c2460563")
                  (file :path "src/ResourceAlgebra/Prelude.agda" :sha256 "9297839256b426b49a1059f58ac284e2e75304d1c58b0d619cabd9eb2198d8a8"))
                (axioms))
+      ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
+               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
+               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :state superseded
+               :reason "replaced by run 44131609502 at 246b03d, the first run of the Agda jobs recorded with its digest-pinned image (the Agda inputs are the same at both commits)")
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43213340167"
                :commit "b5034884dbe945139d03b38fe80cfdf1106a77e1"
@@ -73,6 +81,13 @@
                :state superseded
                :reason "before --cubical-compatible, before Epistemic.agda and before SingleActiveLog.agda; it never covered E-1m, nor T-2 and T-3 as now stated, so it is listed for G-1 and T-1 only"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); every Print Assumptions closed; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
+               :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran in ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8 (recorded on main by hyperpolymath/januskey#191 as current) but at 246b03d, before the change that moves the Lean legs under lake; that change alters scripts/check-recheck.sh, the checker both legs run through, and a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules). To be replaced by the first run on main after that change")
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
@@ -81,20 +96,28 @@
                :state superseded
                :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); every #print axioms none; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
+               :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. It did run in a digest-pinned image (ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8), but hyperpolymath/januskey#191 graded PWG-1 from it before the legs moved under lake; the owner ruled by selector on 2026-11-21 that the merged tree stays PWG-3. To be replaced by the first run of the legs under lake")
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")))
+               :reason "ran lean directly, not under lake (owner ruling 2026-11-17), and on a runner outside a digest-pinned image (owner ruling 2026-11-16, hyperpolymath/januskey#184); replaced in the ledger by run 44131609502, itself superseded")))
   (claim :id "T-1" :pwg PWG-3 :foundation-diverse #f
     (leg :prover agda :route source :token proven :state AGDA-VERIFIED
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
-               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :image "debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
                :inputs-sha256 "6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8"
                :state current
                (inputs-manifest
@@ -108,6 +131,13 @@
                  (file :path "src/ResourceAlgebra/Instances/Loss.agda" :sha256 "79863d1124d8fcb61a70f6a7710ec1b9ce44568b2f901d0efb875d24c2460563")
                  (file :path "src/ResourceAlgebra/Prelude.agda" :sha256 "9297839256b426b49a1059f58ac284e2e75304d1c58b0d619cabd9eb2198d8a8"))
                (axioms))
+      ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
+               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
+               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :state superseded
+               :reason "replaced by run 44131609502 at 246b03d, the first run of the Agda jobs recorded with its digest-pinned image (the Agda inputs are the same at both commits)")
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43213340167"
                :commit "b5034884dbe945139d03b38fe80cfdf1106a77e1"
@@ -144,6 +174,13 @@
                :state superseded
                :reason "before --cubical-compatible, before Epistemic.agda and before SingleActiveLog.agda; it never covered E-1m, nor T-2 and T-3 as now stated, so it is listed for G-1 and T-1 only"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); every Print Assumptions closed; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
+               :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran in ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8 (recorded on main by hyperpolymath/januskey#191 as current) but at 246b03d, before the change that moves the Lean legs under lake; that change alters scripts/check-recheck.sh, the checker both legs run through, and a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules). To be replaced by the first run on main after that change")
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
@@ -166,13 +203,20 @@
                :state superseded
                :reason "the first run on main (hyperpolymath/januskey#171); replaced by the run at the receipt's source commit"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); every #print axioms none; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
+               :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. It did run in a digest-pinned image (ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8), but hyperpolymath/januskey#191 graded PWG-1 from it before the legs moved under lake; the owner ruled by selector on 2026-11-21 that the merged tree stays PWG-3. To be replaced by the first run of the legs under lake")
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")
+               :reason "ran lean directly, not under lake (owner ruling 2026-11-17), and on a runner outside a digest-pinned image (owner ruling 2026-11-16, hyperpolymath/januskey#184); replaced in the ledger by run 44131609502, itself superseded")
       ; the run reported: 1 lean leg checks with no axioms (Rollback); the job refused its 2 fixtures (1 Rocq, 1 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43213340167"
                :commit "b5034884dbe945139d03b38fe80cfdf1106a77e1"
@@ -190,10 +234,11 @@
   (claim :id "T-2" :pwg PWG-3 :foundation-diverse #f
     (leg :prover agda :route source :token proven :state AGDA-VERIFIED
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
-               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :image "debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
                :inputs-sha256 "6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8"
                :state current
                (inputs-manifest
@@ -207,6 +252,13 @@
                  (file :path "src/ResourceAlgebra/Instances/Loss.agda" :sha256 "79863d1124d8fcb61a70f6a7710ec1b9ce44568b2f901d0efb875d24c2460563")
                  (file :path "src/ResourceAlgebra/Prelude.agda" :sha256 "9297839256b426b49a1059f58ac284e2e75304d1c58b0d619cabd9eb2198d8a8"))
                (axioms))
+      ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
+               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
+               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :state superseded
+               :reason "replaced by run 44131609502 at 246b03d, the first run of the Agda jobs recorded with its digest-pinned image (the Agda inputs are the same at both commits)")
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43213340167"
                :commit "b5034884dbe945139d03b38fe80cfdf1106a77e1"
@@ -222,6 +274,13 @@
                :state superseded
                :reason "the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); every Print Assumptions closed; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
+               :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran in ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8 (recorded on main by hyperpolymath/januskey#191 as current) but at 246b03d, before the change that moves the Lean legs under lake; that change alters scripts/check-recheck.sh, the checker both legs run through, and a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules). To be replaced by the first run on main after that change")
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
@@ -230,20 +289,28 @@
                :state superseded
                :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); every #print axioms none; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
+               :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. It did run in a digest-pinned image (ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8), but hyperpolymath/januskey#191 graded PWG-1 from it before the legs moved under lake; the owner ruled by selector on 2026-11-21 that the merged tree stays PWG-3. To be replaced by the first run of the legs under lake")
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")))
+               :reason "ran lean directly, not under lake (owner ruling 2026-11-17), and on a runner outside a digest-pinned image (owner ruling 2026-11-16, hyperpolymath/januskey#184); replaced in the ledger by run 44131609502, itself superseded")))
   (claim :id "T-3" :pwg PWG-3 :foundation-diverse #f
     (leg :prover agda :route source :token proven :state AGDA-VERIFIED
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
-               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :image "debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
                :inputs-sha256 "6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8"
                :state current
                (inputs-manifest
@@ -257,6 +324,13 @@
                  (file :path "src/ResourceAlgebra/Instances/Loss.agda" :sha256 "79863d1124d8fcb61a70f6a7710ec1b9ce44568b2f901d0efb875d24c2460563")
                  (file :path "src/ResourceAlgebra/Prelude.agda" :sha256 "9297839256b426b49a1059f58ac284e2e75304d1c58b0d619cabd9eb2198d8a8"))
                (axioms))
+      ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
+               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
+               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :state superseded
+               :reason "replaced by run 44131609502 at 246b03d, the first run of the Agda jobs recorded with its digest-pinned image (the Agda inputs are the same at both commits)")
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43213340167"
                :commit "b5034884dbe945139d03b38fe80cfdf1106a77e1"
@@ -272,6 +346,13 @@
                :state superseded
                :reason "the first green run on main of the gate as changed by hyperpolymath/januskey#174; replaced by the run at the receipt's source commit"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); every Print Assumptions closed; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
+               :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran in ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8 (recorded on main by hyperpolymath/januskey#191 as current) but at 246b03d, before the change that moves the Lean legs under lake; that change alters scripts/check-recheck.sh, the checker both legs run through, and a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules). To be replaced by the first run on main after that change")
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
@@ -280,20 +361,28 @@
                :state superseded
                :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); every #print axioms none; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
+               :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. It did run in a digest-pinned image (ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8), but hyperpolymath/januskey#191 graded PWG-1 from it before the legs moved under lake; the owner ruled by selector on 2026-11-21 that the merged tree stays PWG-3. To be replaced by the first run of the legs under lake")
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")))
+               :reason "ran lean directly, not under lake (owner ruling 2026-11-17), and on a runner outside a digest-pinned image (owner ruling 2026-11-16, hyperpolymath/januskey#184); replaced in the ledger by run 44131609502, itself superseded")))
   (claim :id "E-1m" :pwg PWG-3 :foundation-diverse #f
     (leg :prover agda :route source :token proven :state AGDA-VERIFIED
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
-      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
-               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
                :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
                :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :image "debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
                :inputs-sha256 "6e17ce4ad8264cd09de228eaa06e212caeb4d090436a4d9373078ee7978800d8"
                :state current
                (inputs-manifest
@@ -307,6 +396,13 @@
                  (file :path "src/ResourceAlgebra/Instances/Loss.agda" :sha256 "79863d1124d8fcb61a70f6a7710ec1b9ce44568b2f901d0efb875d24c2460563")
                  (file :path "src/ResourceAlgebra/Prelude.agda" :sha256 "9297839256b426b49a1059f58ac284e2e75304d1c58b0d619cabd9eb2198d8a8"))
                (axioms))
+      ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
+               :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
+               :checker "Agda version 2.6.4.3 (Debian trixie agda-bin=2.6.4.3-1+b2, container debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f)"
+               :invocation "agda --safe --without-K --cubical-compatible --no-libraries --ignore-interfaces --double-check -i verification/proofs/agda -i _build/dependencies/resource-algebra/src verification/proofs/agda/{Reversibility,TransactionAtomicity,Epistemic,SingleActiveLog}.agda (scripts/check-agda.sh)"
+               :state superseded
+               :reason "replaced by run 44131609502 at 246b03d, the first run of the Agda jobs recorded with its digest-pinned image (the Agda inputs are the same at both commits)")
       ; the run reported: import cone 7 first-party modules and 8 supplied with the prover; postulate scan 7 files, 0 postulates; 7 fixtures refused as expected; [check-agda] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43213340167"
                :commit "b5034884dbe945139d03b38fe80cfdf1106a77e1"
@@ -336,6 +432,13 @@
                :state superseded
                :reason "canonical flags and three modules, before SingleActiveLog.agda, so it is listed for G-1, T-1 and E-1m only; replaced by run 42076969251 at a later commit"))
     (leg :prover rocq :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); every Print Assumptions closed; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "The Coq Proof Assistant, version 8.18.0 (Ubuntu 24.04 coq=8.18.0+dfsg-1build2)"
+               :invocation "coqc -q -Q . JanusKey <leg>.v for each of Epistemic, Reversibility, Rollback, SingleActiveLog (copies of verification/proofs/rocq/*.v; scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran in ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8 (recorded on main by hyperpolymath/januskey#191 as current) but at 246b03d, before the change that moves the Lean legs under lake; that change alters scripts/check-recheck.sh, the checker both legs run through, and a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules). To be replaced by the first run on main after that change")
       ; the run reported: 4 rocq legs check with no assumptions (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
@@ -344,11 +447,18 @@
                :state superseded
                :reason "its checker, scripts/check-recheck.sh, is changed by the change that moves the Lean legs under lake; a changed checker re-earns the receipt (docs/theory/PROOF-GRADES.adoc, reporting rules), although the Rocq steps of the script are byte-identical. To be replaced by the first run on main after that change. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)"))
     (leg :prover lean :route re-proved :token proven :state RECONCILED
+      ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); every #print axioms none; [check-recheck] OK
+      (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/44131609502"
+               :commit "246b03d8888a08e9540611b3b7ddeb8052004f8e"
+               :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
+               :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
+               :state superseded
+               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. It did run in a digest-pinned image (ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8), but hyperpolymath/januskey#191 graded PWG-1 from it before the legs moved under lake; the owner ruled by selector on 2026-11-21 that the merged tree stays PWG-3. To be replaced by the first run of the legs under lake")
       ; the run reported: 4 lean legs check with no axioms (Epistemic, Reversibility, Rollback, SingleActiveLog); the job refused its 8 fixtures (4 Rocq, 4 Lean) as expected; [check-recheck] OK
       (receipt :run "https://github.com/hyperpolymath/januskey/actions/runs/43945986467"
                :commit "e8deeaf7bc7b70500d57c282828512c8f8ba81f9"
                :checker "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release) (release tarball, sha256 7289597a44543246c9227b8cae501767e095ce17f6d448b95fc4a8dc97268f6d)"
                :invocation "lean -o <leg>.olean verification/proofs/lean/<leg>.lean for each of Epistemic, Reversibility, Rollback, SingleActiveLog (scripts/check-recheck.sh)"
                :state superseded
-               :reason "ran lean directly, not under lake; PROOF-POLICY §8.2 names lean under lake, and the owner ruled on 2026-11-17 that a direct run does not qualify. To be replaced by the first run of the legs under lake. It also ran on a runner outside a digest-pinned image, which the owner ruled on 2026-11-16 is not enough for PWG-1 (hyperpolymath/januskey#184)")))
+               :reason "ran lean directly, not under lake (owner ruling 2026-11-17), and on a runner outside a digest-pinned image (owner ruling 2026-11-16, hyperpolymath/januskey#184); replaced in the ledger by run 44131609502, itself superseded")))
 )

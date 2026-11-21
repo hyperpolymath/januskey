@@ -137,8 +137,9 @@ inputs must record a new run, or mark the current one `superseded` or
 `regressed`, which drops the grade until a new run is recorded (§8.4). This
 page is the human reading of that file.
 
-The receipt describes commit `e8deeaf7bc7b70500d57c282828512c8f8ba81f9` on `main`,
-the merge of hyperpolymath/januskey#180, which added the Rocq and Lean legs of
+The receipt describes commit `246b03d8888a08e9540611b3b7ddeb8052004f8e` on `main`, where run 44131609502
+earned the current Agda receipt (the Agda inputs are the same as at `e8deeaf`, the merge of
+hyperpolymath/januskey#180, which added the Rocq and Lean legs of
 G-1, T-2, T-3 and E-1m and changed their checker, `scripts/check-recheck.sh`.
 Before it, the gate changed in #170 (the import-cone postulate scan) and #174 (a
 token may start after a skipped literal), and #171 changed the modules' bytes and
@@ -151,12 +152,12 @@ the current one is the run on `main` after all of them.
 | Field | Value
 
 | Workflow, run | `agda-proofs.yml`, run
-  https://github.com/hyperpolymath/januskey/actions/runs/43945986467[43945986467],
+  https://github.com/hyperpolymath/januskey/actions/runs/44131609502[44131609502],
   branch `main`, conclusion **success**: job "Reversibility as a grade (Loss
   instance), expected rejections" (Agda), job "Rocq and Lean recheck legs,
   expected rejections" (all ten legs and eight twins, §The recheck legs below)
   and job "Proof receipt, derived grades, git checks"
-| Commit | `e8deeaf7bc7b70500d57c282828512c8f8ba81f9` (started 2026-11-16T20:04:43Z)
+| Commit | `246b03d8888a08e9540611b3b7ddeb8052004f8e`
 | Prover | `agda-bin=2.6.4.3-1+b2` on Debian trixie-slim
   (`@sha256:a29215f6…`), asserted by a passing step:
   `test "$(agda --version)" = 'Agda version 2.6.4.3'`
@@ -205,8 +206,8 @@ Earlier receipts, kept with their lineage (§8.4) here and in the receipt file:
   run at #180's merge, the receipt's source commit
 | https://github.com/hyperpolymath/januskey/actions/runs/42736066407[42736066407], `e165438`
 | `superseded`
-| The first green run on `main` of the gate as #174 left it; replaced by the run
-  at the receipt's source commit
+| The first green run on `main` of the gate as #174 left it; replaced by run
+  43213340167 at a later commit
 | https://github.com/hyperpolymath/januskey/actions/runs/42076969251[42076969251], `23bc8c3`
 | `superseded`
 | Before the cone scan (#170) and before `SingleActiveLog.agda` (#171), where
@@ -242,7 +243,7 @@ current Rocq or Lean receipt neither leg counts, so the reader derives `PWG-3`
 So the first run on `main` after that change that checks Agda, Rocq and Lean
 together will be recorded as the receipt's new source commit, and the reader
 will derive `PWG-1` again. Recording only the Rocq and Lean legs of a later run
-would leave Agda receipted at `e8deeaf`, and the reader would not derive `PWG-1`. No witness in
+would leave Agda receipted at `246b03d`, and the reader would not derive `PWG-1`. No witness in
 another foundation exists, so
 `foundation_diverse` is false throughout.
 
@@ -272,7 +273,10 @@ builds with `lake build`.
 So the Rocq and Lean rows of the run at `e8deeaf` are both `superseded` in the
 receipt: the run was outside a pinned image, the Lean legs ran directly, and
 the change that moved them under `lake` edited the script both legs run
-through. The grade is `PWG-3` until one run on `main` of all three witnesses,
+through. The rows of run 44131609502 at `246b03d` (recorded by #191, in pinned
+images) are `superseded` for the same last two reasons: its Lean legs ran directly
+and it predates the changed checker. #191 graded `PWG-1` from that run; the owner
+ruled by selector on 2026-11-21 that the merged tree stays `PWG-3`. The grade is `PWG-3` until one run on `main` of all three witnesses,
 with the Rocq and Lean legs in the pinned
 image and under `lake`, is recorded.
 
@@ -403,8 +407,8 @@ repeated the counts, and the two copies drifted apart.
 ==== Leg records (PROOF-POLICY §8.5)
 
 Every theory row now has both recheck legs, re-proved by hand, so one record
-serves all five. `pwg: 3` for each, derived by the reader. Run 43945986467 at
-`e8deeaf` checked all three witnesses of every row, but its Rocq and Lean
+serves all five. `pwg: 3` for each, derived by the reader. Run 44131609502 at
+`246b03d` (in digest-pinned images) and run 43945986467 at `e8deeaf` checked all three witnesses of every row, but their Rocq and Lean
 receipts are `superseded` (§What the grade rests on above), so only the Agda
 leg counts.
 `foundation_diverse: false` throughout.
@@ -423,7 +427,7 @@ leg counts.
 | `re-proved`
 | `PROVEN`
 | `RECONCILED`
-| run 43945986467, job "Rocq and Lean recheck legs", at `e8deeaf`, in the
+| runs 44131609502 at `246b03d` and 43945986467 at `e8deeaf`, job "Rocq and Lean recheck legs", in the
   receipt (§The machine-readable receipt above). That receipt is `superseded`,
   so the leg does not count toward the grade until a new run is recorded
 
